@@ -57,7 +57,10 @@ Skills, MCP servers and projects for AI agents — one repository, one source of
 - 项目的旧版本用 tag 与 Releases 固定，仓库内不建物理“历史”目录。
 - 提交前跑一次全工作树密钥扫描，细则见 [06-维护与验收](docs/06-维护与验收.md)。
 
-## 许可证
+## 许可证与私有性
 
 本仓库暂无根许可证（默认保留所有权利）。`skills/` 下的第三方内容各自保留原许可证，
 见 [05-许可证与来源](docs/05-许可证与来源.md)。如需开源，先补根 `LICENSE` 并逐项确认。
+
+**项目源码包含真实收件邮箱**（`projects/zcode-persistence/src/error_watch.py`），
+本仓库必须保持私有；公开或分享前先把邮箱改为环境变量注入，并清理文档中的地址。

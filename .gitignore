@@ -1,9 +1,10 @@
-# 密钥、真实配置（仅仓库根与 .zcode 目录）
+# 密钥、真实配置（任意层级）
 .env
 .env.*
 !.env.example
-/config.json
+config.json
 .zcode/
+install-state.json
 *.token
 .token-cache.json
 secrets/

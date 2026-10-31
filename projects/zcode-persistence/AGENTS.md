@@ -81,7 +81,7 @@
 3. 跑 `文档/06-AI维护指南` 第 4 节的心跳配方（四条断言）
 4. `python tools/install.py --with-proxy --provider-id new-provider`
 5. 重启代理（改的是 `retry_proxy.py` 才需要）：**不要手写 taskkill**——用
-   `<安装目录>/restart_proxy_idle.py`（源码项目里在 `运维/` 下，安装器会复制到安装目录），它只在没有在飞请求时动手，
+   `<安装目录>/restart_proxy_idle.py`（源码在 `tools/restart_proxy_idle.py`，安装器会复制到安装目录），它只在没有在飞请求时动手，
    且确认旧进程消失或 8787 端口释放（以端口为准）才拉起新进程（Windows 的 SO_REUSEADDR 允许两个监听并存，
    健康检查会由旧进程应答，看起来成功其实是双份）。等不到静默窗口才加 `--force`：
    只跳过等待，上面的检查一条不少，代价是在飞请求被掐断一次。
