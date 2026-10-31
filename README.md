@@ -3,8 +3,8 @@
 Skills, MCP servers and projects for AI agents — one repository, one source of truth.
 
 > This README is an overview and index only. Usage details, design rationale and maintenance
-> rules live in the [`docs/`](docs/) pages. Project-specific documentation stays inside each
-> project folder and keeps its original language.
+> rules live in the [`docs/`](docs/) pages. Project-specific documentation lives inside each
+> project's `docs/` folder.
 
 ## What's inside
 
@@ -27,7 +27,7 @@ Skills, MCP servers and projects for AI agents — one repository, one source of
 
 | Project | Description | Version | Docs | Release |
 |---|---|---|---|---|
-| [zcode-persistence](projects/zcode-persistence/) | ZCode retry toolkit: hook suggestions, local retry proxy, optional error email reports | V0.2 | [Docs](projects/zcode-persistence/) (Chinese) | [Release](https://github.com/BFTwarrior/AI-Agent-DJY/releases/tag/proj-zcode-persistence-v0.2) |
+| [zcode-persistence](projects/zcode-persistence/) | ZCode retry toolkit: hook suggestions, local retry proxy, optional error email reports | V0.2 | [Docs](projects/zcode-persistence/docs/00-overview.md) (English) | [Release](https://github.com/BFTwarrior/AI-Agent-DJY/releases/tag/proj-zcode-persistence-v0.2) |
 
 ## How to use
 
