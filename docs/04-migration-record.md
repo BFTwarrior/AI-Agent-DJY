@@ -38,8 +38,10 @@ not copied into the repository.
 | `逻辑图/` | 1 | `架构.md` |
 | Root | 4 | `README.md`, `CHANGELOG.md`, `VERSION`, `AGENTS.md` |
 
-24 files, 346,164 bytes. Every file in `src/` and `tools/` has the same sha256 as the
-corresponding file in `发行\Zcode-Persistence-V0.2-正式版`.
+24 files. Size depends on line endings: 346,164 bytes in the original CRLF working copy at
+import; 330,150 bytes in git blobs after LF normalization (333,781 bytes in the current
+checkout). Every file in `src/` and `tools/` has the same sha256 as the corresponding file
+in `发行\Zcode-Persistence-V0.2-正式版`.
 
 ### Path and link adjustments
 
