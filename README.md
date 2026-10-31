@@ -24,9 +24,9 @@ Skills, MCP servers and projects for AI agents — one repository, one source of
 
 ### Projects
 
-| 项目 | 说明 | 当前版本 | 文档 |
-|---|---|---|---|
-| [zcode-persistence](projects/zcode-persistence/) | ZCode 失败重试工具包：钩子建议、本地重试代理、可选的报错邮件 | V0.2 | [文档](projects/zcode-persistence/文档/00-总览.md) |
+| 项目 | 说明 | 当前版本 | 文档 | 发行版 |
+|---|---|---|---|---|
+| [zcode-persistence](projects/zcode-persistence/) | ZCode 失败重试工具包：钩子建议、本地重试代理、可选的报错邮件 | V0.2 | [文档](projects/zcode-persistence/文档/00-总览.md) | [Release](https://github.com/BFTwarrior/AI-Agent-DJY/releases/tag/proj-zcode-persistence-v0.2) |
 
 ## 怎么用
 
