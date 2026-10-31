@@ -1,0 +1,43 @@
+# 密钥、真实配置（仅仓库根与 .zcode 目录）
+.env
+.env.*
+!.env.example
+/config.json
+.zcode/
+*.token
+.token-cache.json
+secrets/
+*.pem
+*.key
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+
+# Node
+node_modules/
+dist/
+build/
+.next/
+
+# 运行数据
+*.log
+*.sqlite
+*.db
+*.bak
+*.bak-*
+
+# 二进制与发行包（走 Releases）
+*.zip
+*.7z
+*.tar.gz
+*.xmind
+
+# 系统
+Thumbs.db
+.DS_Store
+desktop.ini

@@ -1,0 +1,10 @@
+# 来源
+
+- 上游仓库：https://github.com/addyosmani/agent-skills
+- 上游路径：skills/code-simplification
+- 导入方式：已安装快照（非 HEAD）
+- 本地文件：SKILL.md sha256=f0c5ed754057eb0c1e027e2587f59de816651feb5e837242296c43ea21cf621d
+- 上游 blob：c4f794aa3fc63ea041989b30be7a3887c79c53ed
+- 导入日期：2026-11-01
+- 许可证：MIT（见同目录 LICENSE，Copyright (c) 2025 Addy Osmani）
+- 本地改动：无

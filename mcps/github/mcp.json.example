@@ -1,0 +1,14 @@
+{
+  "mcp": {
+    "servers": {
+      "github": {
+        "type": "stdio",
+        "command": "C:\\Program Files\\nodejs\\node.exe",
+        "args": [
+          "C:\\Program Files (x86)\\AI\\github-mcp-server\\github-mcp-launcher.js"
+        ],
+        "timeoutMs": 60000
+      }
+    }
+  }
+}

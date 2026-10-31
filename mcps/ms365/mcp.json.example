@@ -1,0 +1,14 @@
+{
+  "mcp": {
+    "servers": {
+      "ms365": {
+        "type": "stdio",
+        "command": "C:\\Program Files\\nodejs\\node.exe",
+        "args": [
+          "C:\\Program Files (x86)\\AI\\ms-365-mcp-server\\node_modules\\@softeria\\ms-365-mcp-server\\dist\\index.js"
+        ],
+        "timeoutMs": 120000
+      }
+    }
+  }
+}
