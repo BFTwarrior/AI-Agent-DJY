@@ -1,4 +1,4 @@
-# 密钥、真实配置（任意层级）
+# Secrets and real configuration (any level)
 .env
 .env.*
 !.env.example
@@ -25,20 +25,20 @@ dist/
 build/
 .next/
 
-# 运行数据
+# Runtime data
 *.log
 *.sqlite
 *.db
 *.bak
 *.bak-*
 
-# 二进制与发行包（走 Releases）
+# Binaries and release archives (use Releases)
 *.zip
 *.7z
 *.tar.gz
 *.xmind
 
-# 系统
+# OS
 Thumbs.db
 .DS_Store
 desktop.ini

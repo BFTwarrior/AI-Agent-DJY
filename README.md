@@ -2,65 +2,73 @@
 
 Skills, MCP servers and projects for AI agents — one repository, one source of truth.
 
-> 主页只放总览与索引。每个资产怎么用、为什么这样设计、维护时要注意什么，都在
-> [`docs/`](docs/) 的分页里；项目自身的说明在对应项目目录的 `文档/` 下。
+> This README is an overview and index only. Usage details, design rationale and maintenance
+> rules live in the [`docs/`](docs/) pages. Project-specific documentation stays inside each
+> project folder and keeps its original language.
 
-## 里面有什么
+## What's inside
 
 ### Skills
 
-| 技能 | 用途 | 来源 | 状态 |
+| Skill | Purpose | Source | Status |
 |---|---|---|---|
-| [code-review-and-quality](skills/code-review-and-quality/) | 多维代码审查：正确性、可读性、架构、安全、性能 | [addyosmani/agent-skills](https://github.com/addyosmani/agent-skills)（MIT） | 在用 |
-| [code-simplification](skills/code-simplification/) | 行为不变地降低复杂度 | 同上（正文注明受 Anthropic code-simplifier 启发） | 在用 |
-| [constraint-driven-development](skills/constraint-driven-development/) | 把项目质量门槛写成 `CONSTRAINTS.md` 并防止被悄悄降低 | 同上（MIT） | 在用 |
+| [code-review-and-quality](skills/code-review-and-quality/) | Multi-axis code review: correctness, readability, architecture, security, performance | [addyosmani/agent-skills](https://github.com/addyosmani/agent-skills) (MIT) | Active |
+| [code-simplification](skills/code-simplification/) | Reduce complexity without changing behavior | Same (body credits Anthropic's code-simplifier) | Active |
+| [constraint-driven-development](skills/constraint-driven-development/) | Turn a project's quality bar into `CONSTRAINTS.md` and prevent it from being quietly lowered | Same (MIT) | Active |
 
 ### MCP Servers
 
-| 服务 | 用途 | 类型 | 状态 |
+| Server | Purpose | Type | Status |
 |---|---|---|---|
-| [github](mcps/github/) | GitHub 仓库、Issue、PR 操作 | 第三方 launcher + 配置模板 | 在用 |
-| [ms365](mcps/ms365/) | Outlook 邮件、日历、OneDrive | 第三方服务 + 配置模板 | 在用 |
+| [github](mcps/github/) | GitHub repositories, issues, pull requests | Third-party launcher + config template | Active |
+| [ms365](mcps/ms365/) | Outlook mail, calendar, OneDrive | Third-party server + config template | Active |
 
 ### Projects
 
-| 项目 | 说明 | 当前版本 | 文档 | 发行版 |
+| Project | Description | Version | Docs | Release |
 |---|---|---|---|---|
-| [zcode-persistence](projects/zcode-persistence/) | ZCode 失败重试工具包：钩子建议、本地重试代理、可选的报错邮件 | V0.2 | [文档](projects/zcode-persistence/文档/00-总览.md) | [Release](https://github.com/BFTwarrior/AI-Agent-DJY/releases/tag/proj-zcode-persistence-v0.2) |
+| [zcode-persistence](projects/zcode-persistence/) | ZCode retry toolkit: hook suggestions, local retry proxy, optional error email reports | V0.2 | [Docs](projects/zcode-persistence/) (Chinese) | [Release](https://github.com/BFTwarrior/AI-Agent-DJY/releases/tag/proj-zcode-persistence-v0.2) |
 
-## 怎么用
+## How to use
 
-- **技能**：仓库是源，运行时副本在 `~/.zcode/skills/<name>/`。部署链路与同步规则见
-  [部署与同步](docs/03-部署与同步.md)。
-- **MCP**：仓库只存配置模板，真实配置在 `~/.zcode/cli/config.json` 的 `mcp.servers`，
-  密钥不进库。每个服务的启动方式见对应目录的 `README.md`。
-- **项目**：直接在 `projects/<name>/` 里开发，`git pull` → 修改 → 提交 → 推送；
-  发行包走 Releases，不进 git 历史。
+- **Skills**: the repository is the source; the runtime copy lives in `~/.zcode/skills/<name>/`.
+  See [Deployment and Sync](docs/03-deployment-and-sync.md).
+- **MCP**: this repository stores templates only. The real configuration lives in
+  `~/.zcode/cli/config.json` under `mcp.servers`; secrets never enter the repository.
+  Startup details are in each server's `README.md`.
+- **Projects**: develop directly in `projects/<name>/`. Pull, edit, test, commit, push.
+  Release archives go to GitHub Releases, not into git history.
 
-## 文档索引
+## Documentation
 
-| 页面 | 内容 |
+| Page | Contents |
 |---|---|
-| [00-总览](docs/00-总览.md) | 仓库定位、边界、三类资产的关系 |
-| [01-目录与命名](docs/01-目录与命名.md) | 目录结构、命名规范、tag 规范 |
-| [02-收录规范](docs/02-收录规范.md) | 什么样的技能/MCP/项目可以进来，模板长什么样 |
-| [03-部署与同步](docs/03-部署与同步.md) | 仓库 → AI 安装层 → ZCode 运行时的链路与安全规则 |
-| [04-迁移记录](docs/04-迁移记录.md) | 2026-11-01 首次导入的清单、排除项与校验值 |
-| [05-许可证与来源](docs/05-许可证与来源.md) | 第三方内容的许可证、版权行与收录边界 |
-| [06-维护与验收](docs/06-维护与验收.md) | 改完怎么测、提交前查什么、发版检查表 |
+| [00-Overview](docs/00-overview.md) | Scope, boundaries, how the three asset types relate |
+| [01-Structure and Naming](docs/01-structure-and-naming.md) | Directory layout, naming rules, tag conventions |
+| [02-Inclusion Rules](docs/02-inclusion-rules.md) | What may enter the repository, and the templates to use |
+| [03-Deployment and Sync](docs/03-deployment-and-sync.md) | Repository → AI install layer → ZCode runtime, and the safety rules |
+| [04-Migration Record](docs/04-migration-record.md) | What was imported on 2026-11-01, exclusions, checksums |
+| [05-Licenses and Sources](docs/05-licenses-and-sources.md) | Third-party licenses, copyright lines, inclusion boundaries |
+| [06-Maintenance and Acceptance](docs/06-maintenance-and-acceptance.md) | Tests to run, checks before commit, release checklist |
 
-## 约定速览
+## Conventions at a glance
 
-- 目录名统一小写 kebab-case；技能目录名必须与 `SKILL.md` 的 `name` 一致。
-- 第三方技能必须同时有 `LICENSE`（含版权行）和 `UPSTREAM.md`（来源、hash、改动）。
-- 任何密钥、token、真实 `config.json` 都不进库；只提交 `*.example`。
-- 项目的旧版本用 tag 与 Releases 固定，仓库内不建物理“历史”目录。
-- 提交前跑一次全工作树密钥扫描，细则见 [06-维护与验收](docs/06-维护与验收.md)。
+- Directory names are lowercase kebab-case; a skill directory name must match the `name`
+  field in its `SKILL.md`.
+- Third-party skills must include both `LICENSE` (with the copyright line) and `UPSTREAM.md`
+  (source, hash, local changes).
+- No secrets, tokens or real `config.json` files. Commit `*.example` templates only.
+- Old project versions are fixed by tags and Releases; there is no physical `history/`
+  directory inside the repository.
+- Run a full-worktree secret scan before every commit. Details in
+  [06-Maintenance and Acceptance](docs/06-maintenance-and-acceptance.md).
 
-## 许可证与私有性
+## License and privacy
 
-本仓库暂无根许可证（默认保留所有权利）。`skills/` 下的第三方内容各自保留原许可证，
-见 [05-许可证与来源](docs/05-许可证与来源.md)。如需开源，先补根 `LICENSE` 并逐项确认。
+This repository has no root LICENSE yet (all rights reserved). Third-party content under
+`skills/` keeps its own license; see [05-Licenses and Sources](docs/05-licenses-and-sources.md).
+If this repository is ever open-sourced, add a root `LICENSE` and verify each third-party entry.
 
-**项目源码包含真实收件邮箱**（`projects/zcode-persistence/src/error_watch.py`），
-本仓库必须保持私有；公开或分享前先把邮箱改为环境变量注入，并清理文档中的地址。
+**The project source contains real email addresses** (`projects/zcode-persistence/src/error_watch.py`).
+This repository must remain private. Before publishing or sharing, move those addresses to
+environment variables and remove them from the documentation.

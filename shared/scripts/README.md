@@ -1,16 +1,17 @@
 # Scripts
 
-规划中的跨项目脚本。实现时必须遵守：
+Planned cross-project scripts. Any implementation must follow these rules:
 
-1. 默认 `--dry-run`，打印将新增/覆盖/跳过的文件；
-2. 真正写入前备份目标到 `%TEMP%\AI-Agent-DJY-backup-<时间>`；
-3. 不删除目标里多出来的目录或条目，只报告；
-4. 路径用 `pathlib` + `expanduser`，不写死盘符；
-5. 失败以非 0 退出，并说明失败原因，不静默吞异常。
+1. Default to `--dry-run` and print files that would be added, overwritten or skipped.
+2. Back up the target to `%TEMP%\AI-Agent-DJY-backup-<timestamp>` before writing.
+3. Never delete extra directories or entries in the target; report them only.
+4. Use `pathlib` + `expanduser`; do not hard-code drive letters.
+5. Exit non-zero on failure and explain the cause; never swallow exceptions silently.
 
-| 脚本 | 作用 | 状态 |
+| Script | Purpose | Status |
 |---|---|---|
-| `sync_skills.py` | 技能三层同步与校验 | 未实现 |
-| `install_mcp.py` | MCP 模板渲染与合并 | 未实现 |
+| `sync_skills.py` | Three-layer skill sync and verification | Not implemented |
+| `install_mcp.py` | MCP template rendering and merge | Not implemented |
 
-在脚本落地前，按 [03-部署与同步](../../docs/03-部署与同步.md) 手工执行。
+Until the scripts exist, follow
+[03-Deployment and Sync](../../docs/03-deployment-and-sync.md) manually.

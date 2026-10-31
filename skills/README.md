@@ -1,14 +1,16 @@
 # Skills
 
-| 技能 | 用途 | 来源 | 许可证 |
+| Skill | Purpose | Source | License |
 |---|---|---|---|
-| [code-review-and-quality](code-review-and-quality/) | 多维代码审查：正确性、可读性、架构、安全、性能 | addyosmani/agent-skills | MIT |
-| [code-simplification](code-simplification/) | 行为不变地降低复杂度 | addyosmani/agent-skills | MIT |
-| [constraint-driven-development](constraint-driven-development/) | 把质量门槛写成 `CONSTRAINTS.md`，防止被悄悄降低 | addyosmani/agent-skills | MIT |
+| [code-review-and-quality](code-review-and-quality/) | Multi-axis code review: correctness, readability, architecture, security, performance | addyosmani/agent-skills | MIT |
+| [code-simplification](code-simplification/) | Reduce complexity without changing behavior | addyosmani/agent-skills | MIT |
+| [constraint-driven-development](constraint-driven-development/) | Turn the quality bar into `CONSTRAINTS.md` and prevent it from being lowered | addyosmani/agent-skills | MIT |
 
-## 新增技能
+## Adding a skill
 
-1. 建目录 `skills/<name>/`，目录名与 `SKILL.md` 的 `name` 一致；
-2. 第三方内容补 `LICENSE` 与 `UPSTREAM.md`（模板见 [02-收录规范](../docs/02-收录规范.md)）；
-3. 更新本表与根 `README.md` 的索引；
-4. 按 [03-部署与同步](../docs/03-部署与同步.md) 安装到 `AI` 目录，再同步到运行时。
+1. Create `skills/<name>/`; the directory name must match `name` in `SKILL.md`.
+2. For third-party content, add `LICENSE` and `UPSTREAM.md` (template in
+   [02-Inclusion Rules](../docs/02-inclusion-rules.md)).
+3. Update this table and the index in the root `README.md`.
+4. Install to the AI directory and sync to the runtime, following
+   [03-Deployment and Sync](../docs/03-deployment-and-sync.md).

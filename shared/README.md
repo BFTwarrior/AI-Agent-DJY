@@ -1,17 +1,18 @@
 # Shared
 
-跨项目复用的脚本与提示词。
+Cross-project scripts and prompts.
 
 ```text
-scripts/    同步、校验、打包等工具（规划中）
-prompts/    可复用的提示词片段
+scripts/    Sync, validation and packaging tools (planned)
+prompts/    Reusable prompt fragments
 ```
 
-## 规划中的脚本
+## Planned scripts
 
-| 脚本 | 作用 | 状态 |
+| Script | Purpose | Status |
 |---|---|---|
-| `sync_skills.py` | 仓库 → `AI\AI-Agent-DJY\skills` → `~\.zcode\skills`，默认 dry-run、写前备份、不删多余目录 | 未实现 |
-| `install_mcp.py` | 渲染 `mcp.json.example` → 合并 `mcp.servers`，写前备份、失败回滚 | 未实现 |
+| `sync_skills.py` | Repository → `AI\AI-Agent-DJY\skills` → `~\.zcode\skills`; dry-run by default, backup before write, never delete extra directories | Not implemented |
+| `install_mcp.py` | Render `mcp.json.example` → merge `mcp.servers`; backup before write, roll back on failure | Not implemented |
 
-在脚本落地前，按 [03-部署与同步](../docs/03-部署与同步.md) 的手工步骤执行。
+Until the scripts exist, follow the manual steps in
+[03-Deployment and Sync](../docs/03-deployment-and-sync.md).

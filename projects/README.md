@@ -1,20 +1,22 @@
 # Projects
 
-| 项目 | 说明 | 当前版本 | 状态 | 文档 |
+| Project | Description | Version | Status | Docs |
 |---|---|---|---|---|
-| [zcode-persistence](zcode-persistence/) | ZCode 失败重试工具包：钩子建议、本地重试代理、可选的报错邮件 | V0.2 | 在用 | [00-总览](zcode-persistence/文档/00-总览.md) |
+| [zcode-persistence](zcode-persistence/) | ZCode retry toolkit: hook suggestions, local retry proxy, optional error email reports | V0.2 | Active | [00-总览](zcode-persistence/文档/00-总览.md) (Chinese) |
 
-## 约定
+## Conventions
 
-- 项目直接在仓库内开发：`git pull` → 修改 → 测试 → 提交 → 推送。
-- 项目内沿用 `文档/`、`逻辑图/`；不建 `历史/`，旧版用 tag 与 Releases。
-- 项目 `README.md` 只做索引，事实性内容放 `文档/`。
-- 发行包上传 Releases，文件名与本地一致，上传前比对 sha256。
+- Develop projects inside the repository: `git pull` → edit → test → commit → push.
+- Projects keep `文档/` and `逻辑图/`; there is no `历史/` folder — old versions use tags
+  and Releases.
+- A project `README.md` is an index; factual content lives in `文档/`.
+- Release archives go to Releases; names match the local file and sha256 is compared
+  before upload.
 
-## 新增项目
+## Adding a project
 
-1. 建目录 `projects/<name>/`，按 [02-收录规范](../docs/02-收录规范.md) 放置 `src/`、
-   `tools/`、`文档/`、`逻辑图/`；
-2. 写 `README.md`（一句话 + 版本 + 指向 `文档/`）；
-3. 更新本表与根 `README.md`；
-4. 首次发版打 tag `proj-<name>-vX.Y`，上传发行包。
+1. Create `projects/<name>/` and add `src/`, `tools/`, `文档/`, `逻辑图/` following
+   [02-Inclusion Rules](../docs/02-inclusion-rules.md).
+2. Write `README.md` (one line + version + links into `文档/`).
+3. Update this table and the root `README.md`.
+4. For the first release, tag `proj-<name>-vX.Y` and upload the archive.

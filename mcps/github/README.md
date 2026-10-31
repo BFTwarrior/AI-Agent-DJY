@@ -1,8 +1,9 @@
 # GitHub MCP Server
 
-通过 stdio 连接 GitHub，提供仓库、Issue、PR、代码搜索等工具。
+Connects to GitHub over stdio and exposes repository, issue, pull request and code search
+tools.
 
-## 启动方式（本机实测）
+## Startup (verified locally)
 
 ```text
 command : C:\Program Files\nodejs\node.exe
@@ -11,27 +12,29 @@ type    : stdio
 timeout : 60000
 ```
 
-launcher 自己处理认证（本机使用 `gh` 的登录凭据），配置里不需要写 token。
+The launcher handles authentication itself (this machine uses the `gh` login), so no token
+belongs in the configuration.
 
-## 配置
+## Configuration
 
-复制 `mcp.json.example` 的内容到：
+Copy the contents of `mcp.json.example` into:
 
 ```text
-C:\Users\<用户>\.zcode\cli\config.json  →  mcp.servers.github
+C:\Users\<user>\.zcode\cli\config.json  →  mcp.servers.github
 ```
 
-把占位符换成实际路径；写入前先备份 `config.json`，只合并 `github` 这一项，
-保留其他 server 与未知字段。
+Replace placeholders with real paths. Back up `config.json` before writing, merge only the
+`github` entry, and preserve the other servers and unknown fields.
 
-## 验证
+## Verification
 
-1. 重启 ZCode；
-2. 新会话里确认 `github` 的工具可用；
-3. 失败时看 launcher 的 stderr，常见原因是 Node 路径变化或 `gh` 未登录。
+1. Restart ZCode.
+2. In a new session, confirm the `github` tools are available.
+3. On failure, check the launcher's stderr; common causes are a changed Node path or an
+   unauthenticated `gh`.
 
-## 安全
+## Security
 
-- 不把 `gh` token、token cache 复制进仓库；
-- 不在模板里写账号名以外的个人信息；
-- 需要更小权限时，在 `gh` 侧使用最小 scope 的 token。
+- Never copy the `gh` token or token cache into the repository.
+- Do not put personal information beyond what the template requires into the template.
+- For narrower privileges, use a token with the smallest required scope on the `gh` side.

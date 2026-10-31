@@ -1,8 +1,9 @@
 # Microsoft 365 MCP Server
 
-通过 stdio 连接 Microsoft 365，提供 Outlook 邮件、日历、OneDrive、To Do 等工具。
+Connects to Microsoft 365 over stdio and exposes Outlook mail, calendar, OneDrive and To Do
+tools.
 
-## 启动方式（本机实测）
+## Startup (verified locally)
 
 ```text
 command : C:\Program Files\nodejs\node.exe
@@ -11,41 +12,45 @@ type    : stdio
 timeout : 120000
 ```
 
-## 认证
+## Authentication
 
-- 首次使用走 OAuth 设备码登录；
-- 令牌缓存在 `%APPDATA%\ms-365-mcp-server\.token-cache.json`；
-- 配置里**不需要**写账号、密码或 token。
+- First use runs the OAuth device-code flow.
+- The token cache is stored at `%APPDATA%\ms-365-mcp-server\.token-cache.json`.
+- The configuration contains **no** account, password or token.
 
-令牌缓存属于运行时数据：不进仓库，也不随仓库迁移；换机器重新登录即可。
+The token cache is runtime data: it does not enter the repository and does not migrate with
+it. Sign in again on a new machine.
 
-## 配置
+## Configuration
 
-复制 `mcp.json.example` 的内容到：
+Copy the contents of `mcp.json.example` into:
 
 ```text
-C:\Users\<用户>\.zcode\cli\config.json  →  mcp.servers.ms365
+C:\Users\<user>\.zcode\cli\config.json  →  mcp.servers.ms365
 ```
 
-写入前先备份 `config.json`，只合并 `ms365` 这一项，保留其他 server 与未知字段。
+Back up `config.json` before writing, merge only the `ms365` entry, and preserve the other
+servers and unknown fields.
 
-## 发信注意
+## Sending mail
 
-- 发件地址必须显式指定为有权限的地址；用账号本名当 `From` 时，部分收件方
-  （如 QQ 邮箱）会丢弃邮件，只留在“已发送”。
-- 正文 `contentType` 使用 `text` / `html`，大小写按接口要求。
-- 不要在本目录记录任何真实邮箱密码、应用密钥或刷新令牌。
+- Specify a sender address the account is allowed to use. Using the account's own address as
+  `From` can cause some recipients (for example QQ Mail) to drop the message; it then only
+  remains in Sent Items.
+- Use `text` or `html` for `contentType`, matching the API's expected casing.
+- Never record real passwords, application secrets or refresh tokens in this directory.
 
-## 验证
+## Verification
 
-1. 重启 ZCode；
-2. 新会话里调用一个只读工具（如列出邮箱文件夹）；
-3. 失败时检查：Node 路径、服务安装路径、OAuth 缓存是否过期。
+1. Restart ZCode.
+2. In a new session, call a read-only tool (for example, list mail folders).
+3. On failure, check the Node path, the server install path, and whether the OAuth cache has
+   expired.
 
-## 排障
+## Troubleshooting
 
-| 现象 | 先看什么 |
+| Symptom | Check first |
 |---|---|
-| 工具列表为空 | 服务能否手动启动；`config.json` 的键名是否为 `ms365` |
-| 401 / 需要登录 | 删除或重新生成 `.token-cache.json`，重新走设备码 |
-| 发信成功但对方没收到 | `From` 是否为账号本名；换为有权限的地址 |
+| Empty tool list | Whether the server starts manually; whether the config key is `ms365` |
+| 401 / login required | Remove or regenerate `.token-cache.json`, then repeat the device-code flow |
+| Mail sent but not received | Whether `From` is the account's own address; switch to an allowed sender |

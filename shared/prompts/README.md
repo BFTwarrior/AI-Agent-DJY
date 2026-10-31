@@ -1,7 +1,7 @@
 # Prompts
 
-可复用的提示词片段。新增时遵守：
+Reusable prompt fragments. When adding one:
 
-- 一段提示词一个文件，文件名小写 kebab-case；
-- 顶部写用途与适用场景，正文不写个人隐私与密钥；
-- 引用第三方提示词时保留来源与许可证。
+- One fragment per file, lowercase kebab-case file name.
+- State the purpose and applicable scenario at the top; no personal data or secrets.
+- When adapting third-party prompts, keep the source and license.
