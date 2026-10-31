@@ -1,0 +1,221 @@
+# 04 Test Record
+
+This section records the **decision semantics of v0.4.0** (any Bash failure is advised to retry). After a change, re-run it and only release once everything passes.
+The old expectations of v0.3.x (filtering out by error type, no retry on `permission denied`) are void; do not change the code back according to the old tables.
+
+> **Reading order**: Sections 1 through 9 are historical batches (run under "fixed 4 attempts / progressive backoff" and under the v1.1.0 heartbeat parameters respectively),
+> kept as-is for traceability; **for the parameters currently in effect and the latest round of results, see Sections 10 and 11** (Section 10 holds the final parameters,
+> Section 11 covers the streaming write-back fix after the 2026-10-31 review). Proxy retries have moved from "by count" to
+> "a 180-second time window + one attempt every 20 seconds"; the "503 after 3 retries" wording in the old batches is historical only.
+
+## 1. Hook (retry_hook.py)
+
+Test method: `echo '<payload>' | python src/retry_hook.py`, with the state directory isolated via `ZCODE_RETRY_HOOK_STATE_DIR`.
+
+| # | Input | Expected (v0.4.0) | Observed |
+|---|---|---|---|
+| 1 | `tool_name=Bash` + `operation timed out` | Has output; the message does not contain `sleep` | ✅ |
+| 2 | `network timeout at registry.npmjs.org` | Has output | ✅ |
+| 3 | The same command timing out 4 times in a row | 1/3, 2/3, 3/3, then silent on the 4th | ✅ |
+| 4 | `upstream_deadline` | Has output; the message contains `sleep 180` and `200000 ms` | ✅ |
+| 5 | A Chinese error message meaning "no output from upstream within 95 seconds" | Same as above | ✅ |
+| 6 | `overloaded` | Same as above | ✅ |
+| 7 | `permission denied` | **Has output** (no longer filtered out since v0.4.0) | ✅ |
+| 8 | `upstream_deadline after permission denied` | Has output; the message uses `sleep 180` | ✅ |
+| 9 | `tool_name=Read` + timeout | No output (only Bash is handled) | ✅ |
+| 10 | Invalid JSON | No output, exit code 0 | ✅ |
+| 11 | Empty stdin | No output, exit code 0 | ✅ |
+| 12 | Command `timeout 30 npm test` + `AssertionError` | **Has output** (a timeout in the command text no longer affects the decision; a failure retries) | ✅ |
+| 13 | Error text echoing that command verbatim | Has output | ✅ |
+| 14 | `session_id="abc-429-def"` + `disk is full` | Has output (metadata takes no part in matching, and the decision is independent of the text) | ✅ |
+| 15 | `requestId="req-429-x"` + an unrelated error | Has output | ✅ |
+| 16 | A real `HTTP 429 too many requests` in the error field | Has output | ✅ |
+| 17 | A timeout in the `error_message` field | Has output | ✅ |
+| 18 | Command `ls` + `command not found` | **Has output** (deterministic errors retry too, up to 3 times) | ✅ |
+| 19 | Corrupt state.json + a failing call | **Has output**, exit code 0 (bad records fall back to defaults and are no longer silent) | ✅ |
+| 20 | Success + `status="success"` + a warning on stderr | **No output** (a successful call must not be misjudged as a failure) | ✅ |
+| 21 | Failure + stdout/stderr both empty (exit=1) | Has output; the message marks `no output` | ✅ |
+| 22 | `status="failed"` but `exitCode=0` | Has output | ✅ |
+| 23 | Two consecutive events with the same `toolCallId` | The second is silent (deduplication takes effect) | ✅ |
+| 24 | `tool_name=Bash` but neither `tool_response` nor any error field (only `session_id`/`tool_use_id`) | **No output** (metadata must not be padded out into error text, otherwise every successful Bash call would be advised to retry) | ✅ 2026-11-01 |
+| 25 | `tool_response` is a string (not a dict) and non-empty | Failure is judged by content and a retry is advised | ✅ |
+
+**All 25 items exit with code 0**, with no stderr output.
+
+## 2. Proxy (retry_proxy.py)
+
+| # | Scenario | Expected | Observed |
+|---|---|---|---|
+| 1 | Empty UA, POST /ap/v1/chat/completions | The fallback UA takes effect, HTTP 200 | ✅ 4.3s, returned "connected" ("it worked") |
+| 2 | Streaming, `stream=true` | SSE passed through event by event, content complete | ✅ 54 events, first packet at 5.6s, content `1,2,3,4,5,6,7,8,9,10` |
+| 3 | UA `Python-urllib/3.12` calling the upstream directly | Blocked by Cloudflare with 1010 | ✅ reproduced; normal when going through the proxy |
+| 4 | TLS verification | Passes with certifi | ✅ the default context fails, certifi succeeds |
+| 5 | Unknown path prefix | 400 + a clear error | ✅ |
+| 6 | All attempts fail (fixed 4 at the time) | 503 + retried automatically 3 times and still failing (OpenAI-shaped error body) | ✅ (the fixed-count era; the current wording is "retried continuously for N seconds and still failing") |
+
+## 3. Autostart (ensure_proxy.py)
+
+| # | Scenario | Expected | Observed |
+|---|---|---|---|
+| 1 | The proxy is already listening | Exits silently with 0, does not start another | ✅ the port entry count stays 1 |
+| 2 | Run after the proxy was killed | Starts it, listening again within 3 seconds | ✅ |
+| 3 | Script missing | Exits 0 without reporting an error | ✅ |
+
+## 4. Configuration changes
+
+| # | Check | Result |
+|---|---|---|
+| 1 | `config.json` is valid JSON | ✅ |
+| 2 | Exactly 1 entry in `PostToolUseFailure` that references `retry_hook.py` | ✅ |
+| 3 | That entry has `matcher=Bash`, `timeoutMs=5000` and no extra fields | ✅ |
+| 4 | Exactly 1 entry in `SessionStart` that references `ensure_proxy.py` | ✅ |
+| 5 | The baseUrl of `provider new-provider` points at `127.0.0.1:8787/ap/v1` | ✅ |
+| 6 | The pre-change backup exists and holds the pre-change content | ✅ |
+| 7 | After removing the entries this package added, the configuration is semantically identical to the backup | ✅ |
+
+## 5. Independent re-review
+
+The hook part of v1.0.0 went through two rounds of independent subagent review: the first round scored 4/5 (flagging the metadata false positive and the sleep colliding with the timeout), and the re-check after the fixes scored 5/5. The proxy and autostart parts were added just before packaging; for the review scope see the corresponding CHANGELOG entries.
+
+## 6. Uncovered scenarios (known gaps)
+
+1. **End-to-end triggering in a real ZCode session**: the hook can only fire on a real Bash tool failure, and the proxy needs an actual model call from inside ZCode. The packaging environment can only simulate payloads and cannot replace verification in a real session.
+2. **Hook output field**: in v0.3.0, testing showed the model could not see `systemMessage`; v0.3.1 changed it to `additionalContext`.
+3. **Proxy behavior when the response stream breaks mid-flight**: by design it does not retry, it just disconnects; no real mid-stream break sample was constructed.
+4. **Multi-session concurrency**: hook counters are keyed per session, so in theory they are isolated; no concurrency stress test was run.
+
+## 7. New cases in v1.0.2 (installer/uninstaller)
+
+Executed in an isolated HOME sandbox; the real configuration was never touched.
+
+| # | Scenario | Expected | Result |
+|---|---|---|---|
+| 1 | First install with --with-proxy (original address upstream-a.example.com) | 1 hook entry each, baseUrl switched to /ap/v1, state records originalBaseUrl | ✅ |
+| 2 | Re-running the same install command | Hooks are not duplicated, the provider is unchanged, originalBaseUrl is not overwritten | ✅ |
+| 3 | Wrong providerId | Exits with an error, the configuration is byte-for-byte unchanged | ✅ |
+| 4 | Original address upstream-b.example.com | Automatically selects /cm/v1 | ✅ |
+| 5 | Original address unrecognized and no prefix given | Exits with an error and makes no change | ✅ |
+| 6 | Original address unrecognized + --proxy-prefix ap | Switches normally | ✅ |
+| 7 | uninstall --dry-run | Does not write to disk | ✅ |
+| 8 | Real uninstall | Hooks cleared, the provider restored to the real address | ✅ |
+| 9 | The configuration contains my_retry_hook.py | Only retry_hook.py is recognized/removed; the former is left alone | ✅ |
+| 10 | State after uninstall | hooks/providers cleared and uninstalledAt written | ✅ |
+
+## 8. Prefix-correction path cases for v1.0.3/v1.0.4
+
+| # | Scenario | Expected | Result |
+|---|---|---|---|
+| 1 | Currently /cm, explicit --proxy-prefix ap | Switches to /ap, proxyBaseUrl in state updated accordingly | ✅ |
+| 2 | Currently /ap, explicit --proxy-prefix ap | No switch, provider written 0 times | ✅ |
+| 3 | Currently /ap, no explicit prefix | No switch, provider written 0 times | ✅ |
+| 4 | Currently /cm, explicit ap, but state lacks the original-address record | Fails validation and exits; no script copied, no hook written, no provider written | ✅ (after the v1.0.4 fix) |
+
+## 9. v1.1.0 heartbeat keep-alive cases
+
+The tests used accelerated parameters (SILENCE=2s, HEARTBEAT_START=5s, MAX_ATTEMPTS=4, RETRY_DELAYS=0.2,0.2,0.2); the conclusions hold for the default values as well.
+
+| # | Scenario | Expected | Result |
+|---|---|---|---|
+| 1 | Silent upstream + streaming, observed for 16 seconds | Heartbeat mode is entered only after the threshold is met, then one heartbeat per failure | Pass: entered at 6.6s, more than 3 in a row, no cap |
+| 2 | A 200 received while heartbeating | The status line is not sent again | Pass: the sse_started flag skips the header |
+| 3 | A 4xx/5xx received while heartbeating | The status code cannot be changed; it is turned into an SSE error | Pass |
+| 4 | Silent upstream + non-streaming | No heartbeat; returns 503 after 3 full retries (4 attempts in total) | Pass |
+| 5 | Connection failure + streaming | Retries up to the cap, then returns 503 with a reason | Pass |
+| 6 | Real relay, non-streaming | HTTP 200 returned normally | Pass: 3.5s |
+| 7 | Real relay, streaming | SSE passed through normally | Pass: 6.0s, content complete |
+
+## 10. v0.4.0 final parameters
+
+Release parameters: retry window 180 seconds, interval 20 seconds; single-attempt silence timeout 30 seconds; heartbeat starts after 80 seconds of silence, then one every 80 seconds with no cap.
+
+| # | Scenario | Expected | Result |
+|---|---|---|---|
+| 1 | Silent upstream + streaming | Heartbeats start after 80 seconds and it wraps up when the window expires | Pass (first heartbeat at 3.1s under accelerated parameters, confirming clock-driven behavior) |
+| 2 | Connection failure | Retries every 20 seconds within the window, returns 503 when the window expires | Pass (wrapped up in about 3 seconds under accelerated parameters) |
+| 3 | Real relay (streaming/non-streaming) | Both normal | Pass |
+
+## 11. Streaming write-back fix (after the 2026-10-31 review)
+
+New self-test `tools/selftest_stream.py`; all six scenarios PASS (fake upstream on local loopback, accelerated parameters):
+
+| # | Scenario | Expected | Observed |
+|---|---|---|---|
+| 1 | The upstream sends one 80-byte SSE event every 0.2s, 10 in total | Each arrives individually, maximum gap between consecutive events ≤0.7s (tolerance for high load) | ✅ span 1.80s, maximum consecutive gap 0.20s (before the fix they all arrived at once when the stream ended) |
+| 2 | Send 1 event, pause 2.5s, send 1 more | A `: keepalive` keeps the connection alive, the second one arrives as usual, no truncation reported | ✅ 2 keepalives, second received, log `ok` |
+| 3 | Declares `Content-Length: 100` but sends only 20 bytes | Recorded as `truncated`, no `0\r\n\r\n` appended | ✅ the client sees an incomplete stream |
+| 4 | Normal streaming with two events | Fully written back + `ok` | ✅ |
+| 5 | The upstream sends only 1 event and then goes completely silent (heartbeat 1s / window 2s, connection kept for 8s) | Heartbeats keep going; once cumulative silence reaches the window it wraps up and records `truncated` | ✅ `body silent 2s` + `truncated`, the client receives EOF |
+| 6 | Slow client: the client does not read for 1.5 seconds while the upstream pushes 2000 events × 2KB (about 4MB) | Backpressure works, everything is received and the stream ends normally, no lost chunk and no false silence report | ✅ 2000/2000 events, terminating chunk received, log `ok` |
+
+Also re-run: all four scenarios of `selftest_proxy_429.py` PASS; all four assertions of the heartbeat recipe in Section 4 of `docs/06-ai-maintenance-guide` pass;
+the non-streaming control sends no heartbeat and returns 503 when the window expires; `doctor.py` reports 11 PASS / 1 WARN (another rule for a provider that connects directly) / 0 FAIL.
+
+## 12. v0.4.0 hardening (added during final acceptance)
+| # | Scenario | Expected | Observed |
+|---|---|---|---|
+| 1 | chunked with 1-2 trailers | Written back normally, the next request on the same connection still gets 200 | ✅ |
+| 2 | chunked with 101 trailers | Returns 400 and disconnects, leftover bytes are not taken as a new request | ✅ |
+| 3 | `GET /__zp_health` | 200 + `{"name":"Zcode-Persistence"}` | ✅ |
+| 4 | 8787 occupied by something other than this proxy | `ensure_proxy` writes a warning to `proxy.log` | ✅ |
+| 5 | Old hook pointing at the old directory with matcher=Read | `ensure_hook` rewrites it in place to the new path/Bash, a second call makes no further change | ✅ |
+| 6 | Running `X/doctor.py` after `install.py --prefix X` | It checks X, not the default directory | ✅ |
+| 7 | Hook stdin containing a Chinese message meaning "no output from upstream within 95 seconds" | Hits the upstream wording (stdin is read as UTF-8, not via the system code page) | ✅ |
+| 8 | Hook stdin containing invalid UTF-8 bytes | Does not affect the decision; `hook.log` records only the exception type, never the raw bytes | ✅ |
+| 9 | Successful call with a stderr warning | Silent (not misjudged as a failure) | ✅ |
+| 10 | State file with `count="NaN"` / `t="junk"` / `t="inf"` | Still advises a retry normally | ✅ |
+
+## 13. Client auto-continuation + error reporting (evening of 2026-10-31)
+
+All three self-test suites ran on local loopback with temporary databases and temporary ports; they never touch the real relay or the real session database and never actually send mail
+(`send_mail` is replaced by a recorder, and `error_watch.LOG` points at a temporary directory).
+
+| # | Self-test | Scenario | Expected | Observed |
+|---|---|---|---|---|
+| 1 | selftest_proxy_429 | Recovers after two 429s | 200, upstream hit 3 times | ✅ |
+| 2 | Same as above | Persistent 429 | 503, error body `type=server_error / code=model_server_error / reason=server_error / retryable=true` | ✅ |
+| 3 | Same as above | Recovers after three 400s | 200, hit 4 times | ✅ |
+| 4 | Same as above | Persistent 400 | 503 when the window expires | ✅ |
+| 5 | Same as above | **Unknown prefix (400)** | 400 + `retryable:false` + `code=invalid_request`, upstream hit 0 times | ✅ |
+| 6 | selftest_stream | Event-by-event pass-through / keep-alive during mid-stream silence / short read on fixed length / normal wrap-up / silence deadline / slow client with 2000 events | Consistent with Section 12 | ✅ 6/6 |
+| 7 | Same as above | **Giving up in heartbeat mode** (the upstream returns not a single byte, heartbeat starts at 1 second) | The SSE `data:` carries `retryable:true` + `model_server_error`, and the chunked terminating chunk is appended | ✅ |
+| 8 | selftest_watch | A new red dot | The body contains title/model/provider/`reasons=connect` | ✅ |
+| 9 | Same as above | Scanned again after it was sent | Not sent again | ✅ |
+| 10 | Same as above | Historical red dot (2 hours ago) | The first round only records a baseline and sends nothing | ✅ |
+| 11 | Same as above | `completed` / `interrupted` | Never reported | ✅ |
+| 12 | Same as above | 8 mails already sent within one hour | `send_mail` is not called | ✅ |
+| 13 | Same as above | Two sessions in the same round | Merged into one mail whose title contains "2 sessions reported errors" | ✅ |
+| 14 | Same as above | The log holds only success lines (no failure whose timing matches) | The body says "not caused by the proxy exhausting its retries" ("not caused by the proxy running out of retries") | ✅ |
+| 14b | Same as above | **`attempt fail` in the same period but no `gave up`** (using the pre-upgrade `HH:MM:SS` logs) | The body says "the proxy had failures in the same period but did not give up" ("the proxy had failures in the same period but has not given up yet") and lists the failure details | ✅ |
+| 15 | Same as above | The same session reporting again 1 second later / after the cooldown expires | Not sent during the cooldown; sent again once it expires | ✅ |
+| 16 | Same as above | The send fails | `seen` does not advance, and the retry after the backoff succeeds | ✅ |
+| 17 | Same as above | `--once` (going through the full `main()`) | Prints only; no mail sent, no state file written | ✅ |
+
+Real-machine record (not a self-test): at 22:51 on 2026-10-31 a self-test mail was sent with the corrected `From`;
+from 22:57 to 22:59 the watcher sent 8 mails in a row for the same session (deduplication compared timestamps only), so the watcher was disabled that same day and changed to
+"advance seen only after a successful send + 600-second per-session cooldown + at most 8 mails per hour + not started by default (`ZCODE_PERSISTENCE_WATCH=1`)".
+
+## 14. Process swap with `--force` (2026-11-01)
+
+**Real-machine run** (the only process swap with client-side evidence):
+
+| Item | Result |
+|---|---|
+| How it was started | `restart_proxy_idle.py --force`, run in the foreground by this session's Bash (this session had no in-flight model requests at the time; what got cut were 5-7 upstream connections of another session) |
+| Starting point | PID <pid>, `/__zp_health` returned the lowercase `zcode-persistence` and no `root` (old code from before the rename) |
+| Reason | Another session's team kept 5-7 upstream `ESTABLISHED` connections open and `proxy.log` was silent for <1s, so the idle window never came |
+| Result | <time> `kill: PID <pid> → success`; the first spawn brought up PID <pid> |
+| Re-check | Only 1 LISTENING on 8787; `/__zp_health` = `{"name":"Zcode-Persistence","root":"C:\\Program Files (x86)\\AI\\Zcode-Persistence"}` |
+| Requests afterwards | From <time> `proxy.log` shows consecutive `ok ... status=200`; the proxy serves normally |
+
+**Branch verification with injected stubs** (no real process killed; `netstat_rows`/`kill`/`spawn`/`health_info` replaced one at a time):
+
+| # | Injected condition | Expected | Observed |
+|---|---|---|---|
+| 1 | `netstat_rows()` returns `None` | `abort`, exit code 1, `restart` not called | ✅ |
+| 2 | 8787 has two LISTENING entries | `abort`, exit code 1, no process touched | ✅ |
+| 3 | 8787 has no listener | `nothing`, exit code 0 | ✅ |
+| 4 | A single listener | `restart` is called and the log contains the target PID / in-flight connection count / silent seconds | ✅ |
+| 5 | The kill fails but the port is already free | Logs a `warn` and continues to spawn, ending with `restart: OK` | ✅ |
+| 6 | The kill fails and the port is still occupied | `abort`, `spawn` called 0 times | ✅ |
+| 7 | The health re-check fails after spawning and the leftovers cannot be cleaned up | Logs a `cleanup:` failure, `abort`s, and does not continue spawning | ✅ |
+| 8 | Health re-check fails + `netstat_rows()` returns `None` during cleanup | `abort`s directly, no further `spawn` (`port_free()` also treats the port as occupied at this point) | ✅ |

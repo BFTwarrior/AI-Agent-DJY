@@ -1,57 +1,61 @@
 # Zcode-Persistence
 
-ZCode 失败重试工具包：**工具失败时建议重试**、**模型请求失败时自动重发**，以及默认关闭的
-**会话报错邮件汇报**。
+A ZCode failure-retry toolkit: **suggests a retry when a tool fails**, **automatically
+resends when a model request fails**, plus a default-off **email report of session errors**.
 
-- 版本：V0.2 正式版（构建线 0.4.0）
-- 适用：ZCode Desktop（Windows），Python 3.9+
-- 依赖：仅 Python 标准库；代理模式优先使用 certifi（若已安装）
+- Version: V0.2 official release (build line 0.4.0)
+- Applies to: ZCode Desktop (Windows), Python 3.9+
+- Dependencies: Python standard library only; proxy mode prefers certifi (if installed)
 
-## 文档
+## Documentation
 
-| 页面 | 内容 |
+| Page | Contents |
 |---|---|
-| [00-总览](文档/00-总览.md) | 这是什么、两种模式的区别、快速开始、边界与限制 |
-| [01-安装与回滚](文档/01-安装与回滚.md) | 安装、前缀选择、卸载 |
-| [02-维护手册](文档/02-维护手册.md) | 参数、日志、重启代理、排障 |
-| [03-架构说明](文档/03-架构说明.md) | 钩子与代理的内部结构 |
-| [04-测试记录](文档/04-测试记录.md) | 三套自检的用例与结果 |
-| [05-变更记录](文档/05-变更记录.md) | 版本历史与修复记录 |
-| [06-AI维护指南](文档/06-AI维护指南.md) | 代码地图、不变量、测试配方、故障定位 |
-| [07-AI接手不变量](文档/07-AI接手不变量.md) | 接手维护的硬约束速查 |
+| [00-Overview](docs/00-overview.md) | What this is, the difference between the two modes, quick start, boundaries and limitations |
+| [01-Install and rollback](docs/01-install-and-rollback.md) | Installation, prefix selection, uninstallation |
+| [02-Maintenance manual](docs/02-maintenance.md) | Parameters, logs, restarting the proxy, troubleshooting |
+| [03-Architecture](docs/03-architecture.md) | Internal structure of the hook and the proxy |
+| [04-Test record](docs/04-test-record.md) | Test cases and results of the three self-test suites |
+| [05-Changelog](docs/05-changelog.md) | Version history and fix records |
+| [06-AI maintenance guide](docs/06-ai-maintenance-guide.md) | Code map, invariants, test recipes, fault localization |
+| [07-AI handover invariants](docs/07-ai-invariants.md) | Quick reference of the hard constraints for taking over maintenance |
 
-## 目录
+## Structure
 
 ```text
 projects/zcode-persistence/
-├─ README.md                本文件：索引
-├─ AGENTS.md                给 AI 的硬约束速查
-├─ VERSION                  版本号
-├─ CHANGELOG.md             变更记录
-├─ src/                     运行时脚本（4 个）
-├─ tools/                   安装/卸载/自检/换进程（7 个）
-├─ 文档/                    当前版文档（00–07）
-└─ 逻辑图/                  当前版结构图
+├─ README.md                Index: documentation and directory navigation
+├─ AGENTS.md                Hard constraints for AI maintainers
+├─ VERSION                  Version number
+├─ CHANGELOG.md             Change log
+├─ src/                     Runtime scripts (4)
+├─ tools/                   Install/uninstall/self-test/restart (7)
+├─ docs/                    Current documentation (00-07)
+└─ diagrams/                Current structure diagrams
 ```
 
-## 快速开始
+## Quick start
 
 ```bash
-python tools/install.py          # 模式 A：只装钩子
-python tools/doctor.py           # 健康检查
+python tools/install.py          # Mode A: hook only
+python tools/doctor.py           # Health check
 
-python tools/install.py --with-proxy --provider-id new-provider   # 模式 B：钩子 + 代理
+python tools/install.py --with-proxy --provider-id new-provider   # Mode B: hook + proxy
 ```
 
-前缀选择、参数、卸载与回滚见 [01-安装与回滚](文档/01-安装与回滚.md)；
-设计取舍与内部结构见 [03-架构说明](文档/03-架构说明.md)。
+For prefix selection, parameters, uninstallation and rollback see
+[01-Install and rollback](docs/01-install-and-rollback.md); for design trade-offs and
+internal structure see [03-Architecture](docs/03-architecture.md).
 
-## 安全提示
+## Safety note
 
-`src/error_watch.py` 与部分文档包含**真实收件邮箱**（用于报错汇报）。
-本仓库必须保持私有；若要公开或分享，先把邮箱改为环境变量注入，并清理文档中的地址。
+`src/error_watch.py` and some of the documentation contain a **real recipient email
+address** (used for error reporting). This repository must stay private; to publish or
+share it, first switch the address to environment-variable injection and scrub the
+addresses out of the documentation.
 
-## 发行
+## Distribution
 
-发行包在仓库 Releases：`proj-zcode-persistence-v0.2`。包内是构建产物，
-源码以本目录为准；两者不一致时以本目录 + tag 为准。
+The distribution package lives in the repository Releases: `proj-zcode-persistence-v0.2`.
+The archive contains build artifacts; this directory is authoritative for the source, and
+if the two disagree, this directory plus the tag wins.

@@ -50,7 +50,7 @@ python -I tools/selftest_stream.py
 python -I tools/selftest_watch.py
 ```
 
-All three must pass; details are in the project's `文档/04-测试记录.md`.
+All three must pass; details are in the project's `docs/04-test-record.md`.
 
 ## After committing
 

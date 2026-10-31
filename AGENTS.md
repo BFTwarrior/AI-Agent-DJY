@@ -8,7 +8,7 @@ before making changes.
 - `skills/<name>/`: self-contained skill; the `name` in `SKILL.md` must match the directory.
 - `mcps/<name>/`: self-written servers or configuration templates only. Third-party
   servers are recorded by version and startup command, not vendored.
-- `projects/<name>/`: complete project with source, `文档/` and `逻辑图/`; no `历史/`.
+- `projects/<name>/`: complete project with source, `docs/` and `diagrams/`; no `history/`.
 - `docs/`: repository-level rules only; project details do not belong here.
 - `shared/`: cross-project scripts and prompts.
 
@@ -18,7 +18,7 @@ before making changes.
 2. Never delete or rewrite the `LICENSE` or `UPSTREAM.md` of a third-party skill; upgrades
    go in a separate commit.
 3. Never edit runtime copies under `~/.zcode/skills/` directly. Edit the repository, then sync.
-4. Never create `projects/<name>/历史/` inside the repository. Old versions use tags and Releases.
+4. Never create `projects/<name>/history/` inside the repository. Old versions use tags and Releases.
 5. Never remove tests, assertions or thresholds from `CONSTRAINTS.md` just to get green.
    See `skills/constraint-driven-development/SKILL.md`.
 6. Never push directly to `main`. Use a branch, open a pull request, merge after review.
@@ -28,7 +28,7 @@ before making changes.
 1. Skill changed: verify the `SKILL.md` frontmatter and that `UPSTREAM.md` is still accurate.
 2. MCP template changed: confirm no real values and that fields match
    `~/.zcode/cli/config.json`.
-3. Project changed: run the test recipes in the project's `文档/`, update `CHANGELOG`.
+3. Project changed: run the test recipes in the project's `docs/`, update `CHANGELOG`.
 4. Run the full-worktree secret scan before committing (command in
    `docs/06-maintenance-and-acceptance.md`).
 5. Release: update `VERSION`/`CHANGELOG`, create tags, upload Release assets.

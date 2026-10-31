@@ -114,16 +114,16 @@ Notes:
 
 ```text
 projects/<name>/
-├─ README.md        Index: one line + version + links into 文档/
+├─ README.md        Index: one line + version + links into docs/
 ├─ src/             Executable source
 ├─ tools/           Install/self-test/operations scripts
-├─ 文档/            Current documentation
-└─ 逻辑图/          Current diagrams (Markdown)
+├─ docs/            Current documentation
+└─ diagrams/          Current diagrams (Markdown)
 ```
 
 ### History and releases
 
-- **No `历史/` directory**: old versions are fixed by tags and release archives.
+- **No `history/` directory**: old versions are fixed by tags and release archives.
 - Local history that predates migration is packaged as `*-history-import.zip`, attached to
   the `proj-<project>-v<version>-history` Release, and its sha256 is recorded in
   [04-Migration Record](04-migration-record.md).

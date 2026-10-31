@@ -9,7 +9,7 @@ and release.
 It solves three problems:
 
 1. **Scattered assets**: skills live in `~/.zcode/skills`, MCP configuration lives in
-   `~/.zcode/cli/config.json`, and projects are spread across `<workspace>`, with no
+   `~/.zcode/cli/config.json`, and projects are spread across the local workspace, with no
    single source or version.
 2. **Untraceable changes**: editing runtime copies directly leaves no record of what
    changed or how to roll back.
@@ -46,14 +46,14 @@ Shared principles:
 ## Relationship to the local workspace
 
 ```text
-<workspace>\
-├─ AI-Agent-DJY\                Project folder (contains 文档/逻辑图/历史)
-│  ├─ 文档\ 逻辑图\ 历史\       Planning docs and local history (not in the repo)
+<local workspace>\
+├─ AI-Agent-DJY\                Project folder (contains docs/diagrams/history)
+│  ├─ <local docs>\ <local diagrams>\ <local history>\   Planning docs and local history
 │  └─ repo\                    ★ Repository workspace (the only git root)
 │     ├─ skills/ mcps/ projects/ shared/ docs/
 │     └─ README.md AGENTS.md .gitignore
 └─ Zcode-Persistence\          Old folder, read-only backup after migration
-   └─ 历史\                    Local history originals, kept
+   └─ <local history>\         Local history originals, kept
 ```
 
 **The repository root is `AI-Agent-DJY\repo`.** Do not initialize git in the

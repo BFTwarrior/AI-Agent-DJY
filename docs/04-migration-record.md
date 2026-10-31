@@ -2,7 +2,7 @@
 
 ## Initial import, 2026-11-01
 
-Imported from the local workspace `<workspace>`. The repository contains source,
+Imported from the local workspace. The repository contains source,
 current documentation and configuration templates only. Release archives, historical
 versions and runtime data stay on the local machine or go to Releases.
 
@@ -34,37 +34,37 @@ not copied into the repository.
 |---|---|---|
 | `src/` | 4 | `retry_hook`, `retry_proxy`, `ensure_proxy`, `error_watch` |
 | `tools/` | 7 | install, uninstall, doctor, 3 self-tests, proxy restart |
-| `文档/` | 8 | 00–07, current documentation (Chinese) |
-| `逻辑图/` | 1 | `架构.md` |
+| `docs/` | 8 | 00–07, current documentation (English) |
+| `diagrams/` | 1 | `architecture.md` |
 | Root | 4 | `README.md`, `CHANGELOG.md`, `VERSION`, `AGENTS.md` |
 
 24 files. Size depends on line endings: 346,164 bytes in the original CRLF working copy at
 import; 330,150 bytes in git blobs after LF normalization (333,781 bytes in the current
 checkout). Every file in `src/` and `tools/` has the same sha256 as the corresponding file
-in `发行\Zcode-Persistence-V0.2-正式版`.
+in the V0.2 release package directory.
 
 ### Path and link adjustments
 
-- Project documentation keeps its `文档/` directory (the release package used `docs/`).
-  Operational links were rewritten from `docs/...` to `文档/...`; a full Markdown link
-  check reports zero broken links.
-- The package's `docs/05-AI维护指南.md` corresponds to `文档/06-AI维护指南.md` locally;
+- Project documentation was translated to English and moved from the legacy Chinese docs
+  directory to `docs/`; the diagram moved to `diagrams/`, and all file names were standardized.
+  All links were rewritten; a full Markdown link check reports zero broken links.
+- The package's `docs/05` maintenance guide corresponds to `docs/06-ai-maintenance-guide.md`;
   links were mapped by number.
-- Historical entries in `CHANGELOG.md` keep their original `docs/` wording; a note at the
-  top of the file explains this. `文档/05-变更记录.md` remains byte-identical to the root
-  `CHANGELOG.md`.
-- Overlapping content between the package `docs/` and the local `文档/` was not imported
-  twice; the local `文档/` is canonical.
+- Historical entries in `CHANGELOG.md` keep the paths as originally written; a note at the
+  top of the file explains this. `docs/05-changelog.md` carries the same content as the root
+  `CHANGELOG.md` (only the page title differs).
+- Overlapping content between the package `docs/` and the local documentation was not
+  imported twice; the local documentation is canonical.
 
 ### Deliberately excluded
 
 | Content | Destination |
 |---|---|
-| `发行\*.zip` (current) | GitHub Releases (`proj-zcode-persistence-v0.2`) |
-| `历史\发行\*.zip` (11 files) | History import archive → Release (`...-v0.1-history`) |
-| `历史\文档\` (2 versions), `历史\逻辑图\` (1 version) | Same history import archive |
+| Current release `*.zip` | GitHub Releases (`proj-zcode-persistence-v0.2`) |
+| Historical release zips (11 files) | History import archive → Release (`...-v0.1-history`) |
+| Historical docs (2 versions) and diagram (1 version) | Same history import archive |
 | `proxy.log`, `restart.log`, `install-state.json`, `__pycache__` | Local runtime data |
-| The whole `历史\` directory | Kept locally, never deleted |
+| The whole local history directory | Kept locally, never deleted |
 
 ### Release record (2026-11-01)
 
@@ -82,4 +82,4 @@ in `发行\Zcode-Persistence-V0.2-正式版`.
   - Release title: `Zcode-Persistence pre-import history`
   - Asset: `zcode-persistence-history-import.zip` (1,300,705 bytes, 28 entries)
   - sha256: `f9aaed855ac2b538b298dc88477c2360ae95939477fbb386fd87d3d25a4b27d9`
-  - Extracts to `history/`, matching the local `Zcode-Persistence\历史` directory
+  - Extracts to `history/`, matching the local `Zcode-Persistence` history directory

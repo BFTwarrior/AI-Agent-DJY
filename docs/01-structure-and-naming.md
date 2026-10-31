@@ -35,8 +35,8 @@ AI-Agent-DJY/
 │     ├─ README.md
 │     ├─ src/
 │     ├─ tools/
-│     ├─ 文档/
-│     └─ 逻辑图/
+│     ├─ docs/
+│     └─ diagrams/
 └─ shared/
    ├─ scripts/
    └─ prompts/
@@ -51,14 +51,13 @@ AI-Agent-DJY/
 | MCP directory | Lowercase kebab-case, identical to the `mcp.servers` key | `ms365` |
 | Project directory | Lowercase kebab-case | `zcode-persistence` |
 | Repository docs | `NN-topic.md` with a two-digit number | `03-deployment-and-sync.md` |
-| Project docs | Keep the project's own numbering | `00-总览.md` |
+| Project docs | Keep the project's own numbering | `00-overview.md` |
 
 Constraints:
 
-- No spaces, underscores or Chinese directory names; Chinese appears only in file names
-  and body text.
-- **Single exception**: projects keep `文档/` and `逻辑图/` per the owner's convention
-  (see "Project internals" below). Repository-level directories stay English.
+- No spaces, underscores or Chinese names; repository content uses English.
+- Project directories use `docs/` and `diagrams/`; Chinese directory names are not used
+  in the repository.
 - Once published, a directory name should not change; if it must, update every link,
   `UPSTREAM.md` and deployment script.
 - Use one casing only. Windows and git disagree on case sensitivity.
@@ -67,11 +66,11 @@ Constraints:
 
 - `src/`: executable source.
 - `tools/`: install, self-test and operations scripts (not runtime code).
-- `文档/`: current documentation; old versions are not duplicated in the repository.
-- `逻辑图/`: current diagrams, Markdown only. Original XMind files go to Releases or
+- `docs/`: current documentation; old versions are not duplicated in the repository.
+- `diagrams/`: current diagrams, Markdown only. Original XMind files go to Releases or
   local disk.
 - The project `README.md` is an index: one-line description, version, and links into
-  `文档/`.
+  `docs/`.
 
 ## Tag conventions
 
