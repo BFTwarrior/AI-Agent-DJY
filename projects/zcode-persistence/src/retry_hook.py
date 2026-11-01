@@ -8,11 +8,13 @@ PostToolUseFailure，但 PostToolUse 一定会来，并且带结构化结果
 
 行为：判断这次 Bash 调用是否失败；**任何失败**都向会话注入一条建议重试的提示，
 最多建议 3 次。v0.4.0 起不再按错误类型筛除——用户规格是"只要是报错就重试三次"。
+唯一例外：exit 1 且 stdout/stderr 全空，视为 grep -q / diff --quiet / test 的正常
+否定结果，不算失败（见 failure_of）。
 永不阻断会话，所有路径退出码 0。
 
 判定顺序（命中即返回）：
   1. 不是 Bash                       → 静默
-  2. 没有失败                       → 静默
+  2. 没有失败（含 exit 1 且全空）    → 静默
   3. 同一个 toolCallId 已经建议过     → 静默（防两个事件重复触发）
   4. 超时                            → 建议"立刻原样重试"
   5. 上游没产出（UPSTREAM 命中）      → 建议"先等 3 分钟再重试"
@@ -195,9 +197,16 @@ def failure_of(data):
         stderr_text = text_of(resp.get("stderr"))
         stdout_text = text_of(resp.get("stdout"))
         parts = [x for x in (stderr_text, stdout_text) if x]
+        output = "\n".join(parts)
+        # 退出码 1 且完全没有输出，是 grep / diff --quiet / test 这类"没有匹配、
+        # 条件不成立"的正常结果，不是错误。以前把它当失败，导致每条探测命令都被
+        # 建议重试三次，第三次文案又要求模型停下来，表现为"每分钟卡一次"。
+        if (exit_code == 1 and not timed_out and not stopped
+                and not output.strip()):
+            failed = False
         # 摘要优先 stderr 第一行；没有 stderr 才退回 stdout 最后一行
         head = pick_head(stderr_text) or pick_head(stdout_text, last=True)
-        return failed, "\n".join(parts), timed_out, head
+        return failed, output, timed_out, head
 
     # tool_response 不是字典（少数客户端直接给字符串）时按内容判，不要拿元数据凑
     if resp is not None:
@@ -251,8 +260,9 @@ def main():
     failed, text, timed_out, head = failure_of(data)
     if not failed:
         return 0
-    # 失败但一个字都没有（例如 grep 无匹配 exit=1）照样要建议重试：
-    # 用户的规格是"任何报错都重试"，没有输出不等于没失败。
+    # 注意：exit 1 且 stdout/stderr 全空已在 failure_of() 里判为"没失败"，
+    # 那是 grep -q / diff --quiet / test 的正常否定结果，不能建议重试。
+    # 非 1 的退出码或任何输出仍然算失败，会走到下面。
 
     # 防重复：两个事件可能对同一次调用各触发一次
     call_id = str(data.get("tool_use_id") or data.get("toolCallId") or "")
@@ -269,7 +279,8 @@ def main():
             return 0
 
     # v0.4.0：不再按错误类型筛除。用户的规格是"只要是报错就重试三次"，
-    # 所以任何失败都建议重试，唯一的例外是上游没产出（这类先等 3 分钟再发更有效）。
+    # 所以任何失败都建议重试；exit 1 且无输出已在上游排除，
+    # 这里只把"上游没产出"单独分出来（先等 3 分钟再发更有效）。
     upstream = None if timed_out else UPSTREAM_RE.search(text)
     if timed_out:
         kind, sig = "timeout", "timedOut"
@@ -320,12 +331,13 @@ def main():
                "先运行 `sleep 180` 等 3 分钟再重试。注意 sleep 这条命令本身要把超时上限"
                "设到 200000 毫秒以上（默认 2 分钟会把它杀掉，那就白等了），"
                "然后原样重试同一条命令，这是第 {n}/{mx} 次。"
-               "若第 {mx} 次仍失败，停止重试并向用户说明卡在哪一步，不要改写命令或跳过它。").format(
+               "若第 {mx} 次仍失败，报告结果并继续当前任务的其他步骤，不要改写命令或跳过它；"
+               "不要因此停下整个任务。").format(
                    sig=sig, n=count, mx=MAX_RETRIES)
     else:
         msg = ("检测到报错（{sig}）。按要求任何报错都重试：原样重试同一条命令，"
-               "这是第 {n}/{mx} 次。若第 {mx} 次仍失败，停止重试并向用户说明卡在哪一步，"
-               "不要改写命令或跳过它。").format(sig=sig, n=count, mx=MAX_RETRIES)
+               "这是第 {n}/{mx} 次。若第 {mx} 次仍失败，报告结果并继续当前任务的其他步骤，"
+               "不要改写命令或跳过它；不要因此停下整个任务。").format(sig=sig, n=count, mx=MAX_RETRIES)
 
     # 必须用 additionalContext：只有这个字段会注入模型上下文，模型才会真的去重试。
     # systemMessage 只对用户可见、模型看不见，等于没生效（v0.3.0 的 bug）。

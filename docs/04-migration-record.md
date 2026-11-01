@@ -33,15 +33,16 @@ not copied into the repository.
 | Directory | Files | Contents |
 |---|---|---|
 | `src/` | 4 | `retry_hook`, `retry_proxy`, `ensure_proxy`, `error_watch` |
-| `tools/` | 7 | install, uninstall, doctor, 3 self-tests, proxy restart |
+| `tools/` | 8 | install, uninstall, doctor, 4 self-tests, proxy restart |
 | `docs/` | 8 | 00–07, current documentation (English) |
 | `diagrams/` | 1 | `architecture.md` |
 | Root | 4 | `README.md`, `CHANGELOG.md`, `VERSION`, `AGENTS.md` |
 
-24 files. Size depends on line endings: 346,164 bytes in the original CRLF working copy at
-import; 330,150 bytes in git blobs after LF normalization (333,781 bytes in the current
-checkout). Every file in `src/` and `tools/` has the same sha256 as the corresponding file
-in the V0.2 release package directory.
+25 files. The byte counts below are the 2026-11-01 import snapshot: 346,164 bytes in the
+original CRLF working copy, 330,150 bytes in git blobs after LF normalization (333,781 bytes
+in the checkout at import). At import time every file in `src/` and `tools/` matched the V0.2
+package. The V0.2.1 patch changed `src/retry_hook.py`, added `tools/selftest_hook.py`, and
+bumped `VERSION` / `tools/install.py`; the current tree matches the V0.2.1 asset.
 
 ### Path and link adjustments
 
@@ -60,7 +61,7 @@ in the V0.2 release package directory.
 
 | Content | Destination |
 |---|---|
-| Current release `*.zip` | GitHub Releases (`proj-zcode-persistence-v0.2`) |
+| Current release `*.zip` | GitHub Releases (`proj-zcode-persistence-v0.2.1`) |
 | Historical release zips (11 files) | History import archive → Release (`...-v0.1-history`) |
 | Historical docs (2 versions) and diagram (1 version) | Same history import archive |
 | `proxy.log`, `restart.log`, `install-state.json`, `__pycache__` | Local runtime data |
@@ -70,13 +71,21 @@ in the V0.2 release package directory.
 
 - [x] Created the private GitHub repository and pushed the initial commit (`main`, 55 files)
 - [x] Created tags: `v0.1.0`, `proj-zcode-persistence-v0.2`,
-  `proj-zcode-persistence-v0.1-history`
+  `proj-zcode-persistence-v0.1-history`; later added `proj-zcode-persistence-v0.2.1`
 - [x] Uploaded the current archive to the `proj-zcode-persistence-v0.2` Release
   - Release title: `Zcode-Persistence V0.2`
   - Asset: `Zcode-Persistence-V0.2-20261101.zip` (ASCII name, because Chinese characters
     are rewritten to `.` by the platform)
   - Size: 126,779 bytes
   - sha256: `314df991f4c291611fa1c8e4d32b5b62a37d9f30e17aab07d555ac310fef3f38`
+  - **Superseded**: this asset contains the pre-fix `retry_hook.py` and was deleted after
+    the V0.2.1 asset passed verification.
+- [x] Uploaded the V0.2.1 patch archive to the `proj-zcode-persistence-v0.2.1` Release
+  - Release title: `Zcode-Persistence V0.2.1`
+  - Asset: `Zcode-Persistence-V0.2.1-20261101.zip`
+  - Size: 131,104 bytes
+  - sha256: `7f3f382dc3ba69e79e48888eaf43eb8d2d1f0b1011a5bb57b4452b7a5a1ed24c`
+  - Contains `retry_hook.py` sha256 `00f3f22e166dfc247f6b49626ae849c21d18a6ff790fdeddcba166de6243ae0b`
 - [x] Uploaded the history import archive to the
   `proj-zcode-persistence-v0.1-history` Release
   - Release title: `Zcode-Persistence pre-import history`

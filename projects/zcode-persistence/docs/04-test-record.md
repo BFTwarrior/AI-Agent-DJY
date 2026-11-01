@@ -1,6 +1,6 @@
 # 04 Test Record
 
-This section records the **decision semantics of v0.4.0** (any Bash failure is advised to retry). After a change, re-run it and only release once everything passes.
+This section records the **decision semantics of v0.4.0** (any Bash failure is advised to retry; the single exception is exit 1 with completely empty output). After a change, re-run it and only release once everything passes.
 The old expectations of v0.3.x (filtering out by error type, no retry on `permission denied`) are void; do not change the code back according to the old tables.
 
 > **Reading order**: Sections 1 through 9 are historical batches (run under "fixed 4 attempts / progressive backoff" and under the v1.1.0 heartbeat parameters respectively),
@@ -11,6 +11,8 @@ The old expectations of v0.3.x (filtering out by error type, no retry on `permis
 ## 1. Hook (retry_hook.py)
 
 Test method: `echo '<payload>' | python src/retry_hook.py`, with the state directory isolated via `ZCODE_RETRY_HOOK_STATE_DIR`.
+
+Automated regression: `python tools/selftest_hook.py` (10 decision cases, including the exit-1-with-no-output false positive).
 
 | # | Input | Expected (v0.4.0) | Observed |
 |---|---|---|---|
@@ -34,13 +36,19 @@ Test method: `echo '<payload>' | python src/retry_hook.py`, with the state direc
 | 18 | Command `ls` + `command not found` | **Has output** (deterministic errors retry too, up to 3 times) | ✅ |
 | 19 | Corrupt state.json + a failing call | **Has output**, exit code 0 (bad records fall back to defaults and are no longer silent) | ✅ |
 | 20 | Success + `status="success"` + a warning on stderr | **No output** (a successful call must not be misjudged as a failure) | ✅ |
-| 21 | Failure + stdout/stderr both empty (exit=1) | Has output; the message marks `no output` | ✅ |
+| 21 | Failure + stdout/stderr both empty (exit=1) | **No output** (a predicate command's normal negative result; fixed 2026-11-01) | ✅ 2026-11-01 |
 | 22 | `status="failed"` but `exitCode=0` | Has output | ✅ |
 | 23 | Two consecutive events with the same `toolCallId` | The second is silent (deduplication takes effect) | ✅ |
 | 24 | `tool_name=Bash` but neither `tool_response` nor any error field (only `session_id`/`tool_use_id`) | **No output** (metadata must not be padded out into error text, otherwise every successful Bash call would be advised to retry) | ✅ 2026-11-01 |
 | 25 | `tool_response` is a string (not a dict) and non-empty | Failure is judged by content and a retry is advised | ✅ |
+| 26 | `exitCode=1` + non-empty stderr | Has output (any output means it is not a silent predicate result) | ✅ 2026-11-01 |
+| 27 | `exitCode=1` + non-empty stdout | Has output | ✅ 2026-11-01 |
+| 28 | `exitCode=2` + empty stdout/stderr | Has output (an exit code other than 1 is still a failure) | ✅ 2026-11-01 |
+| 29 | `status="failed"` + `exitCode=1` + empty output | **No output** (the client marks exit 1 as failed, so status alone is not enough) | ✅ 2026-11-01 |
+| 30 | `exitCode=1` + `timedOut=true` + empty output | Has output; uses the timeout wording | ✅ 2026-11-01 |
+| 31 | `exitCode=1` + `cancelled=true` + empty output | Has output (cancellation still counts as a failure) | ✅ 2026-11-01 |
 
-**All 25 items exit with code 0**, with no stderr output.
+**All 31 items exit with code 0**, with no stderr output.
 
 ## 2. Proxy (retry_proxy.py)
 

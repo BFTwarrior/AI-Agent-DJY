@@ -97,6 +97,7 @@ projects/zcode-persistence/
 │  ├─ install.py            Install (idempotent, automatic backup)
 │  ├─ uninstall.py          Uninstall (exact restore)
 │  ├─ doctor.py             Health check
+│  ├─ selftest_hook.py      Self-test: ten hook decision cases (exit 1 with no output is not a failure)
 │  ├─ selftest_proxy_429.py Self-test: five retry-semantics scenarios (including 400 not retryable)
 │  ├─ selftest_stream.py    Self-test: seven streaming write-back scenarios (including the retryable error body on give-up)
 │  ├─ selftest_watch.py     Self-test: 12 error-reporting assertions (cooldown/rate limit/send failure/cause attribution/--once does not persist)
@@ -124,9 +125,9 @@ Mount points: ZCode's **`PostToolUse`** (primary) + **`PostToolUseFailure`** (fa
 > only `PostToolUse` always arrives, and it carries `exitCode` / `timedOut` / `stderr`.
 > Both are mounted, deduplicated by `toolCallId`, so the same call is not suggested twice.
 
-**Scope of the retry suggestion: any failure**
+**Scope of the retry suggestion: any failure (single exception: exit 1 with no output)**
 
-Since v0.4.0 there is no filtering by error type any more — as soon as a Bash call fails (non-zero exit code, genuine timeout, cancelled, or a status that is explicitly failed/error), a retry is suggested. The old "do not retry on permission denied / no such file / syntax error" whitelist has been removed.
+Since v0.4.0 there is no filtering by error type any more — as soon as a Bash call fails (non-zero exit code, genuine timeout, cancelled, or a status that is explicitly failed/error), a retry is suggested. Exception: exit code 1 with completely empty stdout/stderr is a predicate command's normal negative result (grep -q no match, diff --quiet differences, false test), not a failure. The old "do not retry on permission denied / no such file / syntax error" whitelist has been removed.
 
 | Situation | Detection basis | Suggested wording |
 |---|---|---|
@@ -260,6 +261,6 @@ It checks each item in turn: whether the scripts are all present, whether the in
 
 
 - Update `VERSION` and `CHANGELOG.md` with every change.
-- Adding wording rules: change only `UPSTREAM_PATTERNS` at the top of `src/retry_hook.py` (on a match it suggests waiting 3 minutes first). Since v0.4.0 there is no longer a "decide by error type whether to retry" list: every failure is retried. Re-run `install.py` afterwards (idempotent, it overwrites the scripts).
+- Adding wording rules: change only `UPSTREAM_PATTERNS` at the top of `src/retry_hook.py` (on a match it suggests waiting 3 minutes first). Since v0.4.0 there is no longer a "decide by error type whether to retry" list: every failure is retried (except exit 1 with no output). Re-run `install.py` afterwards (idempotent, it overwrites the scripts).
 - Adding an upstream: change `UPSTREAMS` in `src/retry_proxy.py` and add the matching prefix in `tools/install.py`.
 - After any change you must run the cases in `docs/04-test-record.md`, and only release once they all pass.

@@ -37,6 +37,11 @@ Two main components plus one optional side path (off by default):
     `--once`/`--no-send` may all not advance it — otherwise that error is lost permanently (hit on 2026-10-31: after 8 emails went out in a row one was then silently dropped).
 21. **Proxy log timestamps must carry the date** (`%Y-%m-%d %H:%M:%S`). Error reporting relies on it to line `gave up` up with the moment of the error;
     with hours and seconds only, crossing a day boundary writes the previous incident up as the cause of this one.
+22. **`exitCode == 1` with completely empty stdout/stderr is not a failure**. It is the normal negative result of predicate commands
+    such as `grep -q` with no match, `diff --quiet` with differences, or a false `test`; the client nevertheless marks the call
+    `status="failed"`, so status alone is not enough. Any exit code other than 1, any output, a timeout, or cancellation still counts
+    as a failure. The 2026-11-01 "pause once a minute" bug missed exactly this: three retry advices, and the third told the model to stop.
+
 ## Current final parameters (v0.4.0)
 
 `RETRY_WINDOW=180` (seconds, the time window), `RETRY_INTERVAL=20` (seconds, fixed interval; `MAX_ATTEMPTS` is only a runaway fuse, default 200), `SILENCE_TIMEOUT=30`, `HEARTBEAT_START=80`, `HEARTBEAT_INTERVAL=80` (no cap on count), `PROXY_RETRY_WINDOW` / `PROXY_RETRY_INTERVAL` override the window and the interval, `RETRY_AFTER_CAP=60`, port 8787.
@@ -46,8 +51,8 @@ Changing these defaults amounts to changing the product spec; you **must** updat
 ## What you must do after making changes
 
 1. Run the accelerated test in section 4 of `docs/06-ai-maintenance-guide.md` (all four assertions must pass).
-2. Run `python -I tools/selftest_proxy_429.py`, `tools/selftest_stream.py`, `tools/selftest_watch.py`
-   (5 retry scenarios + 7 streaming scenarios + 12 error-reporting assertions must all pass). If you changed `pipe_response` you must run the streaming suite;
+2. Run `python -I tools/selftest_hook.py`, `tools/selftest_proxy_429.py`, `tools/selftest_stream.py`, `tools/selftest_watch.py`
+   (10 hook cases + 5 retry scenarios + 7 streaming scenarios + 12 error-reporting assertions must all pass). If you changed `pipe_response` you must run the streaming suite;
    if you changed `error_watch.py` you must run the third suite.
 3. Bump `VERSION` and the `VERSION` in `tools/install.py`.
 4. Record "what changed + why" in `CHANGELOG.md`.

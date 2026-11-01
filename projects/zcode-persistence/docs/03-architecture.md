@@ -50,7 +50,7 @@ retry_hook.py reads stdin JSON
    └─ any other failure ──► count+1 ──► emit "retry immediately" advice
 
 Counting rule: key = sha1(session | command), cap 3, 10-minute window, pruned after 1 day.
-Since v0.4.0 there is no FATAL filter: every failure gets a retry suggestion.
+Since v0.4.0 there is no FATAL filter: every failure gets a retry suggestion. Exception: exit 1 with completely empty output is a predicate command's normal negative result, not a failure.
 ```
 
 **Why `tool_input` is stripped first**: since v0.4.0, "whether to retry" looks only at exit

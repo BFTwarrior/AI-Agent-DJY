@@ -39,7 +39,7 @@ main()
  └─ any other failure → advise "retry the same command immediately"
 ```
 
-Since v0.4.0 only a single pattern list remains, `UPSTREAM_PATTERNS` (a hit means: advise waiting 3 minutes before sending again); **whether to retry is not decided by the pattern** — every failure is advised to retry, up to 3 times. Counter state lives in `%TEMP%\Zcode-Persistence\state.json`, keyed by `sha1(session|command)`.
+Since v0.4.0 only a single pattern list remains, `UPSTREAM_PATTERNS` (a hit means: advise waiting 3 minutes before sending again); **whether to retry is not decided by the pattern** — every failure is advised to retry, up to 3 times (single exception: exit 1 with completely empty output). Counter state lives in `%TEMP%\Zcode-Persistence\state.json`, keyed by `sha1(session|command)`.
 
 ### `src/retry_proxy.py` (about 710 lines)
 
@@ -117,7 +117,7 @@ These were hardened after real incidents; breaking any one of them causes a know
 | 8 | TLS uses certifi | The Windows root store lacks SSL.com and the proxy cannot connect at all |
 | 9 | UA fallback | Relay Cloudflare blocks `Python-urllib` and returns 1010 |
 | 10 | Hook output may only use `additionalContext` | With `systemMessage` the model cannot see it, which equals no advice (the v0.3.0 pitfall) |
-| 11 | **Do not filter by error type**: every failure is advised to retry | Adding the FATAL filter back violates the requirement "retry every error three times" |
+| 11 | **Do not filter by error type**: every failure is advised to retry (except exit 1 with empty output) | Adding the FATAL filter back violates the requirement "retry every error three times" |
 | 12 | The proxy retries **any non-2xx** | Reverting to a whitelist makes 4xx pop up immediately and the user sees no retry |
 | 13 | The backoff period must `sleep` and wait | Busy-spinning saturates a single core (97% measured in v0.3.1) |
 | 14 | Write the response body back with `resp.read1(n)`, not `resp.read(n)` | `read(n)` waits until 8KB is accumulated, so SSE does not look streaming |
@@ -256,14 +256,14 @@ the mapping entry at the top of `CHANGELOG.md` tells you which build line the cu
 1. Read the "What it is / Limitations" sections of `README.md`.
 2. Read this file (`docs/06-ai-maintenance-guide.md`), section 2 code map and section 3 invariants.
 3. Run a health check once: `python <install directory>/doctor.py`; expect 11 items passed, 0 failed.
-4. Run the self-tests: `tools/selftest_proxy_429.py` (5 scenarios), `tools/selftest_stream.py` (7 scenarios),
+4. Run the self-tests: `tools/selftest_hook.py` (10 cases), `tools/selftest_proxy_429.py` (5 scenarios), `tools/selftest_stream.py` (7 scenarios),
    `tools/selftest_watch.py` (12 assertions); all should PASS.
 
 **Three things you must know before changing code**
 
 - The hook only "advises" a retry; what actually resends is the proxy; the two do not depend on each other and can be installed separately.
 - Hook output **may only use `additionalContext`**; if written as `systemMessage` the model cannot see it (hit in v0.3.0).
-- **No filtering by error type**. Every failure is advised to retry; the proxy resends on any non-2xx.
+- **No filtering by error type**. Every failure is advised to retry (except exit 1 with empty output); the proxy resends on any non-2xx.
 
 **Standard actions after changes**
 

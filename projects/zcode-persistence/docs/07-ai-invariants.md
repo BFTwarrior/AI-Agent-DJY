@@ -36,6 +36,7 @@ Three components (the third is off by default):
 19. **Only 503 carries `retryable:true`; 400 must return `retryable:false`**. 503 (the proxy exhausted its retries) must let the client continue writing by itself; 400 means the client wrote a wrong prefix/request body, and marking it retryable would resend it 10 times.
 20. **`error_watch`'s `seen` advances only after the email is sent successfully**. Being blocked by cooldown/rate limiting, a failed send, `--once`/`--no-send` must never advance it, otherwise the error is lost forever (on 2026-10-31 it sent 8 emails in a row and then silently dropped one, for exactly this reason).
 21. **Proxy log timestamps must include the date** (`%Y-%m-%d %H:%M:%S`). Error reporting uses it to align `gave up` with the error moment; with time-of-day only, cross-day alignment goes wrong.
+22. **`exitCode == 1` with completely empty stdout/stderr is not a failure**. It is the normal negative result of predicate commands such as `grep -q` with no match, `diff --quiet` with differences, or a false `test`; the client nevertheless marks the call `status="failed"`, so status alone is not enough. Any exit code other than 1, any output, a timeout, or cancellation still counts as a failure. The 2026-11-01 "pause once a minute" bug missed exactly this: three retry advices, and the third told the model to stop.
 
 ## Current finalized parameters (v0.4.0)
 
@@ -46,7 +47,7 @@ Changing these defaults equals changing the product spec; you **must** update `R
 ## What must be done after changes
 
 1. Run the accelerated test in section 4 of `docs/06-ai-maintenance-guide.md` (all four assertions pass).
-2. Run `python -I tools/selftest_proxy_429.py`, `tools/selftest_stream.py`, `tools/selftest_watch.py` (5 / 7 / 12 all pass). If `pipe_response` changed you must run the streaming set; if `error_watch.py` changed you must run the third set.
+2. Run `python -I tools/selftest_hook.py`, `tools/selftest_proxy_429.py`, `tools/selftest_stream.py`, `tools/selftest_watch.py` (10 / 5 / 7 / 12 all pass). If `pipe_response` changed you must run the streaming set; if `error_watch.py` changed you must run the third set.
 3. Bump `VERSION` and `VERSION` in `tools/install.py`.
 4. Record "what changed + why" in `CHANGELOG.md`.
 5. Repackage, **excluding** `__pycache__`, `*.pyc`, `*.log`.

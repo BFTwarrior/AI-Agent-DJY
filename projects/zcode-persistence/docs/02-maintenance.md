@@ -14,7 +14,7 @@ The "proxy runtime parameters" check exists specifically to catch the "changed t
 
 ## Adjusting error handling
 
-Since v0.4.0 there is **no error-type classification**: any failed Bash call gets a retry suggestion, at most 3 times (a 4th failure is no longer suggested). This is the user's explicit specification — do not add the FATAL filter back.
+Since v0.4.0 there is **no error-type classification**: any failed Bash call gets a retry suggestion (single exception: exit 1 with completely empty output), at most 3 times (a 4th failure is no longer suggested). This is the user's explicit specification — do not add the FATAL filter back.
 
 The only pattern table left is `UPSTREAM_PATTERNS` (at the top of `src/retry_hook.py`): on a hit, the suggestion is to `sleep 180` and wait 3 minutes before resending, because for these "upstream produced nothing" errors an immediate resend will basically fail again. To extend it, add to this one list only.
 
@@ -24,7 +24,7 @@ The rules are Python regular expressions and are case-insensitive. After changin
 2. Update `CHANGELOG.md`
 3. Re-run `python tools/install.py` to overwrite the installed scripts
 
-**Note**: only `UPSTREAM_PATTERNS` affects the wording (wait 3 minutes); it does not affect "whether to retry" — every failure is retried, and that behavior must not be steered by the pattern table.
+**Note**: only `UPSTREAM_PATTERNS` affects the wording (wait 3 minutes); it does not affect "whether to retry" — every failure is retried (except exit 1 with empty output), and that behavior must not be steered by the pattern table.
 
 ---
 

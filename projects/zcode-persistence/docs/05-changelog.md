@@ -2,8 +2,22 @@
 
 > 2026-11-01: migrated to the AI-Agent-DJY repository; documentation was translated to English and directories standardized to `docs/` and `diagrams/`. Historical entries keep paths as originally written.
 
-> **Version numbering convention**: only release numbers are published externally (V0.1, V0.2, ...); the build line in parentheses is the internal iteration number.
-> Release V0.2 = everything on build line 0.4.0; the functionality matches the 0.4.0 entry in this file.
+## V0.2.1 — 2026-11-01
+
+> V0.2.1 is a patch release on top of V0.2: only the hook's false positive and stop wording changed; proxy and error-reporting behavior are unchanged.
+
+### Hook no longer treats "no match" as a failure
+
+**Problem**: a Bash call ending with `exitCode=1` and completely empty stdout/stderr — `grep -q` with no match, `diff --quiet` with differences, a false `test` — was treated as a failure. The client also marks such calls `status="failed"`, so the hook advised a retry three times. The third message told the model to stop and explain, and it did: the "test" session started at 21:22:58, received the 3/3 advice at 21:24:09, and finished at 21:24:14 (1m16s), matching the screenshot's "worked 1m17s / stopped".
+
+**Fix**:
+- `failure_of()` now treats `exitCode == 1`, not timed out, not cancelled, and empty stdout/stderr as **not a failure**. Any other exit code, any output, a timeout, or cancellation still counts as a failure.
+- The third-attempt wording in both branches now says "report the result and continue with the other steps of the current task ... do not stop the whole task".
+- New `tools/selftest_hook.py`: 10 boundary cases covering exit 1 with no output / stderr / stdout, exit 2, exit 0, timeout, cancellation, `status="failed"` with exit 1, `status="failed"` with exit 0, and upstream-no-output.
+
+**Verification**: the 10 hook cases pass; `selftest_proxy_429`, `selftest_stream` and `selftest_watch` still pass; a live `grep -q` with no match produces no hook advice, while `ls` on a missing directory (exit 2) still does.
+
+**Packaging**: `VERSION` and `install.py` are bumped to `0.2.1`; the V0.2 release asset is superseded and removed from GitHub.
 
 ## V0.2 Release — 2026-10-31
 
