@@ -12,7 +12,7 @@ The old expectations of v0.3.x (filtering out by error type, no retry on `permis
 
 Test method: `echo '<payload>' | python src/retry_hook.py`, with the state directory isolated via `ZCODE_RETRY_HOOK_STATE_DIR`.
 
-Automated regression: `python tools/selftest_hook.py` (10 decision cases, including the exit-1-with-no-output false positive).
+Automated regression: `python tools/selftest_hook.py` (11 decision cases plus the third-attempt wording check, including the exit-1-with-no-output false positive).
 
 | # | Input | Expected (v0.4.0) | Observed |
 |---|---|---|---|
@@ -227,3 +227,42 @@ from 22:57 to 22:59 the watcher sent 8 mails in a row for the same session (dedu
 | 6 | The kill fails and the port is still occupied | `abort`, `spawn` called 0 times | ✅ |
 | 7 | The health re-check fails after spawning and the leftovers cannot be cleaned up | Logs a `cleanup:` failure, `abort`s, and does not continue spawning | ✅ |
 | 8 | Health re-check fails + `netstat_rows()` returns `None` during cleanup | `abort`s directly, no further `spawn` (`port_free()` also treats the port as occupied at this point) | ✅ |
+## 2026-11-01 auto-pause fix batch
+
+### Hook false positive (V0.2.1)
+
+| # | Case | Expected | Result |
+|---|---|---|---|
+| 1 | exit 1 + empty output | silent | ✅ |
+| 2 | exit 1 + stderr / stdout | advise an identical retry | ✅ |
+| 3 | exit 2 + empty output | advise an identical retry | ✅ |
+| 4 | timeout / cancelled | advise an identical retry | ✅ |
+| 5 | `status=failed` without `exitCode` | advise a retry | ✅ |
+| 6 | `status=failed` + exit 0 | advise a retry | ✅ |
+| 7 | upstream produced no output | advise `sleep 180` first | ✅ |
+| 8 | the same command fails 4 times | 1/3, 2/3, 3/3 (with "do not stop the whole task"), 4th silent | ✅ |
+
+### Streaming early finish (V0.2.3)
+
+Production evidence: the `finishReason=other` events have no `rawFinishReason` field, so
+the upstream sent no `finish_reason`; the client maps `undefined` to `other`. The tests
+therefore focus on the missing-reason form.
+
+Negative evidence: sending a mid-stream SSE error was classified by the client as
+`ProviderBusinessError` with `retryable=false`, and the turn still failed. The final
+design is an internal re-request, not a client-visible error.
+
+| # | Case | Expected | Result |
+|---|---|---|---|
+| 1 | reasoning then literal `finish_reason=other`, no content/tool call | discard the attempt and re-request; the client never sees `finish_reason`; log `early finish` + `retry after early finish` | ✅ |
+| 2 | content + `finish_reason=stop` | pass through, log `ok` | ✅ |
+| 3 | content + `finish_reason=other` | pass through (avoid duplicate content), log `ok` | ✅ |
+| 4 | reasoning then `[DONE]` with no `finish_reason` | mark early before `[DONE]`; the client never sees `[DONE]`; re-request | ✅ |
+| 5 | reasoning then clean EOF with no `[DONE]` and no `finish_reason` | mark early at EOF and re-request | ✅ |
+| 6 | content then `[DONE]` with no `finish_reason` | pass through, log `ok` | ✅ |
+| 7 | first connection ends early (missing reason), second returns content + stop | client receives `final answer`, `stop`, `[DONE]`, no error; log early + retry + ok | ✅ |
+| 8 | same but the first connection ends with literal `finish_reason=other` | client receives `literal answer`, `stop`, `[DONE]`, no error; log `early finish reason=other` + retry | ✅ |
+
+Together with the original 1–7 cases, the eight new scenarios (8–15) make 15 in total; all pass;
+`selftest_hook.py`, `selftest_proxy_429.py`, `selftest_watch.py` and `selftest_ensure.py`
+also pass.

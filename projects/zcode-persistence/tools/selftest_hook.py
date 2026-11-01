@@ -6,7 +6,7 @@
 正常否定结果，不能建议重试；客户端仍会把它标成 `status="failed"`，所以
 不能只看 status。
 
-验证十件事：
+验证十件事 + 一组次数文案（共 11 行断言）：
   1. exit 1 + 无输出              → 静默
   2. exit 1 + stderr              → 建议重试
   3. exit 1 + stdout              → 建议重试
@@ -17,6 +17,9 @@
   8. status=failed + exit 1 + 空  → 静默（客户端会把 exit 1 标成 failed）
   9. status=failed + exit 0       → 建议重试（明确的失败状态仍算失败）
  10. 上游无产出                   → 建议先等 3 分钟（sleep 180）
+ 11. status=failed 且无 exitCode  → 建议重试（只能靠状态判定）
+ 另加一组次数文案：同一条命令连续失败 3 次，第 3 次必须出现“3/3”和
+ “不要因此停下整个任务”；第 4 次必须静默（达到上限）。
 
 用法：python tools/selftest_hook.py            （默认读同包 src/retry_hook.py）
       python tools/selftest_hook.py --src X    （指定要测的脚本）
@@ -45,8 +48,8 @@ CASES = [
                  "timedOut": True}, True, "原样重试"),
     ("cancelled", {"exitCode": 1, "stdout": "", "stderr": "",
                    "cancelled": True}, True, "原样重试"),
-    ("status_failed_exit1_empty", {"exitCode": 1, "stdout": "", "stderr": "",
-                                   "status": "failed"}, False, ""),
+    ("status_failed_no_exit", {"stdout": "", "stderr": "",
+                               "status": "failed"}, True, "原样重试"),
     ("status_failed_exit0", {"exitCode": 0, "stdout": "", "stderr": "",
                              "status": "failed"}, True, "原样重试"),
     ("upstream_no_output", {"exitCode": 2, "stdout": "",
@@ -98,6 +101,59 @@ def run_case(script, index, name, response, want_advice, want_text):
     return ok
 
 
+def run_sequence(script):
+    """同一条命令连续失败 4 次，验证次数文案与上限。
+
+    第 3 次是模型最容易照做的一次：旧文案在这里要求“停止重试并向用户说明”，
+    模型会直接结束回合。必须断言它变成“继续当前任务的其他步骤”，
+    并且第 4 次安静（上限 3 次，不能无限建议）。
+    """
+    state_dir = tempfile.mkdtemp(prefix="zcode-hook-seq-")
+    env = dict(os.environ, ZCODE_RETRY_HOOK_STATE_DIR=state_dir)
+    advices = []
+    try:
+        for i in range(4):
+            payload = {
+                "tool_name": "Bash",
+                "session_id": "selftest-seq",
+                "tool_use_id": "call-seq-%d" % i,
+                "tool_response": {"exitCode": 2, "stdout": "", "stderr": "boom",
+                                  "status": "failed"},
+                "tool_input": {"command": "same-command"},
+            }
+            proc = subprocess.run(
+                [sys.executable, script],
+                input=json.dumps(payload),
+                text=True,
+                capture_output=True,
+                encoding="utf-8",
+                env=env,
+                timeout=10,
+            )
+            advice = ""
+            if proc.stdout.strip():
+                try:
+                    advice = str(json.loads(proc.stdout).get("additionalContext") or "")
+                except ValueError:
+                    advice = ""
+            advices.append((proc.returncode, advice))
+    finally:
+        shutil.rmtree(state_dir, ignore_errors=True)
+
+    third = advices[2][1] if len(advices) > 2 else ""
+    fourth = advices[3][1] if len(advices) > 3 else ""
+    ok = (len(advices) == 4
+          and all(rc == 0 for rc, _ in advices)
+          and all(advice for _, advice in advices[:3])
+          and "3/3" in third
+          and "不要因此停下整个任务" in third
+          and not fourth)
+    print("%-28s %s" % ("third_attempt_wording", "PASS" if ok else "FAIL"))
+    if not ok:
+        print("  advices=%r" % [(rc, a[:120]) for rc, a in advices])
+    return ok
+
+
 def main():
     "入口：解析参数、逐项跑用例，全部通过才返回 0。"
     here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -113,6 +169,7 @@ def main():
     all_ok = True
     for i, (name, response, want_advice, want_text) in enumerate(CASES):
         all_ok &= run_case(args.src, i, name, response, want_advice, want_text)
+    all_ok &= run_sequence(args.src)
     print("总体: %s" % ("全部通过" if all_ok else "有失败"))
     return 0 if all_ok else 1
 

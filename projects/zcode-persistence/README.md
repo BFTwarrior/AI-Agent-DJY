@@ -3,7 +3,7 @@
 A ZCode failure-retry toolkit: **suggests a retry when a tool fails**, **automatically
 resends when a model request fails**, plus a default-off **email report of session errors**.
 
-- Version: V0.2.1 patch release (build line 0.4.0)
+- Version: V0.2.3 patch release (build line 0.4.0)
 - Applies to: ZCode Desktop (Windows), Python 3.9+
 - Dependencies: Python standard library only; proxy mode prefers certifi (if installed)
 
@@ -15,7 +15,7 @@ resends when a model request fails**, plus a default-off **email report of sessi
 | [01-Install and rollback](docs/01-install-and-rollback.md) | Installation, prefix selection, uninstallation |
 | [02-Maintenance manual](docs/02-maintenance.md) | Parameters, logs, restarting the proxy, troubleshooting |
 | [03-Architecture](docs/03-architecture.md) | Internal structure of the hook and the proxy |
-| [04-Test record](docs/04-test-record.md) | Test cases and results of the three self-test suites |
+| [04-Test record](docs/04-test-record.md) | Test cases and results of the self-test suites |
 | [05-Changelog](docs/05-changelog.md) | Version history and fix records |
 | [06-AI maintenance guide](docs/06-ai-maintenance-guide.md) | Code map, invariants, test recipes, fault localization |
 | [07-AI handover invariants](docs/07-ai-invariants.md) | Quick reference of the hard constraints for taking over maintenance |
@@ -29,7 +29,7 @@ projects/zcode-persistence/
 ├─ VERSION                  Version number
 ├─ CHANGELOG.md             Change log
 ├─ src/                     Runtime scripts (4)
-├─ tools/                   Install/uninstall/self-test/restart (7)
+├─ tools/                   Install/uninstall/self-test/restart (8)
 ├─ docs/                    Current documentation (00-07)
 └─ diagrams/                Current structure diagrams
 ```
@@ -56,6 +56,6 @@ addresses out of the documentation.
 
 ## Distribution
 
-The distribution package lives in the repository Releases: `proj-zcode-persistence-v0.2.1`.
+The distribution package lives in the repository Releases: `proj-zcode-persistence-v0.2.3`.
 The archive contains build artifacts; this directory is authoritative for the source, and
 if the two disagree, this directory plus the tag wins.

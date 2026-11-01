@@ -47,7 +47,7 @@ Changing these defaults equals changing the product spec; you **must** update `R
 ## What must be done after changes
 
 1. Run the accelerated test in section 4 of `docs/06-ai-maintenance-guide.md` (all four assertions pass).
-2. Run `python -I tools/selftest_hook.py`, `tools/selftest_proxy_429.py`, `tools/selftest_stream.py`, `tools/selftest_watch.py` (10 / 5 / 7 / 12 all pass). If `pipe_response` changed you must run the streaming set; if `error_watch.py` changed you must run the third set.
+2. Run `python -I tools/selftest_hook.py`, `tools/selftest_proxy_429.py`, `tools/selftest_stream.py`, `tools/selftest_watch.py` (11 / 5 / 15 / 12 all pass; run `tools/selftest_ensure.py` after changing `ensure_proxy.py`). If `pipe_response` changed you must run the streaming set; if `error_watch.py` changed you must run the third set.
 3. Bump `VERSION` and `VERSION` in `tools/install.py`.
 4. Record "what changed + why" in `CHANGELOG.md`.
 5. Repackage, **excluding** `__pycache__`, `*.pyc`, `*.log`.
@@ -63,7 +63,7 @@ the mapping entry at the top of `CHANGELOG.md` tells you which build line the cu
 
 1. Read the "What it is / Limitations" sections of `README.md`.
 2. Read this file (`docs/06-ai-maintenance-guide.md`), section 2 code map and section 3 invariants.
-3. Run a health check once: `python <install directory>/doctor.py`; expect 11 items passed, 0 failed.
+3. Run a health check once: `python <install directory>/doctor.py`; expect 12 items passed, 0 failed.
 4. Run the self-tests once: `python tools/selftest_proxy_429.py`; all 5 scenarios should PASS.
 
 **Three things you must know before changing code**

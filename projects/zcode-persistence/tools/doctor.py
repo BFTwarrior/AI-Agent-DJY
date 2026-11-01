@@ -57,6 +57,28 @@ def is_our_proxy():
         return False
 
 
+def count_listeners():
+    """统计 8787 上的 LISTENING 进程数。
+
+    Windows 的 SO_REUSEADDR 允许两个进程同时绑定同一端口（Linux 不允许），
+    2026-11-01 重启后确实出现过两个代理同秒启动。只判断"有人在听"会漏掉这种
+    请求被分流的状态，所以这里数一下进程数。
+    """
+    try:
+        out = subprocess.run(["netstat", "-ano"], capture_output=True, text=True,
+                             timeout=10, encoding="utf-8", errors="replace").stdout
+    except Exception:
+        return None
+    pids = set()
+    for line in out.splitlines():
+        parts = line.split()
+        if (len(parts) >= 4 and parts[0].upper() == "TCP"
+                and parts[-2].upper() == "LISTENING"
+                and parts[1].endswith(":%d" % PORT)):
+            pids.add(parts[-1])
+    return len(pids)
+
+
 def tail_lines(path, count):
     """读文件末尾 count 行（最多回看 64KB）。
 
@@ -321,8 +343,13 @@ def main():
         listening = False
     finally:
         s.close()
+    listeners = count_listeners()
     if listening and is_our_proxy():
-        add("PASS", "代理端口 %d" % PORT, "监听中，且 /__zp_health 回答是本代理")
+        if listeners and listeners > 1:
+            add("FAIL", "代理端口 %d" % PORT,
+                "%d 个进程同时监听（Windows SO_REUSEADDR）；请求会被分流，只保留一个 PID" % listeners)
+        else:
+            add("PASS", "代理端口 %d" % PORT, "监听中，且 /__zp_health 回答是本代理")
     elif listening:
         add("WARN", "代理端口 %d" % PORT,
             "端口有服务在听，但不是本代理（provider 会打到错误服务）")

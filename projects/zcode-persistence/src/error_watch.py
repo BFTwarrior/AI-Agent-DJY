@@ -455,7 +455,7 @@ def send_mail(subject, body, timeout=90):
     try:
         init = cli.request("initialize", {
             "protocolVersion": "2024-11-05", "capabilities": {},
-            "clientInfo": {"name": "Zcode-Persistence", "version": "0.2"}}, timeout=45)
+            "clientInfo": {"name": "Zcode-Persistence", "version": "0.2.3"}}, timeout=45)
         if not init or "result" not in init:
             return False, "initialize 无有效响应 %s" % cli.stderr_tail()
         cli.notify("notifications/initialized")

@@ -1,4 +1,4 @@
-# Architecture Diagram (V0.2 official release)
+# Architecture Diagram (V0.2.3 patch release)
 
 > Build line 0.4.0. Parameters and semantics follow the code in this project's `src/`;
 > this document sketches the relationships without repeating every detail.

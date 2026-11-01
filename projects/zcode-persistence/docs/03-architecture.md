@@ -91,6 +91,9 @@ write response headers (strip hop-by-hop) → read1 chunk by chunk, flush to the
    │  (streaming: the reader thread only does blocking reads; the main thread checks the
    │   queue every 0.5s; after 80s of silence add `: keepalive`; at 180s mark truncation)
    │
+   ├─ SSE ends ([DONE] / clean EOF) with no finish_reason, or an unknown reason,
+   │   and no text/tool call yet ──► return "early"; _handle re-requests upstream and
+   │   continues the same client response (V0.2.3)
    ├─ stream breaks mid-way ──► can only end; cannot retry (would duplicate content)
    ├─ fixed-length response delivers too few bytes ──► log truncated, no terminator
    └─ normal end ──► log ok
@@ -105,9 +108,13 @@ instead of spinning. Heartbeats are independent of attempt boundaries: after 80 
 seconds without upstream input one `: keepalive` is sent, and then one every 80 seconds,
 with no upper limit.
 
-**Key design point: retries happen before "any byte has been written to the client".** Once
-write-back starts there is no going back; that is a physical constraint of HTTP streaming,
-not implementation corner-cutting.
+**Key design point: retries happen before any user-visible text is written** (V0.2.3).
+Once text has been written there is no going back; that is a physical constraint of HTTP
+streaming. The one recoverable case is a stream that ends with **no text and no tool call**
+(missing/unknown `finish_reason`, or literal `other`): the proxy discards that upstream
+attempt and re-requests it internally, and the new stream continues writing into the same
+client response. It does **not** send a mid-stream SSE error — production testing showed the
+client classifies that as `ProviderBusinessError` with `retryable=false`.
 
 **Where the 30-second silence timeout comes from**: the ZCode client declares failure if it
 has not received the first byte within 95 seconds. So the proxy first hangs an SSE heartbeat

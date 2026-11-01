@@ -4,8 +4,8 @@
 
 It adds three things to ZCode: **automatically suggest a retry when a tool fails**, **automatically resend when a model request fails**, and (off by default) **email the reason when a session errors**.
 
-- Version: V0.2 official release (build line 0.4.0)
-- Build date: 2026-10-30 (2026-10-31 addenda: the give-up error body is now retryable, error watching, health-probe root)
+- Version: V0.2.3 patch release (build line 0.4.0)
+- Build date: 2026-11-02 (V0.2.3: internal retry for early-finished streams; V0.2.1: hook false-positive fix)
 - Applies to: ZCode Desktop (Windows), Python 3.9+
 - Dependencies: Python standard library only; in proxy mode, TLS verification prefers certifi when it is installed
 
@@ -206,6 +206,8 @@ A slow-reading client only makes the whole stream slower (the proxy uses a queue
 a half-open connection that reads nothing and never disconnects blocks forever (until reading resumes or TCP reports an error) — that is the price of having no client write timeout.
 After that another heartbeat is added **every 80 seconds** without input, **with no cap on the number of heartbeats**. The heartbeat is driven by an independent clock and does not wait for an attempt to fail before being sent.
 
+**Early finish is retried**: if the upstream ends a streaming response before emitting any text or tool call — with `finish_reason=other`, an unknown value, or (the common production case) no `finish_reason` at all — the proxy withholds the ending event, discards that upstream attempt, and immediately re-requests it, continuing the same client response (V0.2.3), so the client sees the stream continue instead of ending the turn silently. The client maps a missing `finish_reason` to `other`, which is why watching only for the literal string misses the real case. An ending that arrives after real content is passed through unchanged, because resending would duplicate what the user already saw.
+
 **Not retried**: a stream break after bytes have already been written back to the client — resending at that point would duplicate content. In this case the proxy does not write the chunked terminating block, so the client sees the stream did not end normally and knows it was truncated instead of mistakenly believing it finished.
 
 **Known requirements**
@@ -233,13 +235,14 @@ It checks each item in turn: whether the scripts are all present, whether the in
 | The hook does not fire | No new session opened / `hooks.enabled` turned off / a tool other than Bash failed | Look at the `doctor.py` output; the hook only handles Bash |
 | The proxy log shows attempt fail but it finally succeeds | Normal, it means the proxy is resending | Nothing to do; look at the `ok ... first=x.xxs` line |
 | The proxy log shows `truncated` | The stream broke after writing back had started, so it cannot be retried | Expected; the client sees an incomplete stream |
+| The proxy log shows `early finish ...` + `retry after early finish` | The upstream ended before producing content | Expected; the proxy discarded that attempt and re-requested upstream, so the client just sees the stream continue |
 
 ---
 
 ## Boundaries and limitations (must read)
 
 1. **Mode A cannot really resend.** The hook can only inject a suggestion, and the model decides whether to retry. If the model does not listen, nothing happened.
-2. **Mode B cannot cover every failure.** The ZCode client raises an error directly when a whole round fails; the proxy can only cover the class "the request failed before it started returning data". If the failure happens in the middle of the response stream, the proxy cannot retry.
+2. **Mode B cannot cover every failure.** It covers "the request failed before returning data" and "the upstream ended with `finish_reason=other` before producing any content". If the failure happens after content has been written back, the proxy cannot retry without duplicating that content.
 3. **The 95 seconds is the client timeout.** A streaming request gets a heartbeat at 80 seconds without data, so the 3-minute window holds; non-streaming requests cannot take heartbeats, so the client may give up at its own timeout first.
 4. **The provider config may be rewritten by the ZCode UI.** If you have changed channel settings in the UI, `baseUrl` may have been overwritten back to the official address, in which case just run `install.py --with-proxy` again.
 5. **Paths of the two config files**: `~/.zcode/cli/config.json` (hooks) and `~/.zcode/v2/provider_config.json` (provider). The installer touches only these two places, and backs both up before changing them.

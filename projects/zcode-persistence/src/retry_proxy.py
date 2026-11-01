@@ -383,6 +383,92 @@ def pipe_response(handler, resp, conn, path, started, sse_started=False, heartbe
     # 只有响应体确实是 SSE 才允许插心跳：往 JSON 里写注释行会直接把内容写坏。
     ctype = (resp.getheader("Content-Type") or "").lower()
     can_hb = bool(heartbeat) and (sse_started or ctype.startswith("text/event-stream"))
+    is_sse = bool(sse_started or ctype.startswith("text/event-stream"))
+    pending = b""
+    saw_text = False
+    saw_tool = False
+    saw_choices = False
+    finish_seen = False
+    early = False
+    # 正常/可接受的结束原因。其它未知值（含字面 "other"）在“没有正文/工具调用”
+    # 时一律按异常提前结束处理：客户端会把未知值映射成 other，然后当正常完成收掉回合。
+    safe_finish = ("stop", "length", "content_filter",
+                   "tool_calls", "tool_call", "function_call")
+
+    def emit(data):
+        "写一个 chunked 块；所有回写都走这里，保证 total/first 统计一致。"
+        nonlocal total, first
+        if first is None:
+            first = time.time() - started
+        handler.wfile.write(b"%x\r\n" % len(data) + data + b"\r\n")
+        handler.wfile.flush()
+        total += len(data)
+
+    def early_finish(why):
+        """记录一次“上游没产出就结束”，交给 _handle 丢弃并重发。
+
+        这里刻意不向客户端发错误：2026-11-02 实测，mid-stream 的 SSE error 会被
+        ZCode 归成 ProviderBusinessError（retryable=false），整轮直接失败，不会自动
+        续写。真正可行的做法是代理内部再发一次上游请求，把新流的 reasoning/正文
+        接着写进同一个响应；客户端只看到流还在继续。
+        """
+        nonlocal early
+        early = True
+        log("early finish %s after %d bytes %s" % (why, total, path))
+        return True
+
+    def process_sse(data, emit_lines=True):
+        """边转发边检查结束原因。
+
+        2026-11-01 实测：上游在只吐了少量 reasoning、没有正文/工具调用时，经常
+        **根本不给 finish_reason**（客户端日志里 rawFinishReason 为空），ZCode 的
+        `Bto(undefined)` 会把它归成 other 并当正常完成（turn.completed），回合就停在
+        半路；如果上游给的是字面 other / 其它未知值，结果一样。这里在 `[DONE]`
+        或正常 EOF 之前截住，丢弃这次尝试并让 _handle 重发上游。
+        正常 stop/tool_calls，以及已经有正文/工具调用的流，一律原样转发——
+        重发会把用户已经看到的内容再写一遍。
+        """
+        nonlocal pending, saw_text, saw_tool, saw_choices, finish_seen
+        pending += data
+        while b"\n" in pending:
+            line, pending = pending.split(b"\n", 1)
+            line += b"\n"
+            if line.startswith(b"data:"):
+                raw = line[5:].strip()
+                if raw:
+                    if raw == b"[DONE]":
+                        # 客户端收到 [DONE] 就结束流；此前没有任何结束原因时，
+                        # 它会按 other 收掉回合，所以必须在这一行之前截住。
+                        if (saw_choices and not finish_seen
+                                and not saw_text and not saw_tool):
+                            return early_finish("missing finish_reason")
+                    else:
+                        try:
+                            obj = json.loads(raw.decode("utf-8", "replace"))
+                        except Exception:
+                            obj = None
+                        if isinstance(obj, dict):
+                            choices = obj.get("choices")
+                            if isinstance(choices, list) and choices:
+                                saw_choices = True
+                                for choice in choices:
+                                    if not isinstance(choice, dict):
+                                        continue
+                                    delta = choice.get("delta")
+                                    if isinstance(delta, dict):
+                                        if delta.get("content"):
+                                            saw_text = True
+                                        if delta.get("tool_calls") or delta.get("function_call"):
+                                            saw_tool = True
+                                    fr = choice.get("finish_reason")
+                                    if isinstance(fr, str) and fr:
+                                        finish_seen = True
+                                        if (fr not in safe_finish
+                                                and not saw_text and not saw_tool):
+                                            return early_finish("reason=%s" % fr)
+            if emit_lines:
+                emit(line)
+        return False
 
     # 响应头之后的静默处理。
     #
@@ -481,11 +567,28 @@ def pipe_response(handler, resp, conn, path, started, sse_started=False, heartbe
                     break
             last_upstream = time.time()
             next_hb_at = last_upstream + HEARTBEAT_INTERVAL
-            if first is None:
-                first = time.time() - started
-            handler.wfile.write(b"%x\r\n" % len(chunk) + chunk + b"\r\n")
-            handler.wfile.flush()
-            total += len(chunk)
+            if is_sse:
+                if process_sse(chunk):
+                    break
+            else:
+                emit(chunk)
+        # 提前结束：丢掉这次上游响应，由 _handle 立刻再发一次；客户端连接保持打开，
+        # 已经转发出去的 reasoning 不会撤回，新流的正文会接着写进同一个响应。
+        if early:
+            return "early"
+        # pending 只可能是“最后一行没有换行”。它可能是完整事件，也可能在 JSON
+        # 中间被断开：只解析、不转发，避免把半截 data: 行写给客户端，重试流再追加
+        # 时合成一个非法事件。
+        if is_sse and pending:
+            if process_sse(b"\n", emit_lines=False):
+                return "early"
+            pending = b""
+        # 上游既没发 [DONE] 也没给 finish_reason，只是正常关闭了连接：客户端同样会
+        # 把它当成完成，所以同样丢弃这次尝试并重发。
+        if (is_sse and saw_choices and not finish_seen
+                and not saw_text and not saw_tool):
+            early_finish("missing finish_reason at EOF")
+            return "early"
         # Content-Length 定长响应：上游声明 N 字节却提前 EOF 时，http.client
         # 的 read1 只返回短数据、不抛异常，不能当成完整响应（否则还会误补终止块）。
         completed = not getattr(resp, "length", 0)
@@ -497,7 +600,11 @@ def pipe_response(handler, resp, conn, path, started, sse_started=False, heartbe
         # 先让读取线程别再往队列里塞东西（它在 put 的 0.5 秒超时里能看到 stop），
         # 再写终止块/关连接。读取线程若正阻塞在 read1，只能等它自己的 socket 超时。
         stop.set()
-        if completed:
+        if early:
+            # 只关上游连接；客户端连接留给下一次尝试继续写，不能补终止块、
+            # 也不能置 close_connection，否则客户端会把流当成正常结束。
+            pass
+        elif completed:
             try:
                 handler.wfile.write(b"0\r\n\r\n")
                 handler.wfile.flush()
@@ -516,6 +623,7 @@ def pipe_response(handler, resp, conn, path, started, sse_started=False, heartbe
     else:
         log("truncated %s status=%d bytes=%d (client sees an incomplete stream)"
             % (path, resp.status, total))
+    return "done"
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -665,9 +773,25 @@ class Handler(BaseHTTPRequestHandler):
             if a is not None:
                 if a.reason == "ok":
                     # 非 2xx 在 fetch_once 里已经转成 reason=status，这里只可能是成功响应
-                    pipe_response(self, a.resp, a.conn, path, started, sse_mode,
-                                  heartbeat=wants_stream)
-                    return
+                    result = pipe_response(self, a.resp, a.conn, path, started,
+                                           sse_mode, heartbeat=wants_stream)
+                    if result != "early":
+                        return
+                    # 这次上游只吐了 reasoning 就结束，没有正文/工具调用。代理已经
+                    # 在同一个客户端响应上发过 200（可能还有心跳），后续尝试必须
+                    # 沿用这个响应：sse_mode=True 阻止再发状态行。
+                    sse_mode = True
+                    reasons.append("early")
+                    elapsed = time.time() - started
+                    log("retry after early finish attempt %d (%.0fs/%gs) %s"
+                        % (attempt, elapsed, RETRY_WINDOW, path))
+                    if elapsed >= RETRY_WINDOW or attempt >= MAX_ATTEMPTS:
+                        break
+                    nxt = time.time() + RETRY_INTERVAL
+                    if nxt - started >= RETRY_WINDOW:
+                        break
+                    next_attempt_at = nxt
+                    continue
 
                 reasons.append(a.reason)
                 log("attempt %d fail (%s: %s) %.1fs %s"

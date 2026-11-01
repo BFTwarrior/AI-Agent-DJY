@@ -52,7 +52,7 @@ Changing these defaults amounts to changing the product spec; you **must** updat
 
 1. Run the accelerated test in section 4 of `docs/06-ai-maintenance-guide.md` (all four assertions must pass).
 2. Run `python -I tools/selftest_hook.py`, `tools/selftest_proxy_429.py`, `tools/selftest_stream.py`, `tools/selftest_watch.py`
-   (10 hook cases + 5 retry scenarios + 7 streaming scenarios + 12 error-reporting assertions must all pass). If you changed `pipe_response` you must run the streaming suite;
+   (11 hook cases + 5 retry scenarios + 15 streaming scenarios + 12 error-reporting assertions must all pass). If you changed `pipe_response` you must run the streaming suite;
    if you changed `error_watch.py` you must run the third suite.
 3. Bump `VERSION` and the `VERSION` in `tools/install.py`.
 4. Record "what changed + why" in `CHANGELOG.md`.

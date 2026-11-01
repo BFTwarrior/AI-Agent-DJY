@@ -3,7 +3,7 @@
 
 不碰真实中转：假上游在本机回环上按脚本吐字节，代理用临时副本 + 临时端口。
 
-验证七件事（对应 2026-10-31 三轮复审与终验发现的真问题）：
+验证十五件事（对应 2026-10-31 三轮复审与终验、2026-11-01 自动暂停修复）：
   1. 逐条透传：上游每 0.2 秒发一条 80 字节事件，客户端应当在每条到达后
      几十毫秒内收到，而不是攒到 8KB 或流结束才一起到
   2. 流中静默：响应头之后上游停 2.5 秒、空闲超时设 1 秒时，代理应当发
@@ -18,6 +18,15 @@
   7. 心跳模式下放弃：上游一个字节都不回、200 已经发出，放弃时只能把错误体
      塞进 SSE `data:` 事件——必须带 retryable/code，并补 chunked 终止块，
      否则客户端的"自动续写"没有依据
+  8. 提前结束（2026-11-01 自动暂停）：上游只吐 reasoning、没有正文/工具调用，
+     却以 `finish_reason=other` 结束——代理必须丢弃本次尝试并内部重发，不能让客户端
+     把它当正常完成而结束整个回合
+  9. 正常 `finish_reason=stop` 必须原样透传，不能被第 8 条误伤
+ 10. 已经有正文的 `other` 也原样透传：内容已经给用户看了，重发会重复
+ 11. 上游根本没给 `finish_reason`、只发 `[DONE]`（线上真实形态）——[DONE] 前判 early
+ 12. 没给 `finish_reason`、也没发 `[DONE]`，直接正常关闭连接——EOF 判 early
+ 13. 有正文但没 `finish_reason` 的 `[DONE]`——原样放行，避免重复内容
+ 14. 第一次连接提前结束、第二次连接成功：代理内部重发，客户端只看到一条连续的流
 
 用法：python tools/selftest_stream.py            （默认读同包 src/retry_proxy.py）
       python tools/selftest_stream.py --src X
@@ -76,8 +85,10 @@ class FakeUpstream(object):
 
     def __init__(self, port, script, content_type="text/event-stream",
                  content_length=None, chunked=True, hold_after=0,
-                 no_response=False):
-        self.script = script
+                 no_response=False, scripts=None):
+        # scripts 非空时按顺序服务多次连接：用来模拟“第一次提前结束、代理内部
+        # 重发第二次并成功”的透明续写路径。
+        self.scripts = scripts if scripts is not None else [script]
         self.content_type = content_type
         self.content_length = content_length
         self.chunked = chunked
@@ -101,10 +112,20 @@ class FakeUpstream(object):
             pass
 
     def _serve(self):
-        try:
-            conn, _ = self.sock.accept()
-        except OSError:
-            return
+        for script in self.scripts:
+            try:
+                conn, _ = self.sock.accept()
+            except OSError:
+                return
+            try:
+                self._serve_one(conn, script)
+            finally:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+
+    def _serve_one(self, conn, script):
         try:
             conn.settimeout(10)
             data = b""
@@ -137,7 +158,7 @@ class FakeUpstream(object):
                 resp.append("Content-Length: %d" % self.content_length)
             conn.sendall(("\r\n".join(resp) + "\r\n\r\n").encode())
 
-            for body, pause in self.script:
+            for body, pause in script:
                 if self.chunked:
                     conn.sendall(b"%x\r\n" % len(body) + body + b"\r\n")
                 else:
@@ -150,11 +171,6 @@ class FakeUpstream(object):
                 conn.sendall(b"0\r\n\r\n")
         except Exception:
             pass
-        finally:
-            try:
-                conn.close()
-            except Exception:
-                pass
 
 
 def call_stream(proxy_port, read_seconds, idle=0.15, start_delay=0.0):
@@ -194,7 +210,7 @@ def call_stream(proxy_port, read_seconds, idle=0.15, start_delay=0.0):
 
 def run_case(name, src, script, content_length=None, chunked=True,
              env_extra=None, read_seconds=4.0, heartbeat_start="100",
-             hold_after=0, start_delay=0.0, no_response=False):
+             hold_after=0, start_delay=0.0, no_response=False, scripts=None):
     "跑一个用例：起假上游 → 起代理副本 → 发流式请求 → 收日志与字节。"
     workdir = tempfile.mkdtemp(prefix="streamtest-")
     proxy_port = free_pair()
@@ -211,7 +227,7 @@ def run_case(name, src, script, content_length=None, chunked=True,
         proxy = make_proxy_copy(src, workdir, upstream_port)
         with FakeUpstream(upstream_port, script, content_length=content_length,
                           chunked=chunked, hold_after=hold_after,
-                          no_response=no_response):
+                          no_response=no_response, scripts=scripts):
             out = open(logfile, "w", encoding="utf-8")
             proc = subprocess.Popen([sys.executable, proxy], env=env, cwd=workdir,
                                     stdout=out, stderr=subprocess.STDOUT)
@@ -246,7 +262,7 @@ def run_case(name, src, script, content_length=None, chunked=True,
 
 
 def main():
-    "依次跑 7 个场景并汇总；全部通过退出码 0。"
+    "依次跑 15 个场景并汇总；全部通过退出码 0。"
     ap = argparse.ArgumentParser()
     ap.add_argument("--src", default=os.path.join(
         os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -349,6 +365,147 @@ def main():
     print("   retryable=%s code=%s 终止块=%s" % (has_retry, has_code, has_term))
     print("   判定:", "PASS" if pass7 else "FAIL")
     ok = ok and pass7
+
+    # 8) 提前结束：只有 reasoning、没有正文/工具调用，上游却回 finish_reason=other。
+    #    代理必须截住这个结束事件、丢弃本次尝试并由 _handle 重发上游；客户端不能
+    #    收到 finish_reason（收到就会被当正常完成）。
+    script = [
+        (b'data: {"choices":[{"delta":{"reasoning_content":"thinking"}}]}\n\n', 0.05),
+        (b'data: {"choices":[{"delta":{},"finish_reason":"other"}]}\n\n', 0.05),
+        (b"data: [DONE]\n\n", 0.0),
+    ]
+    chunks, logtext, tail = run_case("提前结束转内部重发", args.src, script, read_seconds=3.0)
+    data = b"\n\n".join(c for _t, c in chunks) + tail
+    text = data.decode("utf-8", "replace")
+    early = "early finish reason=other" in logtext
+    retried = "retry after early finish" in logtext
+    no_finish = '"finish_reason"' not in text
+    no_error = '"error"' not in text
+    pass8 = early and retried and no_finish and no_error
+    print("   early=%s 已重发=%s 无finish=%s 无error=%s"
+          % (early, retried, no_finish, no_error))
+    print("   判定:", "PASS" if pass8 else "FAIL")
+    ok = ok and pass8
+
+    # 9) 正常结束不能被误伤：stop + 正文必须原样透传。
+    script = [
+        (b'data: {"choices":[{"delta":{"content":"hi"}}]}\n\n', 0.05),
+        (b'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\n', 0.05),
+        (b"data: [DONE]\n\n", 0.0),
+    ]
+    chunks, logtext, tail = run_case("正常结束原样透传", args.src, script, read_seconds=3.0)
+    data = b"\n\n".join(c for _t, c in chunks) + tail
+    pass9 = (b'"finish_reason":"stop"' in data and b"hi" in data
+             and '"retryable"' not in data.decode("utf-8", "replace")
+             and "ok " in logtext and "early finish" not in logtext)
+    print("   判定:", "PASS" if pass9 else "FAIL")
+    ok = ok and pass9
+
+    # 10) 已经有正文再收到 other：内容已经给用户看了，重发会造成重复，必须放行。
+    script = [
+        (b'data: {"choices":[{"delta":{"content":"done"}}]}\n\n', 0.05),
+        (b'data: {"choices":[{"delta":{},"finish_reason":"other"}]}\n\n', 0.05),
+        (b"data: [DONE]\n\n", 0.0),
+    ]
+    chunks, logtext, tail = run_case("有正文的 other 放行", args.src, script, read_seconds=3.0)
+    data = b"\n\n".join(c for _t, c in chunks) + tail
+    pass10 = (b'"finish_reason":"other"' in data and b"done" in data
+              and '"retryable"' not in data.decode("utf-8", "replace")
+              and "ok " in logtext and "early finish" not in logtext)
+    print("   判定:", "PASS" if pass10 else "FAIL")
+    ok = ok and pass10
+
+    # 11) 线上真实形态：没有 finish_reason，直接 [DONE]。客户端把 undefined 映射成
+    #     other 并当正常完成；必须在 [DONE] 交给客户端之前截住。
+    script = [
+        (b'data: {"choices":[{"delta":{"reasoning_content":"hmm"}}]}\n\n', 0.05),
+        (b"data: [DONE]\n\n", 0.0),
+    ]
+    chunks, logtext, tail = run_case("缺 finish_reason 的 DONE", args.src, script, read_seconds=3.0)
+    data = b"\n\n".join(c for _t, c in chunks) + tail
+    missing = "missing finish_reason" in logtext
+    retried = "retry after early finish" in logtext
+    passed_done = b"[DONE]" in data
+    pass11 = missing and retried and not passed_done
+    print("   missing=%s 已重发=%s 放行DONE=%s" % (missing, retried, passed_done))
+    print("   判定:", "PASS" if pass11 else "FAIL")
+    ok = ok and pass11
+
+    # 12) 同样没有 finish_reason，但上游连 [DONE] 都不发，正常关闭连接。
+    script = [
+        (b'data: {"choices":[{"delta":{"reasoning_content":"hmm"}}]}\n\n', 0.05),
+    ]
+    chunks, logtext, tail = run_case("缺 finish_reason 的 EOF", args.src, script, read_seconds=3.0)
+    pass12 = ("missing finish_reason at EOF" in logtext
+              and "retry after early finish" in logtext)
+    print("   判定:", "PASS" if pass12 else "FAIL")
+    ok = ok and pass12
+
+    # 13) 有正文、没有 finish_reason 的 [DONE]：必须放行，重发会重复已显示内容。
+    script = [
+        (b'data: {"choices":[{"delta":{"content":"answer"}}]}\n\n', 0.05),
+        (b"data: [DONE]\n\n", 0.0),
+    ]
+    chunks, logtext, tail = run_case("有正文的缺失结束原因", args.src, script, read_seconds=3.0)
+    data = b"\n\n".join(c for _t, c in chunks) + tail
+    text = data.decode("utf-8", "replace")
+    pass13 = (b"[DONE]" in data and b"answer" in data
+              and '"retryable"' not in text and "ok " in logtext
+              and "early finish" not in logtext)
+    print("   判定:", "PASS" if pass13 else "FAIL")
+    ok = ok and pass13
+    # 14) 透明续写：第一次连接只有 reasoning + [DONE]（无 finish_reason），
+    #     代理内部重发第二次连接，第二次给出正文和 stop。客户端应当只看到一条
+    #     连续的流，最终正常完成，不出现任何错误事件。
+    first = [
+        (b'data: {"choices":[{"delta":{"reasoning_content":"first try"}}]}\n\n', 0.05),
+        (b"data: [DONE]\n\n", 0.0),
+    ]
+    second = [
+        (b'data: {"choices":[{"delta":{"reasoning_content":"second try"}}]}\n\n', 0.05),
+        (b'data: {"choices":[{"delta":{"content":"final answer"}}]}\n\n', 0.05),
+        (b'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\n', 0.05),
+        (b"data: [DONE]\n\n", 0.0),
+    ]
+    chunks, logtext, tail = run_case("提前结束后透明续写", args.src, first,
+                                     scripts=[first, second], read_seconds=8.0)
+    data = b"\n\n".join(c for _t, c in chunks) + tail
+    text = data.decode("utf-8", "replace")
+    pass14 = (b"final answer" in data and b'"finish_reason":"stop"' in data
+              and b"[DONE]" in data and '"error"' not in text
+              and "early finish missing finish_reason" in logtext
+              and "retry after early finish" in logtext
+              and "stream broken" not in logtext)
+    print("   收到正文=%s stop=%s 无error=%s 日志重发=%s"
+          % (b"final answer" in data, b'"finish_reason":"stop"' in data,
+             '"error"' not in text, "retry after early finish" in logtext))
+    print("   判定:", "PASS" if pass14 else "FAIL")
+    ok = ok and pass14
+    # 15) 字面 finish_reason=other 也要能透明续写（场景 14 覆盖的是“缺失”形态）。
+    first_other = [
+        (b'data: {"choices":[{"delta":{"reasoning_content":"literal first"}}]}\n\n', 0.05),
+        (b'data: {"choices":[{"delta":{},"finish_reason":"other"}]}\n\n', 0.05),
+        (b"data: [DONE]\n\n", 0.0),
+    ]
+    second_other = [
+        (b'data: {"choices":[{"delta":{"content":"literal answer"}}]}\n\n', 0.05),
+        (b'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\n', 0.05),
+        (b"data: [DONE]\n\n", 0.0),
+    ]
+    chunks, logtext, tail = run_case("字面 other 透明续写", args.src, first_other,
+                                     scripts=[first_other, second_other], read_seconds=8.0)
+    data = b"\n\n".join(c for _t, c in chunks) + tail
+    text = data.decode("utf-8", "replace")
+    pass15 = (b"literal answer" in data and b'"finish_reason":"stop"' in data
+              and b"[DONE]" in data and '"error"' not in text
+              and "early finish reason=other" in logtext
+              and "retry after early finish" in logtext
+              and "stream broken" not in logtext)
+    print("   收到正文=%s stop=%s 无error=%s 日志重发=%s"
+          % (b"literal answer" in data, b'"finish_reason":"stop"' in data,
+             '"error"' not in text, "retry after early finish" in logtext))
+    print("   判定:", "PASS" if pass15 else "FAIL")
+    ok = ok and pass15
 
     print("\n总体:", "全部通过" if ok else "有失败项")
     return 0 if ok else 1

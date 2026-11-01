@@ -2,6 +2,62 @@
 
 > 2026-11-01: migrated to the AI-Agent-DJY repository; documentation was translated to English and directories standardized to `docs/` and `diagrams/`. Historical entries keep paths as originally written.
 
+## V0.2.3 — 2026-11-02
+
+> Corrects the previous diagnosis: the upstream usually sends **no `finish_reason` at
+> all**, and the client maps `undefined` to `other`. The proxy now checks the end of the
+> stream (`[DONE]` and clean EOF), not just a literal `"other"` value, and **discards the
+> failed attempt and re-requests the upstream internally**. Also fixes the race that let
+> two proxies listen on 8787 after a reboot.
+
+### Fix: a stream without `finish_reason` was treated as a normal completion
+
+**Problem**: a turn ended after a while with no error and had to be continued by hand.
+The client log (`model.sdk.stream.completed`) shows `finishReason=other`,
+`textDeltaChars=0`, `toolCallCount=0`, and **no `rawFinishReason` field**.
+
+**Root cause**: the client's `Bto()` maps a missing/null/unknown `finish_reason` to
+`other`, then completes the turn (`turn.completed`). The previous release only intercepted
+the literal `"other"`, which never matched in production: the 23:48:03 stream was logged
+by the proxy as `ok bytes=1009`, with no `early finish other` line.
+
+**Dead end (discarded)**: sending a mid-stream SSE error to the client. Two production
+trials were classified as `ProviderBusinessError` with `retryable=false`, so the turn
+still failed (one sub-agent was interrupted). A mid-stream error does not trigger the
+client's auto-continuation.
+
+**Final fix** (`src/retry_proxy.py`):
+- Track `choices`, whether any `finish_reason` was seen, and whether text/tool calls were
+  produced. At both stream endings (`[DONE]` and clean EOF): if choices were seen, no
+  `finish_reason` arrived, and no text/tool call was produced, mark the attempt `early`.
+- `pipe_response` returns `"early"`; `_handle` keeps the same client response and
+  immediately re-requests the upstream, writing the new stream's reasoning/text into that
+  same response. The client simply sees the stream continue.
+- A literal `other` or any other unknown `finish_reason` is treated the same way when
+  nothing was produced. `stop` / `length` / `content_filter` / `tool_calls` /
+  `function_call` pass through.
+- Streams that already produced text/tool calls always pass through: retrying would
+  duplicate content the user has already seen.
+- New log lines: `early finish ...` followed by `retry after early finish ...`.
+
+### Fix: two proxies listening on 8787
+
+- `ensure_proxy.py` now takes a Windows named mutex
+  (`Local\ZcodePersistence-EnsureProxy`) around "check the port + spawn", so two
+  SessionStart hooks cannot both spawn a proxy. This actually happened after the
+  2026-11-01 reboot: PIDs <pid> and <pid> started in the same second.
+- `doctor.py` counts LISTENING processes on 8787 and reports FAIL when there is more than
+  one, instead of only checking that "something is listening".
+
+**Verification**: `selftest_stream.py` has 15 scenarios (eight new, 8–15: missing
+`finish_reason` with `[DONE]`, missing `finish_reason` at EOF, content + missing reason,
+and transparent continuations for both the missing-reason and literal-`other` forms); `selftest_hook.py` has 11 cases plus the third-attempt wording;
+`selftest_proxy_429.py` and `selftest_watch.py` still pass. The new
+`selftest_ensure.py` proves two processes serialize on the mutex (2.45 s). Local install
+runs a single proxy. Live traffic also confirmed it twice: the `early finish` events at
+00:59:57 and 01:01:17 were re-requested internally, and the client completed at 01:00:29
+and 01:01:28 with `attempt=1` (`finishReason=tool-calls`), with no `turn.failed`.
+
 ## V0.2.1 — 2026-11-01
 
 > V0.2.1 is a patch release on top of V0.2: only the hook's false positive and stop wording changed; proxy and error-reporting behavior are unchanged.
@@ -13,7 +69,7 @@
 **Fix**:
 - `failure_of()` now treats `exitCode == 1`, not timed out, not cancelled, and empty stdout/stderr as **not a failure**. Any other exit code, any output, a timeout, or cancellation still counts as a failure.
 - The third-attempt wording in both branches now says "report the result and continue with the other steps of the current task ... do not stop the whole task".
-- New `tools/selftest_hook.py`: 10 boundary cases covering exit 1 with no output / stderr / stdout, exit 2, exit 0, timeout, cancellation, `status="failed"` with exit 1, `status="failed"` with exit 0, and upstream-no-output.
+- New `tools/selftest_hook.py`: 11 boundary cases plus the third-attempt wording check, covering exit 1 with no output / stderr / stdout, exit 2, exit 0, timeout, cancellation, `status="failed"` with exit 1, `status="failed"` with exit 0, and upstream-no-output.
 
 **Verification**: the 10 hook cases pass; `selftest_proxy_429`, `selftest_stream` and `selftest_watch` still pass; a live `grep -q` with no match produces no hook advice, while `ls` on a missing directory (exit 2) still does.
 

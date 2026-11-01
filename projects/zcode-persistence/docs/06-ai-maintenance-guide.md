@@ -9,7 +9,7 @@ The audience for this document is an AI or engineer with **absolutely no context
 | Question | Answer |
 |---|---|
 | What is this | A two-piece "automatic retry on failure" kit for ZCode plus one optional bypass: hook + local proxy + error reporting (off by default) |
-| Version | See `VERSION` (currently formal release `0.2`; the build line is `0.4.0`, and the CHANGELOG maps the two) |
+| Version | See `VERSION` (currently formal release `0.2.3`; the build line is `0.4.0`, and the CHANGELOG maps the two) |
 | Where is the code | Four Python files in `src/` (hook / proxy / auto-start / error reporting), no third-party dependencies (certifi optional) |
 | Where it is installed | `C:\Program Files (x86)\AI\Zcode-Persistence\` |
 | Which system config is modified | `~/.zcode/cli/config.json` (hook), `~/.zcode/v2/provider_config.json` (the provider's baseUrl) |
@@ -62,6 +62,9 @@ Handler._safe_handle()          ← client disconnects are collapsed into one lo
 
 pipe_response()                 ← response headers already sent; no more retries
  ├─ read1(8192), write back chunk by chunk (never batch)
+ ├─ streaming: process_sse() parses lines (bytes pass through unchanged), tracks content/tool_calls;
+ │   unknown/other finish_reason with neither present → return "early" to _handle;
+ │   [DONE] or clean EOF with no finish_reason at all → the same "early" signal
  ├─ streaming: start a reader thread that only does blocking reads → queue_; the main thread checks the queue every 0.5s
  │   ├─ silence reaches HEARTBEAT_INTERVAL → write `: keepalive`
  │   └─ silence reaches RETRY_WINDOW      → finish and mark truncated (do not wait for the reader; it exits on stop at put)
@@ -95,7 +98,7 @@ Error reporting: polls `session.last_outcome` in `~/.zcode/cli/db/db.sqlite`; wh
 - `uninstall.py`: delete hooks by exact basename; the provider is restored only when "current value == the recorded proxyBaseUrl"; `--purge` verifies the process command line before killing, and only accepts prefix records whose directory really contains this tool's files.
 - `doctor.py`: script, interpreter, `hooks.enabled`, the three hooks (the two tool hooks validate matcher=Bash, all three validate the script path), provider, port, proxy runtime parameters, log tail. The log tail reads only the last 64KB; finding the "start line" walks back from the end of the file in 64KB blocks, up to 8MB.
 - `selftest_proxy_429.py`: five retry-semantics scenarios (429 recovers / persistent 429 / 400 recovers / persistent 400 / unknown prefix 400 must be `retryable:false`).
-- `selftest_stream.py`: seven streaming write-back scenarios (pass through chunk by chunk / keep alive during mid-stream silence / short read on a fixed length judged truncated / normal finish / silence until the window is judged truncated / slow client loses no data / give up in heartbeat mode must carry a retryable error body).
+- `selftest_stream.py`: fifteen streaming write-back scenarios (including missing-finish-reason cases) (pass through chunk by chunk / keep alive during mid-stream silence / short read on a fixed length judged truncated / normal finish / silence until the window is judged truncated / slow client loses no data / give up in heartbeat mode must carry a retryable error body).
 - `selftest_watch.py`: 12 assertions for error reporting (new red dot / dedupe / historical baseline / completed and stopped are not reported / rate limit / multiple sessions merged / wording when there are no relevant records / failure but not given up · new format / same · old format / cooldown and expiry / send failure retry / `--once` writes nothing to disk).
 
 ---
@@ -197,7 +200,7 @@ print("assert 4: error event    :", b"server_error" in raw)
 
 Non-streaming control: set `stream` to `False`; expect **no** `keepalive`, and an HTTP **503** after the window expires (plain JSON, not SSE; about 3 seconds with the accelerated parameters).
 
-**The response body (streaming write-back) has its own self-test**: `python tools/selftest_stream.py`, whose seven scenarios each stress "pass through chunk by chunk / keep alive during mid-stream silence / short read on a fixed length judged truncated / normal finish / silence until the window is judged truncated / slow client loses no data / give up in heartbeat mode must carry a retryable error body". You must run it after changing `pipe_response` — behavior after the response headers cannot be tested with this recipe.
+**The response body (streaming write-back) has its own self-test**: `python tools/selftest_stream.py`, whose fifteen scenarios each stress "pass through chunk by chunk / keep alive during mid-stream silence / short read on a fixed length judged truncated / normal finish / silence until the window is judged truncated / slow client loses no data / give up in heartbeat mode must carry a retryable error body". You must run it after changing `pipe_response` — behavior after the response headers cannot be tested with this recipe.
 
 ## 5. Troubleshooting
 
@@ -255,8 +258,8 @@ the mapping entry at the top of `CHANGELOG.md` tells you which build line the cu
 
 1. Read the "What it is / Limitations" sections of `README.md`.
 2. Read this file (`docs/06-ai-maintenance-guide.md`), section 2 code map and section 3 invariants.
-3. Run a health check once: `python <install directory>/doctor.py`; expect 11 items passed, 0 failed.
-4. Run the self-tests: `tools/selftest_hook.py` (10 cases), `tools/selftest_proxy_429.py` (5 scenarios), `tools/selftest_stream.py` (7 scenarios),
+3. Run a health check once: `python <install directory>/doctor.py`; expect 12 items passed, 0 failed.
+4. Run the self-tests: `tools/selftest_hook.py` (11 cases), `tools/selftest_proxy_429.py` (5 scenarios), `tools/selftest_stream.py` (15 scenarios),
    `tools/selftest_watch.py` (12 assertions); all should PASS.
 
 **Three things you must know before changing code**
@@ -326,3 +329,19 @@ These are all real problems that were hit and fixed. **Do not reintroduce them.*
     if it is stuck in a blocking read, all it can do is wait for the socket timeout (`RETRY_WINDOW+30` seconds) — the unavoidable price of being unable to interrupt `read1` from outside on Windows.
     Also: when the client "neither reads nor disconnects" (half-open), the main thread blocks in `wfile.write` until the peer recovers or TCP errors; having no client write timeout is a pre-existing boundary.
     Degradation: when `body_socket()` cannot get a socket, the read timeout remains `SILENCE_TIMEOUT=30` and response-body heartbeats are basically ineffective.
+12. **A missing or unknown `finish_reason` is a failure, not a normal end** (V0.2.3).
+    The client's `Bto()` maps `undefined`/null/unknown values to `other`, then completes
+    the turn. If the stream produced no `delta.content` and no tool call, `process_sse()`
+    withholds the ending event at `[DONE]` (or at clean EOF when `[DONE]` is absent) and
+    returns `"early"`; `_handle` discards that upstream attempt and immediately re-requests
+    it, continuing the same client response. Do **not** send a mid-stream SSE error: in
+    production the client classified it as `ProviderBusinessError` with
+    `retryable=false`, and the turn failed. If content or a tool call was already emitted,
+    the ending must pass through unchanged: retrying there would duplicate visible
+    output.
+13. **`ensure_proxy` must hold a cross-process lock** (V0.2.3). Port probing alone races:
+    two SessionStart hooks can both see an empty port and spawn a proxy, and Windows
+    `SO_REUSEADDR` lets both listen on 8787. The named mutex
+    `Local\ZcodePersistence-EnsureProxy` serializes the check-and-spawn critical section;
+    `selftest_ensure.py` proves two processes serialize. `doctor.py` reports FAIL if more
+    than one process is LISTENING on 8787.
