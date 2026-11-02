@@ -3,7 +3,7 @@
 
 不碰真实中转：假上游在本机回环上按脚本吐字节，代理用临时副本 + 临时端口。
 
-验证十九件事（对应 2026-10-31 三轮复审与终验、2026-11-01 自动暂停修复）：
+验证二十三件事（对应 2026-10-31 三轮复审与终验、2026-11-01 自动暂停修复）：
   1. 逐条透传：上游每 0.2 秒发一条 80 字节事件，客户端应当在每条到达后
      几十毫秒内收到，而不是攒到 8KB 或流结束才一起到
   2. 流中静默：响应头之后上游停 2.5 秒、空闲超时设 1 秒时，代理应当发
@@ -34,13 +34,23 @@
  18. 工具调用参数发到一半流就结束（线上 tool_args_invalid 形态，V0.2.5）：
      工具增量先缓冲不写出，EOF 时整体丢弃并内部重发，客户端只收到完整的工具调用
  19. 完整工具调用 + `finish_reason=tool_calls`：缓冲在收尾时写出，原样透传不重试
+ 20. 只吐 reasoning 后上游 RST（客户端判 upstream_stream_read_error）：代理丢弃
+     本次尝试并内部重发，客户端只看到第二段的正文（V0.2.6）
+ 21. `/cg` 前缀路由到本机 Cherry 网关（HTTP），与 `/ap`、`/cm` 一样透传
+ 22. 通用 `/p/<base64url(原始 baseUrl)>` 路由：base 带路径、请求带 query 时
+     路径拼成 `/relay/v1/...?...`，Host 带非默认端口（V0.2.6）
+ 23. `/p` 坏 token（空、非 base64、非 http(s)、非法端口）必须回 400
 
 用法：python tools/selftest_stream.py            （默认读同包 src/retry_proxy.py）
       python tools/selftest_stream.py --src X
 """
 
 import argparse
+import base64
+import json
 import os
+import re
+import struct
 import shutil
 import socket
 import subprocess
@@ -72,12 +82,13 @@ def free_pair():
 def make_proxy_copy(src, workdir, upstream_port):
     "复制代理脚本并改写上游表，避免影响真实代理。"
     text = open(src, encoding="utf-8").read()
-    text = text.replace(
-        'UPSTREAMS = {\n    "/ap": ("upstream-a.example.com", 443),\n'
-        '    "/cm": ("upstream-b.example.com", 443),\n}',
-        'UPSTREAMS = {\n    "/ap": ("127.0.0.1", %d, "http"),\n'
-        '    "/cm": ("127.0.0.1", %d, "http"),\n}' % (upstream_port, upstream_port))
-    assert '127.0.0.1", %d' % upstream_port in text, "改写 UPSTREAMS 失败，脚本结构变了"
+    block = ("UPSTREAMS = {\n"
+             '    "/ap": ("127.0.0.1", %d, "http"),\n'
+             '    "/cm": ("127.0.0.1", %d, "http"),\n'
+             '    "/cg": ("127.0.0.1", %d, "http"),\n'
+             "}" % (upstream_port, upstream_port, upstream_port))
+    text, n = re.subn(r"UPSTREAMS = \{.*?\n\}", block, text, count=1, flags=re.S)
+    assert n == 1, "改写 UPSTREAMS 失败，脚本结构变了"
     dst = os.path.join(workdir, "retry_proxy.py")
     open(dst, "w", encoding="utf-8").write(text)
     return dst
@@ -92,7 +103,7 @@ class FakeUpstream(object):
 
     def __init__(self, port, script, content_type="text/event-stream",
                  content_length=None, chunked=True, hold_after=0,
-                 no_response=False, scripts=None):
+                 no_response=False, scripts=None, rst_after=0, echo=False):
         # scripts 非空时按顺序服务多次连接：用来模拟“第一次提前结束、代理内部
         # 重发第二次并成功”的透明续写路径。
         self.scripts = scripts if scripts is not None else [script]
@@ -103,6 +114,12 @@ class FakeUpstream(object):
         # no_response=True：读完请求后一个字节都不回，制造"上游一直不给响应头"，
         # 用来测心跳模式下的 SSE 错误收尾
         self.no_response = no_response
+        # rst_after=True：脚本发完立刻 RST（SO_LINGER 0），模拟上游读错误，
+        # 而不是正常 EOF。用来测"只吐了 reasoning 就被读错误打断"的重发路径。
+        self.rst_after = rst_after
+        # echo=True：把收到的请求行和 Host 头回显进正文。用来证明 /cg、/p
+        # 不只知道"有个前缀"，而是真的把路径和 Host 转发到了正确位置。
+        self.echo = echo
         self.sock = socket.socket()
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.sock.bind(("127.0.0.1", port))
@@ -119,20 +136,20 @@ class FakeUpstream(object):
             pass
 
     def _serve(self):
-        for script in self.scripts:
+        for idx, script in enumerate(self.scripts):
             try:
                 conn, _ = self.sock.accept()
             except OSError:
                 return
             try:
-                self._serve_one(conn, script)
+                self._serve_one(conn, script, idx < self.rst_after)
             finally:
                 try:
                     conn.close()
                 except Exception:
                     pass
 
-    def _serve_one(self, conn, script):
+    def _serve_one(self, conn, script, rst=False):
         try:
             conn.settimeout(10)
             data = b""
@@ -156,6 +173,20 @@ class FakeUpstream(object):
                 time.sleep(self.hold_after or 5)
                 return
 
+            if self.echo:
+                lines = head.split(b"\r\n")
+                req_line = lines[0].decode("latin-1") if lines else ""
+                host_h = ""
+                for line in lines[1:]:
+                    if line.lower().startswith(b"host:"):
+                        host_h = line.split(b":", 1)[1].strip().decode("latin-1")
+                payload = json.dumps(
+                    {"choices": [{"delta": {"content": req_line + " | Host=" + host_h}}]},
+                    ensure_ascii=False)
+                script = [(("data: " + payload + "\r\n\r\n").encode(), 0.02),
+                          (b'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\r\n\r\n', 0.02),
+                          (b"data: [DONE]\r\n\r\n", 0.0)]
+
             resp = ["HTTP/1.1 200 OK",
                     "Content-Type: " + self.content_type,
                     "Connection: close"]
@@ -172,6 +203,13 @@ class FakeUpstream(object):
                     conn.sendall(body)
                 if pause:
                     time.sleep(pause)
+            if rst:
+                try:
+                    conn.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER,
+                                    struct.pack("ii", 1, 0))
+                except Exception:
+                    pass
+                return
             if self.hold_after:
                 time.sleep(self.hold_after)      # 故意不结束响应，制造"上游静默"
             if self.chunked:
@@ -180,14 +218,18 @@ class FakeUpstream(object):
             pass
 
 
-def call_stream(proxy_port, read_seconds, idle=0.15, start_delay=0.0):
+def call_stream(proxy_port, read_seconds, idle=0.15, start_delay=0.0, prefix="ap",
+                query=""):
     """发一个流式请求，返回 (每条数据到达的时刻, 原始字节)。
 
     start_delay > 0 时先不读（模拟慢客户端/卡住的界面），用来验证背压不丢数据。
+    query 非空时拼在请求路径后面，用来验证 baseUrl 查询串是否保留。
     """
     body = (b'{"model":"t","stream":true,"messages":'
             b'[{"role":"user","content":"hi"}]}')
-    req = (b"POST /ap/v1/chat/completions HTTP/1.1\r\nHost: x\r\n"
+    tail = ("?" + query) if query else ""
+    req = (b"POST /" + prefix.encode() + b"/v1/chat/completions" + tail.encode()
+           + b" HTTP/1.1\r\nHost: x\r\n"
            b"Content-Type: application/json\r\n"
            b"Content-Length: " + str(len(body)).encode() + b"\r\n\r\n") + body
     s = socket.create_connection(("127.0.0.1", proxy_port), timeout=5)
@@ -215,9 +257,29 @@ def call_stream(proxy_port, read_seconds, idle=0.15, start_delay=0.0):
     return chunks, raw
 
 
+def call_raw(proxy_port, path):
+    "发一个最小 POST，返回完整原始响应（状态行 + 头 + 体）。"
+    body = b"{}"
+    req = (("POST " + path + " HTTP/1.1\r\nHost: x\r\n"
+            "Content-Type: application/json\r\nContent-Length: 2\r\n"
+            "Connection: close\r\n\r\n").encode() + body)
+    s = socket.create_connection(("127.0.0.1", proxy_port), timeout=5)
+    s.sendall(req)
+    data = b""
+    while True:
+        d = s.recv(65536)
+        if not d:
+            break
+        data += d
+    s.close()
+    return data
+
+
 def run_case(name, src, script, content_length=None, chunked=True,
              env_extra=None, read_seconds=4.0, heartbeat_start="100",
-             hold_after=0, start_delay=0.0, no_response=False, scripts=None):
+             hold_after=0, start_delay=0.0, no_response=False, scripts=None,
+             rst_after=0, prefix="ap", generic=False, generic_path="",
+             echo=False, query=""):
     "跑一个用例：起假上游 → 起代理副本 → 发流式请求 → 收日志与字节。"
     workdir = tempfile.mkdtemp(prefix="streamtest-")
     proxy_port = free_pair()
@@ -229,12 +291,17 @@ def run_case(name, src, script, content_length=None, chunked=True,
                PROXY_HEARTBEAT_INTERVAL="1", PROXY_RETRY_WINDOW="5",
                PROXY_RETRY_INTERVAL="0.2")
     env.update(env_extra or {})
+    if generic:
+        base = "http://127.0.0.1:%d%s" % (upstream_port, generic_path)
+        token = base64.urlsafe_b64encode(base.encode()).decode().rstrip("=")
+        prefix = "p/" + token
     logfile = os.path.join(workdir, "proxy.log")
     try:
         proxy = make_proxy_copy(src, workdir, upstream_port)
         with FakeUpstream(upstream_port, script, content_length=content_length,
                           chunked=chunked, hold_after=hold_after,
-                          no_response=no_response, scripts=scripts):
+                          no_response=no_response, scripts=scripts,
+                          rst_after=rst_after, echo=echo):
             out = open(logfile, "w", encoding="utf-8")
             proc = subprocess.Popen([sys.executable, proxy], env=env, cwd=workdir,
                                     stdout=out, stderr=subprocess.STDOUT)
@@ -248,7 +315,8 @@ def run_case(name, src, script, content_length=None, chunked=True,
                     except OSError:
                         time.sleep(0.05)
                 chunks, tail = call_stream(proxy_port, read_seconds,
-                                           start_delay=start_delay)
+                                           start_delay=start_delay, prefix=prefix,
+                                           query=query)
             finally:
                 proc.terminate()
                 try:
@@ -269,7 +337,7 @@ def run_case(name, src, script, content_length=None, chunked=True,
 
 
 def main():
-    "依次跑 19 个场景并汇总；全部通过退出码 0。"
+    "依次跑 23 个场景并汇总；全部通过退出码 0。"
     ap = argparse.ArgumentParser()
     ap.add_argument("--src", default=os.path.join(
         os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -323,19 +391,27 @@ def main():
     print("   判定:", "PASS" if pass4 else "FAIL")
     ok = ok and pass4
 
-    # 5) 上游彻底静默：心跳照发，但累计静默到窗口必须收尾（不能无限挂着）
+    # 5) 上游彻底静默：心跳照发；静默且无产出先内部重发，窗口到点才收尾。
     #    HEARTBEAT_INTERVAL=1、RETRY_WINDOW=2；上游发 1 条后保持连接不动 8 秒。
     script = [(b"data: only\n\n", 0)]
     chunks, logtext, tail = run_case(
-        "静默到窗口判截断", args.src, script, read_seconds=4.0, hold_after=8,
+        "静默到窗口重试后放弃", args.src, script, read_seconds=4.0, hold_after=8,
         env_extra={"PROXY_RETRY_WINDOW": "2"})
-    said = "body silent" in logtext
-    truncated = "truncated" in logtext
-    closed = b"0\r\n\r\n" not in tail
-    pass5 = said and truncated and closed
+    data = b"\n\n".join(c for _t, c in chunks) + tail
+    said = "early finish stream error" in logtext
+    # 静默只在 RETRY_WINDOW 到点时才被判定，_handle 打 window exhausted 后立刻 break，
+    # 不会再发起上游请求。这里只断言“进入 early + 窗口放弃 + 可重试错误体”；
+    # 真正会重发的读错误路径由场景 20 覆盖。
+    scheduled = ("window exhausted" in logtext
+                 or "retry after early finish" in logtext)
+    gave_up = "gave up" in logtext
+    retryable = b'"retryable": true' in data or b'"retryable":true' in data
+    pass5 = said and gave_up and retryable and scheduled
     print("   日志: %s" % [l.strip() for l in logtext.splitlines()
-                         if "body silent" in l or "truncated" in l or "keepalive" in l][-4:])
-    print("   静默截止=%s 记 truncated=%s 未补终止块=%s" % (said, truncated, closed))
+                         if "body silent" in l or "early finish" in l
+                         or "gave up" in l or "keepalive" in l][-4:])
+    print("   静默判早期=%s early收尾路径=%s 窗口放弃=%s 可重试错误体=%s"
+          % (said, scheduled, gave_up, retryable))
     print("   判定:", "PASS" if pass5 else "FAIL")
     ok = ok and pass5
 
@@ -618,6 +694,114 @@ def main():
              b"0\r\n\r\n" in tail, "retry after early finish" not in logtext))
     print("   判定:", "PASS" if pass19 else "FAIL")
     ok = ok and pass19
+
+    # 20) 只吐 reasoning 后上游 RST（读错误，客户端会判 upstream_stream_read_error）：
+    #     代理必须丢弃本次尝试并内部重发（V0.2.6）。
+    first_reset = [
+        (b'data: {"choices":[{"delta":{"reasoning_content":"need more time"}}]}\n\n', 0.05),
+    ]
+    second_reset = [
+        (b'data: {"choices":[{"delta":{"content":"answer after reset"}}]}\n\n', 0.05),
+        (b'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\n', 0.05),
+        (b"data: [DONE]\n\n", 0.0),
+    ]
+    chunks, logtext, tail = run_case("读错误后透明续写", args.src, first_reset,
+                                     scripts=[first_reset, second_reset],
+                                     read_seconds=8.0, rst_after=1)
+    data = b"\n\n".join(c for _t, c in chunks) + tail
+    text = data.decode("utf-8", "replace")
+    pass20 = (b"answer after reset" in data
+              and b'"finish_reason":"stop"' in data
+              and b"[DONE]" in data and '"error"' not in text
+              and "early finish stream error" in logtext
+              and "retry after early finish" in logtext
+              and "stream broken" not in logtext)
+    print("   收到正文=%s 日志重发=%s 未记broken=%s"
+          % (b"answer after reset" in data, "retry after early finish" in logtext,
+             "stream broken" not in logtext))
+    print("   判定:", "PASS" if pass20 else "FAIL")
+    ok = ok and pass20
+
+    # 21) /cg 前缀路由（本机 Cherry 网关走 http）：假上游回显请求行和 Host，
+    #     证明转发的路径与端口都正确，而不只是"前缀命中"。
+    chunks, logtext, tail = run_case("cg 前缀路由", args.src, [],
+                                     read_seconds=4.0, prefix="cg", echo=True)
+    data = b"\n\n".join(c for _t, c in chunks) + tail
+    text = data.decode("utf-8", "replace")
+    pass21 = ("POST /v1/chat/completions HTTP/1.1" in text
+              and "Host=127.0.0.1:" in text
+              and b'"finish_reason":"stop"' in data
+              and b"0\r\n\r\n" in tail and "ok " in logtext
+              and '"error"' not in text)
+    print("   路径正确=%s Host带端口=%s 正常收尾=%s"
+          % ("POST /v1/chat/completions HTTP/1.1" in text,
+             "Host=127.0.0.1:" in text, "ok " in logtext))
+    print("   判定:", "PASS" if pass21 else "FAIL")
+    ok = ok and pass21
+    # 22) 通用 /p/<base64url(baseUrl)> 路由：base 带路径 /relay，请求带 query。
+    #     期望拼成 /relay/v1/chat/completions?base=1&api-version=1，且 Host 带非默认端口。
+    chunks, logtext, tail = run_case("通用 /p 路由", args.src, [],
+                                     read_seconds=4.0, generic=True,
+                                     generic_path="/relay?base=1", echo=True,
+                                     query="api-version=1")
+    data = b"\n\n".join(c for _t, c in chunks) + tail
+    text = data.decode("utf-8", "replace")
+    want_path = "POST /relay/v1/chat/completions?base=1&api-version=1 HTTP/1.1"
+    pass22 = (want_path in text and "Host=127.0.0.1:" in text
+              and b'"finish_reason":"stop"' in data
+              and b"0\r\n\r\n" in tail and "ok " in logtext
+              and '"error"' not in text)
+    print("   路径拼接=%s Host带端口=%s 正常收尾=%s"
+          % (want_path in text, "Host=127.0.0.1:" in text, "ok " in logtext))
+    print("   判定:", "PASS" if pass22 else "FAIL")
+    ok = ok and pass22
+
+    # 23) /p 坏 token 必须回 400（空 token / 非 base64 / 非 http(s) / 非法端口），
+    #     不能落到 8787 上无限重试，也不能 500。
+    bad_tokens = ["/p", "/p/", "/p/@@@@", "/p/" + "A" * 5,
+                  "/p/" + base64.urlsafe_b64encode(b"ftp://x").decode().rstrip("="),
+                  "/p/" + base64.urlsafe_b64encode(b"http://").decode().rstrip("="),
+                  "/p/" + base64.urlsafe_b64encode(b"http://h:99999").decode().rstrip("=")]
+    results = []
+    for path in bad_tokens:
+        workdir = tempfile.mkdtemp(prefix="streamtest-")
+        proxy_port = free_pair()
+        env = {k: v for k, v in os.environ.items() if not k.startswith("PROXY_")}
+        env.update(PROXY_PORT=str(proxy_port), PROXY_RETRY_WINDOW="1",
+                   PROXY_RETRY_INTERVAL="0.1", PROXY_SILENCE_TIMEOUT="1")
+        try:
+            proxy = make_proxy_copy(args.src, workdir, proxy_port + 1)
+            out = open(os.path.join(workdir, "proxy.log"), "w", encoding="utf-8")
+            proc = subprocess.Popen([sys.executable, proxy], env=env, cwd=workdir,
+                                    stdout=out, stderr=subprocess.STDOUT)
+            try:
+                end = time.time() + 8
+                while time.time() < end:
+                    try:
+                        sk = socket.create_connection(("127.0.0.1", proxy_port), 0.3)
+                        sk.close()
+                        break
+                    except OSError:
+                        time.sleep(0.05)
+                raw = call_raw(proxy_port, path).decode("latin-1")
+                results.append((path, "400" in raw.split("\r\n")[0]
+                                and "bad /p/ route token" in raw))
+            finally:
+                proc.terminate()
+                try:
+                    proc.wait(timeout=5)
+                except Exception:
+                    proc.kill()
+                out.close()
+        finally:
+            shutil.rmtree(workdir, ignore_errors=True)
+    pass23 = all(ok for _p, ok in results)
+    print("   坏 token 全部 400=%s (%s)"
+          % (pass23, ", ".join("%s:%s" % (p, "PASS" if r else "FAIL")
+                               for p, r in results)))
+    print("   判定:", "PASS" if pass23 else "FAIL")
+    ok = ok and pass23
+
 
     print("\n总体:", "全部通过" if ok else "有失败项")
     return 0 if ok else 1

@@ -43,12 +43,12 @@ Since v0.4.0 only a single pattern list remains, `UPSTREAM_PATTERNS` (a hit mean
 
 ### `src/retry_proxy.py` (about 710 lines)
 
-Local HTTP proxy. A request comes in → pick the upstream by prefix → forward → resend on failure.
+Local HTTP proxy. A request comes in → resolve the upstream from a fixed prefix or `/p/<b64>` → forward → resend on failure.
 
 ```
 Handler._safe_handle()          ← client disconnects are collapsed into one log line here
  └─ Handler._handle()
-     ├─ parse the /ap or /cm prefix → (host, port, scheme)
+     ├─ parse /ap, /cm, /cg, or /p/<b64> → (host, port, scheme)
      ├─ read the full body (chunked-aware)
      ├─ UA fallback (python-urllib → browser UA)
      ├─ inspect body.stream to decide streaming vs non-streaming
@@ -95,7 +95,8 @@ Error reporting: polls `session.last_outcome` in `~/.zcode/cli/db/db.sqlite`; wh
 ### `tools/`
 
 - `install.py`: validate first (config exists, source files exist, provider exists, prefix can be determined) → then write to disk (copy scripts, write hooks, modify provider) → finally write `install-state.json`. A config parse failure exits before anything is written to disk.
-- `uninstall.py`: delete hooks by exact basename; the provider is restored only when "current value == the recorded proxyBaseUrl"; `--purge` verifies the process command line before killing, and only accepts prefix records whose directory really contains this tool's files.
+- `route_providers.py` (in `src/`): rewrite every provider's baseUrl to `/p/<base64url>`; idempotent, backs up first, records original URLs in a sidecar, `--restore`. SessionStart calls it only after the proxy reports the `p_route` feature and a matching `root`.
+- `uninstall.py`: delete hooks by exact basename; the provider is restored only when "current value == the recorded proxyBaseUrl"; `/p` migrations are restored from `provider_config.json.proxy-origins.json`, including before `--purge`; `--purge` verifies the process command line before killing, and only accepts prefix records whose directory really contains this tool's files.
 - `doctor.py`: script, interpreter, `hooks.enabled`, the three hooks (the two tool hooks validate matcher=Bash, all three validate the script path), provider, port, proxy runtime parameters, log tail. The log tail reads only the last 64KB; finding the "start line" walks back from the end of the file in 64KB blocks, up to 8MB.
 - `selftest_proxy_429.py`: five retry-semantics scenarios (429 recovers / persistent 429 / 400 recovers / persistent 400 / unknown prefix 400 must be `retryable:false`).
 - `selftest_stream.py`: nineteen streaming write-back scenarios (including missing-finish-reason, upstream-error and partial-tool-call cases) (pass through chunk by chunk / keep alive during mid-stream silence / short read on a fixed length judged truncated / normal finish / silence until the window is judged truncated / slow client loses no data / give up in heartbeat mode must carry a retryable error body).
@@ -259,7 +260,7 @@ the mapping entry at the top of `CHANGELOG.md` tells you which build line the cu
 1. Read the "What it is / Limitations" sections of `README.md`.
 2. Read this file (`docs/06-ai-maintenance-guide.md`), section 2 code map and section 3 invariants.
 3. Run a health check once: `python <install directory>/doctor.py`; expect 12 items passed, 0 failed.
-4. Run the self-tests: `tools/selftest_hook.py` (11 cases), `tools/selftest_proxy_429.py` (5 scenarios), `tools/selftest_stream.py` (19 scenarios),
+4. Run the self-tests: `tools/selftest_hook.py` (11 cases), `tools/selftest_proxy_429.py` (5 scenarios), `tools/selftest_stream.py` (23 scenarios), `tools/selftest_route.py` (13 checks),
    `tools/selftest_watch.py` (12 assertions); all should PASS.
 
 **Three things you must know before changing code**
@@ -313,7 +314,7 @@ These are all real problems that were hit and fixed. **Do not reintroduce them.*
 1. **The hook cannot catch a whole-turn failure**. `PostToolUseFailure` requires `toolName`/`toolCallId`; a model-level `Turn execution failed` has no tool involved, so none of the seven hook events fires. This class can only be handled by the proxy.
 2. **The proxy cannot rescue "the upstream slowly swallows the request body"**. 95 seconds is a hard client timeout, and the proxy cannot make the upstream faster.
 3. **Heartbeats work only for streaming**. A non-streaming response must be complete JSON; nothing can be inserted in the middle.
-4. **The heartbeat comes online at 80 seconds**, after which the client's 95-second timeout no longer counts; after the response headers, if the upstream emits no bytes for a long time, the reader thread + main loop keep sending heartbeats, and truncation is judged only when accumulated silence reaches the retry window (180 seconds).
+4. **The heartbeat comes online at 80 seconds**, after which the client's 95-second timeout no longer counts; after the response headers, if the upstream emits no bytes for a long time, the reader thread + main loop keep sending heartbeats, and truncation is judged only when accumulated silence reaches the retry window (300 seconds).
 5. **The provider config may be rewritten by the ZCode UI**; re-running `install.py --with-proxy` restores it.
 6. **`retryable` is decided locally, not by the upstream** (corrected 2026-10-31). When the proxy gives up it returns
    `code=model_server_error` + `retryable:true` itself, and only then does the client retry using stream recovery and continue writing;

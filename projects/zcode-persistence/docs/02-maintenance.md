@@ -59,12 +59,20 @@ ZCODE_RETRY_HOOK_STATE_DIR=/tmp/rh-test python src/retry_hook.py < sample.json
 
 ## Adding a new upstream relay
 
+**V0.2.6 and later: no code change needed.** Run `python src/route_providers.py`;
+it rewrites each provider's baseUrl to `http://127.0.0.1:8787/p/<base64url(original)>`
+and the proxy forwards to the decoded origin. New providers are migrated
+automatically on the next session start.
+
+If you really need a fixed prefix (for example when the baseUrl cannot be edited):
+
 1. Edit `UPSTREAMS` in `src/retry_proxy.py`:
 
    ```python
    UPSTREAMS = {
        "/ap": ("upstream-a.example.com", 443),
        "/cm": ("upstream-b.example.com", 443),
+       "/cg": ("127.0.0.1", 27891, "http"),
        "/xx": ("new-domain.example", 443),  # added
    }
    ```
@@ -80,7 +88,7 @@ All of the proxy's timing can be overridden with environment variables; changes 
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `PROXY_RETRY_WINDOW` | `180` | Duration of the retry window (seconds). Once it is reached no new attempts are started; an attempt already in flight is allowed to finish, so the actual duration may slightly exceed the window |
+| `PROXY_RETRY_WINDOW` | `300` | Duration of the retry window (seconds). Once it is reached no new attempts are started; an attempt already in flight is allowed to finish, so the actual duration may slightly exceed the window |
 | `PROXY_RETRY_INTERVAL` | `20` | Interval between two attempts (seconds) |
 | `PROXY_MAX_ATTEMPTS` | `200` | Fuse against runaway retries; not reached in normal operation |
 | `PROXY_SILENCE_TIMEOUT` | `30` | Seconds a single attempt waits for the first byte |

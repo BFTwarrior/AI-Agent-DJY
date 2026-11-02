@@ -29,6 +29,9 @@ import tempfile
 import time
 import types
 
+# 导入 src 模块时不要在发布目录生成 __pycache__。
+sys.dont_write_bytecode = True
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 SRC = os.path.join(os.path.dirname(HERE), "src")
 sys.path.insert(0, SRC)

@@ -2,6 +2,61 @@
 
 > 2026-11-01: migrated to the AI-Agent-DJY repository; documentation was translated to English and directories standardized to `docs/` and `diagrams/`. Historical entries keep paths as originally written.
 
+## V0.2.6 — 2026-11-03
+
+> Three changes so that **any relay/provider** benefits from retries: a generic
+> `/p/<base64url>` route plus automatic provider migration on session start; a
+> read error after reasoning-only is now retried internally; and the default retry
+> window grows from 180 s to 300 s (a live AP attempt gave up at 169 s and the
+> upstream recovered 11 s later).
+
+### Added: generic provider routing
+
+- `src/retry_proxy.py`: `POST /p/<token>/...`, where token is the base64url
+  (padding stripped) of the original baseUrl. The proxy decodes it, validates
+  scheme/host/port, and forwards to the original origin/path. An invalid or empty
+  token returns 400; query strings from both the base URL and the request are
+  preserved; the Host header includes a non-default port (IPv6 literals are
+  bracketed); `/p/<token>` is masked to 8 chars in `proxy.log`.
+- `src/route_providers.py` (new): rewrites every provider's baseUrl to
+  `http://127.0.0.1:8787/p/<b64>`. Idempotent, backs up the config, records the
+  original URLs in `provider_config.json.proxy-origins.json`, supports
+  `--restore`, skips non-http(s)/hostless/invalid-port/userinfo URLs, and writes
+  the sidecar before the config (so a failed config write never loses the
+  rollback data).
+- `src/ensure_proxy.py`: SessionStart migrates providers automatically, but only
+  after `/__zp_health` reports `features` containing `p_route` **and** a `root`
+  equal to the running script's directory (fail-closed). This prevents an
+  upgrade from pointing providers at an old proxy process that does not
+  understand `/p`.
+- `tools/uninstall.py`: reads the sidecar and restores `/p` migrations, including
+  before `--purge`.
+- `/cg/...` is a fixed route to `http://127.0.0.1:27891/v1` (local Cherry
+  gateway).
+
+### Fixed: read error after reasoning-only
+
+The exception path now treats an SSE read error as retryable when the client is
+still connected and no text, tool call, or `finish_reason` has been written.
+Content already sent is never retried. Client disconnects are logged separately
+as `client gone after N bytes` and are never treated as upstream failures.
+
+### Changed: default retry window 180 → 300 s
+
+`PROXY_RETRY_WINDOW` still overrides it. A complete SSE line without a trailing
+newline is now forwarded and terminated with a blank line, so a following retry
+cannot merge two JSON payloads into one SSE event.
+
+### Verification
+
+- `selftest_stream.py`: 23 scenarios (adds RST after reasoning, `/cg`, `/p` with
+  base path + query and path/Host assertions, and bad `/p` tokens returning 400).
+- `selftest_route.py`: 13 checks (encoding round-trip, bad addresses, idempotence,
+  sidecar, restore, old proxy / missing root / mismatched root do not migrate,
+  `08787` is treated as 8787, uninstall restores via sidecar).
+- Also passing: hook 11, 429 5, watch 12, ensure serialization.
+- `VERSION`, `tools/install.py`, `src/error_watch.py` bumped to 0.2.6.
+
 ## V0.2.5 — 2026-11-02
 
 > Fixes a third silent-failure path: the upstream ends the stream **in the middle of

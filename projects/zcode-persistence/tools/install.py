@@ -24,7 +24,7 @@ import sys
 import time
 import urllib.parse
 
-VERSION = "0.2.5"
+VERSION = "0.2.6"
 DEFAULT_PREFIX = r"C:\Program Files (x86)\AI\Zcode-Persistence"
 PROXY_HOST = "127.0.0.1:8787"
 PROXY_PORT = int(PROXY_HOST.rsplit(":", 1)[1])
@@ -34,6 +34,7 @@ HOOK_SCRIPT = "retry_hook.py"
 ENSURE_SCRIPT = "ensure_proxy.py"
 PROXY_SCRIPT = "retry_proxy.py"
 WATCH_SCRIPT = "error_watch.py"
+ROUTE_SCRIPT = "route_providers.py"
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SRC = os.path.join(os.path.dirname(HERE), "src")
@@ -200,7 +201,7 @@ def main():
     # ---------- 阶段 1：全部校验，不写盘 ----------
     if not os.path.exists(config_path):
         die("找不到 " + config_path)
-    for name in (HOOK_SCRIPT, ENSURE_SCRIPT, PROXY_SCRIPT, WATCH_SCRIPT):
+    for name in (HOOK_SCRIPT, ENSURE_SCRIPT, PROXY_SCRIPT, WATCH_SCRIPT, ROUTE_SCRIPT):
         if not os.path.exists(os.path.join(SRC, name)):
             die("找不到源文件 " + os.path.join(SRC, name))
 
@@ -236,7 +237,9 @@ def main():
             planned_prefix = pick_prefix(args.original_base_url or current_url, args.proxy_prefix)
             if planned_prefix is None:
                 die("无法从原始地址判断该用哪个上游前缀（%s）。"
-                    "请显式指定 --proxy-prefix cm 或 --proxy-prefix ap，未做任何改动。" % current_url)
+                    "请显式指定 --proxy-prefix cm 或 --proxy-prefix ap；"
+                    "任意中转可改用 python src/route_providers.py 迁移。"
+                    "未做任何改动。" % current_url)
         elif args.proxy_prefix:
             # 已指向代理且显式要求不同前缀：这是"纠正切错的上游"。
             # 必须在此处（写盘之前）确认有原始地址记录，否则拒绝。
@@ -251,7 +254,7 @@ def main():
     # ---------- 阶段 2：复制脚本 ----------
     os.makedirs(prefix, exist_ok=True)
     placed = []
-    for name in (HOOK_SCRIPT, ENSURE_SCRIPT, PROXY_SCRIPT, WATCH_SCRIPT):
+    for name in (HOOK_SCRIPT, ENSURE_SCRIPT, PROXY_SCRIPT, WATCH_SCRIPT, ROUTE_SCRIPT):
         shutil.copy2(os.path.join(SRC, name), os.path.join(prefix, name))
         placed.append(name)
     # doctor 也放一份到安装目录，否则安装完成后的提示路径不存在
@@ -343,9 +346,9 @@ def main():
         else:
             providers_state.setdefault(args.provider_id, {})
             providers_state[args.provider_id].update({"proxyBaseUrl": target})
-            print("      警告: 该 provider 已在代理地址且没有原始地址记录，"
-                  "uninstall 无法自动还原。请用 --original-base-url 补记，"
-                  "或参考 " + (p_bak or "历史 .bak 备份"))
+            print("      提示: 该 provider 已在代理地址且 install-state 没有原始地址记录。"
+                  "如果它是 route_providers.py 做的 /p 迁移，uninstall 会按 sidecar 还原；"
+                  "否则请用 --original-base-url 补记，或参考 " + (p_bak or "历史 .bak 备份"))
     else:
         print("[3/4] 未启用代理（如需自动重发请加 --with-proxy）")
 

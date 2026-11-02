@@ -20,6 +20,7 @@ import argparse
 import http.client
 import json
 import os
+import re
 import shutil
 import socket
 import subprocess
@@ -79,14 +80,15 @@ class FakeUpstream(object):
 
 
 def make_proxy_copy(src, workdir, upstream_port):
-    """把被测脚本复制到临时目录，改写上游表和默认端口，避免影响真实代理。"""
+    "复制代理脚本并改写上游表，避免影响真实代理。"
     text = open(src, encoding="utf-8").read()
-    text = text.replace(
-        'UPSTREAMS = {\n    "/ap": ("upstream-a.example.com", 443),\n'
-        '    "/cm": ("upstream-b.example.com", 443),\n}',
-        'UPSTREAMS = {\n    "/ap": ("127.0.0.1", %d, "http"),\n'
-        '    "/cm": ("127.0.0.1", %d, "http"),\n}' % (upstream_port, upstream_port))
-    assert "127.0.0.1\", %d" % upstream_port in text, "改写 UPSTREAMS 失败，脚本结构变了"
+    block = ("UPSTREAMS = {\n"
+             '    "/ap": ("127.0.0.1", %d, "http"),\n'
+             '    "/cm": ("127.0.0.1", %d, "http"),\n'
+             '    "/cg": ("127.0.0.1", %d, "http"),\n'
+             "}" % (upstream_port, upstream_port, upstream_port))
+    text, n = re.subn(r"UPSTREAMS = \{.*?\n\}", block, text, count=1, flags=re.S)
+    assert n == 1, "改写 UPSTREAMS 失败，脚本结构变了"
     dst = os.path.join(workdir, "retry_proxy.py")
     open(dst, "w", encoding="utf-8").write(text)
     return dst

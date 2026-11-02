@@ -4,8 +4,8 @@
 
 It adds three things to ZCode: **automatically suggest a retry when a tool fails**, **automatically resend when a model request fails**, and (off by default) **email the reason when a session errors**.
 
-- Version: V0.2.5 patch release (build line 0.4.0)
-- Build date: 2026-11-02 (V0.2.5: buffer tool-call deltas so a partial tool call can be retried internally; V0.2.4: absorb upstream SSE `error`/`stream_truncated`; V0.2.3: internal retry for early-finished streams; V0.2.1: hook false-positive fix)
+- Version: V0.2.6 patch release (build line 0.4.0)
+- Build date: 2026-11-03 (V0.2.6: generic `/p` routing + automatic provider migration + retry after a reasoning-only read error + 300 s default window; V0.2.5: buffer tool-call deltas; V0.2.4: absorb upstream SSE `error`; V0.2.3: internal retry for early-finished streams)
 - Applies to: ZCode Desktop (Windows), Python 3.9+
 - Dependencies: Python standard library only; in proxy mode, TLS verification prefers certifi when it is installed
 
@@ -54,19 +54,21 @@ Open a new ZCode session and it takes effect.
 ### Mode B (hook + proxy)
 
 ```bash
-# AP channel (upstream-a.example.com): prefix auto-detected as /ap
+# Install hooks and proxy auto-start first (route_providers only edits config)
+python tools/install.py
+
+# Recommended (V0.2.6): route every provider through /p/<b64>
+python src/route_providers.py --dry-run
+python src/route_providers.py
+# Open a new ZCode session afterwards (SessionStart starts the proxy).
+
+# Optional: a fixed channel, only if the provider really is AP/UPSTREAM-B
 python tools/install.py --with-proxy --provider-id new-provider
-
-# upstream-b channel (upstream-b.example.com): prefix auto-detected as /cm
-python tools/install.py --with-proxy --provider-id new-provider-3
-
-# If the original address cannot be identified, specify the prefix explicitly or the installer refuses to run
-python tools/install.py --with-proxy --provider-id my-relay --proxy-prefix ap
 
 python tools/doctor.py
 ```
 
-**Prefix selection rule**: when `--proxy-prefix` is omitted, the prefix is derived from the original `baseUrl` — if it contains `upstream-b.example.com` the prefix is `/cm`, if it contains `upstream-a.example.com` it is `/ap`; if neither matches the installer **errors out and makes no changes at all**. It never silently defaults to some upstream, which would send channel A's requests to channel B.
+**Prefix selection rule**: when `--proxy-prefix` is omitted, the prefix is derived from the original `baseUrl` — if it contains `upstream-b.example.com` the prefix is `/cm`, if it contains `upstream-a.example.com` it is `/ap`; if neither matches the installer **errors out and makes no changes at all**. It never silently defaults to some upstream, which would send channel A's requests to channel B. **Do not guess a prefix for an unknown address** — use `route_providers.py` (`/p`) instead.
 
 After opening a new ZCode session, `doctor.py` should report "provider goes through the proxy" and "proxy port listening".
 
@@ -148,7 +150,7 @@ Since v0.4.0 there is no filtering by error type any more — as soon as a Bash 
 
 ```
 ZCode ──► 127.0.0.1:8787 ──► real relay ──► upstream
-Resend on any error: up to 3 minutes, one attempt every 20 seconds; give up only when the window expires
+Resend on any error: up to 5 minutes, one attempt every 20 seconds; give up only when the window expires
 ```
 
 The path prefix selects the upstream:
@@ -157,10 +159,12 @@ The path prefix selects the upstream:
 |---|---|
 | `/ap/...` | `https://upstream-a.example.com/v1/...` |
 | `/cm/...` | `https://upstream-b.example.com/v1/...` |
+| `/cg/...` | `http://127.0.0.1:27891/v1/...` (local Cherry gateway) |
+| `/p/<b64>/...` | any origin decoded from the base64url token (recommended, V0.2.6) |
 
-So the provider's baseUrl has to become `http://127.0.0.1:8787/ap/v1` (or `/cm/v1`).
+So a provider's baseUrl becomes `http://127.0.0.1:8787/p/<b64>` for any relay, or a fixed `/ap/v1` for the AP channel.
 
-**The three situations that are retried**
+**The situations that are retried**
 
 1. Cannot connect, or the connection is dropped
 2. The upstream returns **any non-2xx** (including 4xx; the spec is to retry on any error)
@@ -168,7 +172,7 @@ So the provider's baseUrl has to become `http://127.0.0.1:8787/ap/v1` (or `/cm/v
 
 **Retry count**
 
-Not by count but by time window: **keep retrying for 3 minutes, once every 20 seconds** (about 9 attempts inside the window), identical for streaming and non-streaming.
+Not by count but by time window: **keep retrying for 5 minutes, once every 20 seconds** (about 15 attempts inside the window), identical for streaming and non-streaming.
 Wait **20 seconds** between two attempts; if the upstream returns a longer `Retry-After`, honour that instead (capped at 60 seconds). When the window expires no new attempt is started;
 the attempt already in flight is allowed to run to completion (connect 10 s + send 90 s + wait for headers 30 s maximum), so the total duration may be slightly longer than the window.
 In practice failures are mostly **HTTP 429 (concurrency saturated)**; waiting a few seconds before resending almost always gets through.
@@ -199,14 +203,14 @@ with a chunked terminating block appended at the end — scenario 7 in `tools/se
 When a streaming request reaches **80 seconds** with no upstream input at all, the proxy writes an SSE comment line (`: keepalive`) into the conversation:
 the client ignores the content but can see that bytes are arriving, so it does not abort outright because of "no output for 95 seconds".
 This works equally after the response headers have come back: when the upstream stalls mid-stream, a heartbeat is added every 80 seconds to keep waiting,
-and truncation is only declared after 3 minutes of cumulative silence (content already received is not lost).
+and truncation is only declared after 5 minutes of cumulative silence (content already received is not lost).
 **Precondition**: the response must be `Content-Type: text/event-stream` (every normal streaming request is);
 with any other type, inserting a comment line would corrupt the body, so only the 30-second silence truncation applies.
 A slow-reading client only makes the whole stream slower (the proxy uses a queue to create backpressure) and never loses chunks;
 a half-open connection that reads nothing and never disconnects blocks forever (until reading resumes or TCP reports an error) — that is the price of having no client write timeout.
 After that another heartbeat is added **every 80 seconds** without input, **with no cap on the number of heartbeats**. The heartbeat is driven by an independent clock and does not wait for an attempt to fail before being sent.
 
-**Early finish is retried**: if the upstream ends a streaming response before emitting any text or tool call — with `finish_reason=other`, an unknown value, or (the common production case) no `finish_reason` at all — the proxy withholds the ending event, discards that upstream attempt, and immediately re-requests it, continuing the same client response (V0.2.3), so the client sees the stream continue instead of ending the turn silently. The client maps a missing `finish_reason` to `other`, which is why watching only for the literal string misses the real case. An ending that arrives after real content is passed through unchanged, because resending would duplicate what the user already saw. The same rule covers an upstream SSE `{"error":...}` event (production: `stream_truncated`): with no text or tool call yet the event is swallowed and the attempt is re-requested; after real content it is forwarded unchanged (V0.2.4). Tool-call deltas are buffered until the call is complete (V0.2.5): a stream that dies mid-arguments leaves nothing written out, so it can be retried instead of failing the turn with `tool_args_invalid`.
+**Early finish is retried**: if the upstream ends a streaming response before emitting any text or tool call — with `finish_reason=other`, an unknown value, or (the common production case) no `finish_reason` at all — the proxy withholds the ending event, discards that upstream attempt, and immediately re-requests it, continuing the same client response (V0.2.3), so the client sees the stream continue instead of ending the turn silently. The client maps a missing `finish_reason` to `other`, which is why watching only for the literal string misses the real case. An ending that arrives after real content is passed through unchanged, because resending would duplicate what the user already saw. The same rule covers an upstream SSE `{"error":...}` event (production: `stream_truncated`): with no text or tool call yet the event is swallowed and the attempt is re-requested; after real content it is forwarded unchanged (V0.2.4). Tool-call deltas are buffered until the call is complete (V0.2.5): a stream that dies mid-arguments leaves nothing written out, so it can be retried instead of failing the turn with `tool_args_invalid`. Finally, a streaming read error (V0.2.6) is treated the same way when the client is still connected and no text, tool call or finish reason has been written; content already sent is never retried.
 
 **Not retried**: a stream break after bytes have already been written back to the client — resending at that point would duplicate content. In this case the proxy does not write the chunked terminating block, so the client sees the stream did not end normally and knows it was truncated instead of mistakenly believing it finished.
 
@@ -265,5 +269,5 @@ It checks each item in turn: whether the scripts are all present, whether the in
 
 - Update `VERSION` and `CHANGELOG.md` with every change.
 - Adding wording rules: change only `UPSTREAM_PATTERNS` at the top of `src/retry_hook.py` (on a match it suggests waiting 3 minutes first). Since v0.4.0 there is no longer a "decide by error type whether to retry" list: every failure is retried (except exit 1 with no output). Re-run `install.py` afterwards (idempotent, it overwrites the scripts).
-- Adding an upstream: change `UPSTREAMS` in `src/retry_proxy.py` and add the matching prefix in `tools/install.py`.
+- Adding an upstream: prefer `python src/route_providers.py` (any address via `/p/<b64>`, no code change); only add a fixed prefix to `UPSTREAMS`/`PREFIXES` when you really need one.
 - After any change you must run the cases in `docs/04-test-record.md`, and only release once they all pass.

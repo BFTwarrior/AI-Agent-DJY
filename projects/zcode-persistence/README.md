@@ -3,7 +3,7 @@
 A ZCode failure-retry toolkit: **suggests a retry when a tool fails**, **automatically
 resends when a model request fails**, plus a default-off **email report of session errors**.
 
-- Version: V0.2.5 patch release (build line 0.4.0)
+- Version: V0.2.6 patch release (build line 0.4.0)
 - Applies to: ZCode Desktop (Windows), Python 3.9+
 - Dependencies: Python standard library only; proxy mode prefers certifi (if installed)
 
@@ -28,8 +28,8 @@ projects/zcode-persistence/
 ├─ AGENTS.md                Hard constraints for AI maintainers
 ├─ VERSION                  Version number
 ├─ CHANGELOG.md             Change log
-├─ src/                     Runtime scripts (4)
-├─ tools/                   Install/uninstall/self-test/restart (8)
+├─ src/                     Runtime scripts (5; includes route_providers.py)
+├─ tools/                   Install/uninstall/self-test/restart (10)
 ├─ docs/                    Current documentation (00-07)
 └─ diagrams/                Current structure diagrams
 ```
@@ -37,10 +37,13 @@ projects/zcode-persistence/
 ## Quick start
 
 ```bash
-python tools/install.py          # Mode A: hook only
+python tools/install.py          # Mode A: hook + proxy auto-start
 python tools/doctor.py           # Health check
 
-python tools/install.py --with-proxy --provider-id new-provider   # Mode B: hook + proxy
+# Mode B, recommended: route every provider through the proxy
+python src/route_providers.py --dry-run
+python src/route_providers.py
+# Open a new ZCode session afterwards (SessionStart starts the proxy).
 ```
 
 For prefix selection, parameters, uninstallation and rollback see
@@ -56,6 +59,6 @@ addresses out of the documentation.
 
 ## Distribution
 
-The distribution package lives in the repository Releases: `proj-zcode-persistence-v0.2.5`.
+The distribution package lives in the repository Releases: `proj-zcode-persistence-v0.2.6`.
 The archive contains build artifacts; this directory is authoritative for the source, and
 if the two disagree, this directory plus the tag wins.

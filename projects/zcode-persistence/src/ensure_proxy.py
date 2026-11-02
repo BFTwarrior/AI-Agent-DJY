@@ -42,8 +42,13 @@ def is_listening():
         s.close()
 
 
-def is_our_proxy():
-    """端口上的服务是不是本代理。连不上或回的格式不对都算“不是”。"""
+def health_info():
+    """读 /__zp_health 的 JSON；连不上或格式不对返回 None。
+
+    除了身份，还要看 version/features/root：8787 上常驻的代理是旧代码时，
+    provider 自动迁移绝不能执行——旧进程不认识 /p 路由，改了配置等于
+    把每个模型请求都变成 400。
+    """
     try:
         s = socket.create_connection((HOST, PORT), timeout=1.0)
         try:
@@ -57,11 +62,17 @@ def is_our_proxy():
                 data += chunk
             body = data.split(b"\r\n\r\n", 1)[-1]
             info = json.loads(body.decode("utf-8", "replace"))
-            return info.get("name") == "Zcode-Persistence"
+            return info if isinstance(info, dict) else None
         finally:
             s.close()
     except Exception:
-        return False
+        return None
+
+
+def is_our_proxy():
+    "端口上的服务是不是本代理（身份匹配即可，能力检查另做）。"
+    info = health_info()
+    return bool(info and info.get("name") == "Zcode-Persistence")
 
 
 def acquire_lock():
@@ -141,6 +152,38 @@ def ensure_watch():
         pass
 
 
+def route_providers_if_ready():
+    """代理健康且支持 /p 路由时，把还没走代理的 provider 自动迁移（V0.2.6）。
+
+    必须在代理确认可用之后才改：把 provider 指向一个没起来的 8787 会让
+    模型请求全部失败。还要确认端口上跑的是**支持 /p 的新代码**——升级后
+    旧代理进程常驻 8787 时，光看 name 会误判为健康，迁移后所有请求 400。
+    失败只记日志，绝不影响会话启动。
+    """
+    info = health_info()
+    if not info or info.get("name") != "Zcode-Persistence":
+        return
+    if "p_route" not in (info.get("features") or []):
+        note("代理进程不支持 /p 路由（旧版本），跳过 provider 迁移；重启代理后下次会话自动生效")
+        return
+    root = info.get("root") or ""
+    if (not root
+            or os.path.normcase(os.path.abspath(root)) != os.path.normcase(HERE)):
+        # 没说清自己是哪份代码，就不能信：宁可先不迁移。8787 上跑的是另一份
+        # 代码（常见于项目 src 里的手动启动）时，那份代码是否有 /p 路由无法保证。
+        note("8787 上运行的代理未报告可匹配的 root（%r），跳过 provider 迁移"
+             % (root or "-",))
+        return
+    try:
+        import route_providers
+        changed, _skipped, bak = route_providers.route_all(verbose=False)
+        if changed:
+            note("provider 自动迁移 %d 个（备份 %s）"
+                 % (changed, os.path.basename(bak) if bak else "-"))
+    except Exception as exc:
+        note("provider 自动迁移失败: %r" % (exc,))
+
+
 def main():
     "会话启动时调用：代理没起就拉起，端口被别的进程占了就记一笔告警。永远返回 0。"
     lock = acquire_lock()
@@ -154,6 +197,8 @@ def main():
         if is_listening():
             if not is_our_proxy():
                 note("端口 %d 被别的进程占用，且不是本代理；provider 会打到错误服务" % PORT)
+            else:
+                route_providers_if_ready()
             return 0
         if not os.path.exists(PROXY):
             return 0
@@ -188,6 +233,7 @@ def main():
             out.close()
         except Exception:
             pass
+        route_providers_if_ready()
         return 0
     finally:
         release_lock(lock)

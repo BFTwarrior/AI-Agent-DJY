@@ -5,7 +5,7 @@
 ```text
 ZCode Desktop
   model request ──┐
-                  │  (mode B: baseUrl = 127.0.0.1:8787/ap/v1)
+                  │  (mode B: baseUrl = 127.0.0.1:8787/p/<b64> or a fixed /ap,/cm,/cg)
                   ▼
             retry_proxy :8787 ──► upstream-a.example.com/v1
                   │                (resend on failure)
@@ -72,7 +72,7 @@ session to a halt. All exceptions are swallowed in the outer `__main__`.
 ## Mode B: the proxy chain
 
 ```text
-client POST /ap/v1/chat/completions
+client POST /p/<base64url(original)>/v1/chat/completions (or /ap,/cm,/cg)
    │
    ▼
 read the full body (supports Content-Length and chunked)
@@ -89,7 +89,7 @@ attempt 1:
    ▼
 write response headers (strip hop-by-hop) → read1 chunk by chunk, flush to the client
    │  (streaming: the reader thread only does blocking reads; the main thread checks the
-   │   queue every 0.5s; after 80s of silence add `: keepalive`; at 180s mark truncation)
+   │   queue every 0.5s; after 80s of silence add `: keepalive`; at 300s mark truncation)
    │
    ├─ SSE ends ([DONE] / clean EOF) with no finish_reason, or an unknown reason,
    │   and no text/tool call yet ──► return "early"; _handle re-requests upstream and
@@ -99,14 +99,17 @@ write response headers (strip hop-by-hop) → read1 chunk by chunk, flush to the
    ├─ stream ends mid-tool-arguments (tool_args_invalid shape) with nothing written
    │   out yet ──► drop the buffer, mark early, re-request (V0.2.5; tool deltas are
    │   buffered and only written out at finish time)
-   ├─ stream breaks mid-way ──► can only end; cannot retry (would duplicate content)
+   ├─ read error with no text/tool call/finish reason and the client still connected
+   │   ──► mark early, re-request (V0.2.6; a client disconnect is logged as
+   │   `client gone` and never retried)
+   ├─ stream breaks after content was written ──► can only end; cannot retry (would duplicate content)
    ├─ fixed-length response delivers too few bytes ──► log truncated, no terminator
    └─ normal end ──► log ok
 ```
 
 **The v0.4.0 retry decision**: every failed attempt is resent — connection errors, any
 non-2xx from upstream, and silence timeouts. It is not count-based but time-window-based:
-keep retrying for 3 minutes, once every 20 seconds (`Retry-After` is honored, capped at 60
+keep retrying for 5 minutes, once every 20 seconds (`Retry-After` is honored, capped at 60
 seconds), and only stop when the window expires; `MAX_ATTEMPTS=200` is merely a fuse against
 runaway retries. During backoff the thread does a `time.sleep` until the next attempt
 instead of spinning. Heartbeats are independent of attempt boundaries: after 80 consecutive
@@ -131,7 +134,7 @@ Silence **before the response headers** is judged a failure with `SILENCE_TIMEOU
 retried; **after the response headers** retrying is no longer possible, and silence is
 handled instead by "reader thread + main thread consuming the queue": one heartbeat every
 80 seconds keeps the wait alive, and the stream is judged truncated only once cumulative
-silence reaches `RETRY_WINDOW` (180 seconds).
+silence reaches `RETRY_WINDOW` (300 seconds).
 
 The premise is that the response body really is SSE (`Content-Type: text/event-stream`, or
 a 200 event-stream has already been sent in heartbeat mode); otherwise inserting a comment

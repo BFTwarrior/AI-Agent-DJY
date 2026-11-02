@@ -270,3 +270,23 @@ design is an internal re-request, not a client-visible error.
 Together with the original 1–7 cases, the twelve new scenarios (8–19) make 19 in total; all pass;
 `selftest_hook.py`, `selftest_proxy_429.py`, `selftest_watch.py` and `selftest_ensure.py`
 also pass.
+
+## V0.2.6 — generic routing, read-error retry, 23 scenarios
+
+| # | Case | Expected | Result |
+|---|---|---|---|
+| 5 | upstream goes silent (short timeouts) | early finish at the window, then a retryable give-up; never an empty successful end | ✅ |
+| 20 | reasoning then a TCP RST from upstream (SO_LINGER 0) | nothing written out → early and internal re-request; second attempt returns content | ✅ |
+| 21 | `POST /cg/v1/chat/completions` (fake upstream echoes request line and Host) | forwards `POST /v1/chat/completions`, Host includes the non-default port | ✅ |
+| 22 | `/p/<b64(baseUrl=/relay?base=1)>` plus a request query | path becomes `/relay/v1/chat/completions?base=1&api-version=1`, Host includes the port | ✅ |
+| 23 | `/p`, `/p/`, non-base64, non-http(s), invalid port | all return 400 `bad /p/ route token`, no retry loop and no 500 | ✅ |
+
+`selftest_stream.py`: 23 scenarios pass. `selftest_route.py`: 13 checks pass —
+encoding round-trip; already-proxied, hostless, non-http(s), invalid-port and
+userinfo URLs skipped; sidecar and backup; idempotence; `--restore`; proxy-root
+`http://127.0.0.1:8787` not re-encoded; `08787` parsed as 8787; old proxy
+(missing `p_route`), unreachable health, empty or mismatched `root` do not
+migrate; uninstall restores `/p` from the sidecar (dry-run writes nothing).
+
+Also passing: `selftest_hook.py` (11), `selftest_proxy_429.py` (5),
+`selftest_watch.py` (12), `selftest_ensure.py` (serialization).

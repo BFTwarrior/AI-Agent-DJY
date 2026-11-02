@@ -22,7 +22,7 @@ Two main components plus one optional side path (off by default):
 8. TLS must use certifi's CA bundle (the Windows built-in root store lacks SSL.com, so validation fails).
 9. The UA fallback must not be removed: the relay's Cloudflare blocks `Python-urllib` (returns 1010).
 10. The hook's stdout JSON **may only use `additionalContext`**. `systemMessage` is visible to the user only and invisible to the model — that is exactly where v0.3.0 came unstuck: the hook dutifully wrote `advise` to the log, yet the model still did not retry. The client parses with zod (non-strict), so unknown keys get stripped — but stripped means written for nothing, so still emit this one key only.
-11. Backoff must not be "retry immediately". 85% of the failures actually observed are upstream **HTTP 429 (concurrency saturated)**, so you must wait for `RETRY_INTERVAL` (20 seconds); if the upstream hands you a longer `Retry-After`, obey it (capped by `RETRY_AFTER_CAP`=60 seconds). The total retry budget is measured by `RETRY_WINDOW` (180 seconds), not by attempt count.
+11. Backoff must not be "retry immediately". 85% of the failures actually observed are upstream **HTTP 429 (concurrency saturated)**, so you must wait for `RETRY_INTERVAL` (20 seconds); if the upstream hands you a longer `Retry-After`, obey it (capped by `RETRY_AFTER_CAP`=60 seconds). The total retry budget is measured by `RETRY_WINDOW` (300 seconds), not by attempt count.
 12. **Do not add "filter by error type" back in**. The user's spec is "any error at all gets three retries": the hook suggests a retry on any failure, the proxy resends on any non-2xx. The FATAL filter from v0.3.x has been deleted; adding it back amounts to violating the requirement.
 13. The heartbeat is "send **only after 80 seconds with no upstream input at all**, then one every 80 seconds, **with no cap on the number of times**". Do not change it to a fixed count, and do not change it to also fire when data is arriving. Before the response headers it is sent by the main loop's independent clock; after the response headers it is sent by `pipe_response`'s reader thread plus the main thread consuming the queue (send one when silence reaches `HEARTBEAT_INTERVAL`, and only call it truncated when silence reaches `RETRY_WINDOW`).
 14. During the backoff wait the thread must `sleep`, not spin (v0.3.1 once pinned a single core at 97% during a 50-second backoff).
@@ -42,10 +42,14 @@ Two main components plus one optional side path (off by default):
     `status="failed"`, so status alone is not enough. Any exit code other than 1, any output, a timeout, or cancellation still counts
     as a failure. The 2026-11-01 "pause once a minute" bug missed exactly this: three retry advices, and the third told the model to stop.
 23. **Tool-call deltas must be buffered and only written out at `finish_reason` (or when content appears)** (V0.2.5). A stream that ends mid-arguments with nothing written out must be discarded and re-requested; once a complete tool call has been written out, it must pass through (resending would run the tools twice). Reverting the buffer to direct streaming brings `tool_args_invalid` back.
+24. **A read error may be retried only when nothing has been written out** (V0.2.6). Check SSE, `client_gone`, `saw_text`, `tool_out`, `finish_seen`; content already sent must never be retried, and a client disconnect is not an upstream failure.
+25. **`/p/<token>` is base64url of the original baseUrl** (V0.2.6); validate scheme/host/port after decoding, preserve base and request queries, include non-default ports in Host, and return 400 for a bad token.
+26. **Provider migration is idempotent, sidecar-first and restorable** (V0.2.6); compare proxy addresses with `urlsplit` host+port, skip unusable URLs, write the sidecar before the config.
+27. **Automatic migration requires `features` containing `p_route` and a matching non-empty `root`** (V0.2.6, fail-closed); `uninstall` must restore `/p` from the sidecar, including before `--purge`.
 
 ## Current final parameters (v0.4.0)
 
-`RETRY_WINDOW=180` (seconds, the time window), `RETRY_INTERVAL=20` (seconds, fixed interval; `MAX_ATTEMPTS` is only a runaway fuse, default 200), `SILENCE_TIMEOUT=30`, `HEARTBEAT_START=80`, `HEARTBEAT_INTERVAL=80` (no cap on count), `PROXY_RETRY_WINDOW` / `PROXY_RETRY_INTERVAL` override the window and the interval, `RETRY_AFTER_CAP=60`, port 8787.
+`RETRY_WINDOW=300` (seconds, the time window), `RETRY_INTERVAL=20` (seconds, fixed interval; `MAX_ATTEMPTS` is only a runaway fuse, default 200), `SILENCE_TIMEOUT=30`, `HEARTBEAT_START=80`, `HEARTBEAT_INTERVAL=80` (no cap on count), `PROXY_RETRY_WINDOW` / `PROXY_RETRY_INTERVAL` override the window and the interval, `RETRY_AFTER_CAP=60`, port 8787.
 
 Changing these defaults amounts to changing the product spec; you **must** update `README.md`, `docs/02-maintenance.md`, `docs/04-test-record.md` and `CHANGELOG.md` in step.
 

@@ -2,6 +2,14 @@
 
 > 2026-11-01: migrated to the AI-Agent-DJY repository; documentation was translated to English and directories standardized to `docs/` and `diagrams/`. Historical entries keep paths as originally written.
 
+## V0.2.6 — 2026-11-03
+
+Generic `/p/<base64url>` routing for any provider, automatic provider migration
+on SessionStart (gated by the proxy's `p_route` feature and a matching `root`),
+internal retry after a reasoning-only stream read error, sidecar-based
+uninstall rollback, and a 300-second default retry window. 23 streaming
+scenarios and 13 migration checks pass. See `CHANGELOG.md` for details.
+
 ## V0.2.5 — 2026-11-02
 
 > Fixes a third silent-failure path: the upstream ends the stream **in the middle of

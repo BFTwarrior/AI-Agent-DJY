@@ -280,7 +280,8 @@ def main():
     print("-" * 60)
 
     # 1) 脚本
-    for name in ("retry_hook.py", "retry_proxy.py", "ensure_proxy.py"):
+    for name in ("retry_hook.py", "retry_proxy.py", "ensure_proxy.py",
+                 "route_providers.py"):
         p = os.path.join(prefix, name)
         if os.path.exists(p):
             add("PASS", "脚本存在 " + name, "%d 字节" % os.path.getsize(p))
@@ -365,7 +366,7 @@ def main():
             last_listen = find_last_line(log, "proxy listening on")
             if last_listen:
                 want = [
-                    "retry %ss window" % as_int_text(_script_default(prefix, "retry_proxy.py", "PROXY_RETRY_WINDOW", "180")),
+                    "retry %ss window" % as_int_text(_script_default(prefix, "retry_proxy.py", "PROXY_RETRY_WINDOW", "300")),
                     "every %ss" % as_int_text(_script_default(prefix, "retry_proxy.py", "PROXY_RETRY_INTERVAL", "20")),
                     "silence=%ss" % as_int_text(_script_default(prefix, "retry_proxy.py", "PROXY_SILENCE_TIMEOUT", "30")),
                     "heartbeat>=%ss" % as_int_text(_script_default(prefix, "retry_proxy.py", "PROXY_HEARTBEAT_START", "80")),

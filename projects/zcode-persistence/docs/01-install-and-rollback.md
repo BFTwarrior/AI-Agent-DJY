@@ -43,19 +43,29 @@ You should see `PostToolUse hook (primary): registered`, `PostToolUseFailure hoo
 ## Installing Mode B (hook + proxy)
 
 ```bash
-# AP channel
+# 1. Install hooks and proxy auto-start (route_providers only edits config)
+python tools/install.py
+
+# 2. Recommended (V0.2.6): route every provider through /p/<b64>
+python src/route_providers.py --dry-run
+python src/route_providers.py
+# Open a new ZCode session afterwards (SessionStart starts the proxy).
+
+# 3. Optional: one fixed channel, only if it really is AP/UPSTREAM-B
 python tools/install.py --with-proxy --provider-id new-provider
-
-# upstream-b channel
-python tools/install.py --with-proxy --provider-id new-provider-3
-
-# If the address cannot be identified, specify the prefix explicitly
-python tools/install.py --with-proxy --provider-id my-relay --proxy-prefix ap
 ```
 
-The extra action: the `baseUrl` of that provider is changed to the local proxy address. The prefix is derived automatically from the original address
-(contains `upstream-b.example.com` → `/cm`, contains `upstream-a.example.com` → `/ap`); if it cannot be determined the installer errors out and exits,
-it does not guess.
+`route_providers.py` rewrites the baseUrl to
+`http://127.0.0.1:8787/p/<base64url(original)>`; the proxy decodes it and
+forwards to the original origin. It backs up the config, records original URLs
+in `provider_config.json.proxy-origins.json`, is idempotent, and supports
+`--restore`. SessionStart also migrates automatically once the proxy reports
+the `p_route` feature.
+
+**Do not guess a prefix for an unknown address**: `--proxy-prefix ap` would send
+that provider's requests to `upstream-a.example.com`. Use `route_providers.py` instead.
+The prefix is derived from the original address only for known AP/UPSTREAM-B hosts;
+if it cannot be determined the installer errors out and exits, it does not guess.
 
 **Why the provider id must be confirmed first**: the installer changes only the one you name, to avoid damaging other channels. To list the existing ids:
 
@@ -72,7 +82,7 @@ EOF
 
 1. `python tools/doctor.py` → should show "provider goes through the proxy" and "proxy port 8787 listening"
 2. `python src/retry_proxy.py` (run it once in the foreground to see whether it throws any errors)
-3. In another terminal, `curl http://127.0.0.1:8787/ap/v1/models` — returning 401/404 is normal (it means the proxy is forwarding); only a failure to connect is a problem
+3. In another terminal, `curl http://127.0.0.1:8787/ap/v1/models` (or a `/p/<b64>` URL) — returning 401/404 is normal (it means the proxy is forwarding); only a failure to connect is a problem
 4. Open a new ZCode session, ask anything, and a normal reply means success
 
 ---

@@ -21,6 +21,7 @@ import sys
 import time
 
 PROXY_HOST = "127.0.0.1:8787"
+PROXY_BASE = "http://" + PROXY_HOST
 
 
 # 下面几个小工具（home/load_json/save_json/backup/script_basename）与 install.py
@@ -294,6 +295,24 @@ def main():
             return 2
         records = state.get("providers") or {}
         pending = []
+        # route_providers.py 的 /p 迁移记在 sidecar 里，install-state 不知道它。
+        # 不补这一段，先装钩子再跑 route_providers 的用户就永远无法用 uninstall
+        # 还原。sidecar 在 ~/.zcode/v2 下，--purge 不会删它；但配置必须在这里先还原，
+        # 否则卸载完 provider 会指向一个没有代理的 8787。
+        sidecar = provider_path + ".proxy-origins.json"
+        routed = {}
+        if os.path.exists(sidecar):
+            try:
+                routed = load_json(sidecar)
+            except Exception as exc:
+                print("警告: 无法解析 %s（%s），/p 迁移不会自动还原" % (sidecar, exc))
+        routed_pending = []
+        for rule in pc.get("config", {}).get("providerConfigRules", {}).get("providerRules", []):
+            pid = rule.get("providerId")
+            cur = ((rule.get("config", {}).get("api") or {}).get("baseUrl") or "")
+            orig = routed.get(pid)
+            if orig and cur.startswith(PROXY_BASE + "/p/"):
+                routed_pending.append((pid, cur, orig))
         for rule in pc.get("config", {}).get("providerConfigRules", {}).get("providerRules", []):
             pid = rule.get("providerId")
             api = rule.setdefault("config", {}).setdefault("api", {})
@@ -308,10 +327,17 @@ def main():
             elif original:
                 print("警告: provider %s 当前地址 %s 与本包记录的 %s 不一致，可能已被手动修改，不自动还原。"
                       % (pid, current, expected))
+            elif routed.get(pid) and current.startswith(PROXY_BASE + "/p/"):
+                pass  # 有 /p 迁移的 sidecar 记录，下面统一还原
             else:
                 print("警告: provider %s 指向代理(%s)，但没有原始地址记录，无法自动还原。" % (pid, current))
                 print("      请手动把 baseUrl 改回真实上游，或用 .bak 备份还原：")
                 print("      " + provider_path + ".bak-*")
+
+        for pid, cur, orig in routed_pending:
+            if not any(item[0] == pid for item in pending):
+                pending.append((pid, cur, orig))
+                print("按 /p 迁移记录还原 provider %s: %s -> %s" % (pid, cur, orig))
 
         if pending:
             if dry:
@@ -326,7 +352,7 @@ def main():
                 bak = backup(provider_path)
                 save_json(provider_path, pc)
                 print("  备份: " + bak)
-        elif not records:
+        elif not records and not routed_pending:
             print("提示: 安装状态里没有 provider 记录")
 
     # 3) 代理进程、报错监听与目录

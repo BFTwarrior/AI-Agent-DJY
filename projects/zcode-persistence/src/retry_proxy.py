@@ -3,7 +3,7 @@
 
 ZCode 只看到最终结果，看不到中间失败。
 
-重试触发条件（六类，v0.4.0 起覆盖"任何报错"）：
+重试触发条件（七类，v0.4.0 起覆盖"任何报错"）：
   1. 连接失败 / 连接被断 / 任何异常
   2. 上游返回任何非 2xx 状态码（含 4xx —— 用户规格是"只要是报错就重试"）
   3. 上游 SILENCE_TIMEOUT 秒内一个字节都不吐
@@ -13,9 +13,11 @@ ZCode 只看到最终结果，看不到中间失败。
      （V0.2.4）
   6. 流在工具调用参数中途结束（客户端会判 tool_args_invalid，V0.2.5）：
      工具增量先缓冲，收尾时没有已写出内容就整体丢弃重发
+  7. 流被读错误/静默超时打断，且只吐了 reasoning、没有正文/完整工具调用
+     （客户端会判 upstream_stream_read_error，V0.2.6）：丢弃本次尝试并重发
 
 重试次数：
-  不按次数，按时间窗：默认持续重试 180 秒，每 20 秒一次（窗口内约 9 次尝试）；
+  不按次数，按时间窗：默认持续重试 300 秒，每 20 秒一次（窗口内约 15 次尝试）；
   上游给了更长的 Retry-After 就尊重它（上限 60 秒）。窗口/间隔由
   PROXY_RETRY_WINDOW / PROXY_RETRY_INTERVAL 覆盖；MAX_ATTEMPTS（默认 200）
   只是防跑飞的保险丝，正常路径碰不到。流式与非流式一致。
@@ -30,10 +32,12 @@ ZCode 只看到最终结果，看不到中间失败。
 路径前缀选上游：
   /ap/...  -> https://upstream-a.example.com/v1/...
   /cm/...  -> https://upstream-b.example.com/v1/...
+  /cg/...  -> http://127.0.0.1:27891/v1/...（本机 Cherry AI 连接中心）
 
 不记录任何请求/响应内容，只记状态行。
 """
 
+import base64
 import http.client
 import json
 import math
@@ -81,10 +85,12 @@ def env_int(name, default, lo=1, hi=1000000):
 
 LISTEN_HOST = "127.0.0.1"
 LISTEN_PORT = env_int("PROXY_PORT", 8787, 1, 65535)
+# 只用于 /__zp_health 的能力标记，让 ensure_proxy 能分辨"跑的是不是支持 /p 的新代码"。
+PROXY_VERSION = "0.2.6"
 
-# 重试策略：按"时间窗"而不是次数。默认持续重试 3 分钟，每 20 秒一次（窗口内约 9 次）。
+# 重试策略：按"时间窗"而不是次数。默认持续重试 5 分钟，每 20 秒一次（窗口内约 15 次）。
 # MAX_ATTEMPTS 只保留为防跑飞的保险丝，正常永远碰不到。
-RETRY_WINDOW = env_int("PROXY_RETRY_WINDOW", 180, 1, 3600)
+RETRY_WINDOW = env_int("PROXY_RETRY_WINDOW", 300, 1, 3600)
 RETRY_INTERVAL = max(0.05, min(env_float("PROXY_RETRY_INTERVAL", 20.0), 600.0))
 MAX_ATTEMPTS = env_int("PROXY_MAX_ATTEMPTS", 200, 1, 1000)
 SILENCE_TIMEOUT = env_int("PROXY_SILENCE_TIMEOUT", 30)
@@ -167,6 +173,7 @@ DEFAULT_UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
 UPSTREAMS = {
     "/ap": ("upstream-a.example.com", 443),
     "/cm": ("upstream-b.example.com", 443),
+    "/cg": ("127.0.0.1", 27891, "http"),
 }
 
 HOP_BY_HOP = {
@@ -199,6 +206,10 @@ def log(msg):
     "写一行状态日志；含 ? 的部分按 query 脱敏，绝不记录请求/响应正文。"
     if "?" in msg:
         msg = re.sub(r"\?[^\s)]*", "?<redacted>", msg)
+    # /p/<token> 里的 token 是原始 baseUrl 的 base64，可逆；只留前 8 位便于
+    # 对照是哪个 provider，不把完整地址（可能含密钥）写进日志。
+    msg = re.sub(r"/p/([A-Za-z0-9_-]{8,})",
+                 lambda m: "/p/" + m.group(1)[:8] + "…", msg)
     with _lock:
         # 带日期：报错邮件要按时间把 giveup 与报错时刻对齐（只有时分秒时跨天会张冠李戴）
         sys.stdout.write("%s\t%s\n" % (time.strftime("%Y-%m-%d %H:%M:%S"), msg))
@@ -290,7 +301,13 @@ def fetch_once(host, port, scheme, method, path, headers, body):
         conn.putrequest(method, path, skip_host=True, skip_accept_encoding=True)
         for k, v in headers:
             conn.putheader(k, v)
-        conn.putheader("Host", host)
+        default_port = 443 if scheme == "https" else 80
+        host_hdr = host if port == default_port else "%s:%d" % (host, port)
+        if ":" in host and not host.startswith("["):
+            # IPv6 字面量在 Host 头里必须加方括号，否则端口部分会被当成
+            # 地址的一部分（::1:8080 无法解析）。
+            host_hdr = "[%s]%s" % (host, "" if port == default_port else ":%d" % port)
+        conn.putheader("Host", host_hdr)
         conn.putheader("Content-Length", str(len(body)))
         conn.endheaders()
         if body:
@@ -396,6 +413,8 @@ def pipe_response(handler, resp, conn, path, started, sse_started=False, heartbe
     saw_choices = False
     finish_seen = False
     early = False
+    # 客户端写失败（关窗/取消）不能当成上游失败去重发；emit() 置位。
+    client_gone = False
     # 工具调用增量先缓冲、写完整再出手（V0.2.5）。线上实测：上游经常在工具参数
     # 发到一半时就把流结束（无 finish_reason=tool_calls），客户端拿到"开了头没
     # 结尾"的工具调用，判 tool_args_invalid、retryable=false，回合失败。
@@ -410,11 +429,15 @@ def pipe_response(handler, resp, conn, path, started, sse_started=False, heartbe
 
     def emit(data):
         "写一个 chunked 块；所有回写都走这里，保证 total/first 统计一致。"
-        nonlocal total, first
+        nonlocal total, first, client_gone
         if first is None:
             first = time.time() - started
-        handler.wfile.write(b"%x\r\n" % len(data) + data + b"\r\n")
-        handler.wfile.flush()
+        try:
+            handler.wfile.write(b"%x\r\n" % len(data) + data + b"\r\n")
+            handler.wfile.flush()
+        except Exception:
+            client_gone = True
+            raise
         total += len(data)
 
     def early_finish(why):
@@ -637,6 +660,7 @@ def pipe_response(handler, resp, conn, path, started, sse_started=False, heartbe
                         raise TimeoutError("body silent %.0fs" % (now - last_upstream))
                     if now >= next_hb_at:
                         if not handler._heartbeat():
+                            client_gone = True
                             raise ConnectionError("client gone during silent stream")
                         log("keepalive after %.0fs body silence %s"
                             % (now - last_upstream, path))
@@ -663,11 +687,25 @@ def pipe_response(handler, resp, conn, path, started, sse_started=False, heartbe
         if early:
             return "early"
         # pending 只可能是“最后一行没有换行”。它可能是完整事件，也可能在 JSON
-        # 中间被断开：只解析、不转发，避免把半截 data: 行写给客户端，重试流再追加
-        # 时合成一个非法事件。
+        # 中间被断开：半截 data: 行绝不能转发（重试流再追加时会合成非法事件）。
+        # 完整行必须正常转发——否则正文被解析成 saw_text 却没写给客户端，
+        # 后面的“缺 finish_reason”判定会因为 saw_text=True 放行，变成静默截断。
         if is_sse and pending:
-            if process_sse(b"\n", emit_lines=False):
+            complete = True
+            if pending.startswith(b"data:"):
+                raw = pending[5:].strip()
+                if raw and raw != b"[DONE]":
+                    try:
+                        json.loads(raw.decode("utf-8", "replace"))
+                    except Exception:
+                        complete = False
+            if process_sse(b"\n", emit_lines=complete):
                 return "early"
+            if complete:
+                # SSE 以空行分事件。最后一行补的 \n 只结束行、不结束事件；
+                # 若随后 early 重发，新流的第一行会粘进同一个事件，data 里
+                # 变成两段 JSON，客户端解析失败。所以完整行要补事件终止空行。
+                emit(b"\n")
             pending = b""
         # 上游既没发 [DONE] 也没给 finish_reason，只是正常关闭了连接：客户端同样会
         # 把它当成完成，所以同样丢弃这次尝试并重发。
@@ -686,9 +724,21 @@ def pipe_response(handler, resp, conn, path, started, sse_started=False, heartbe
         # 的 read1 只返回短数据、不抛异常，不能当成完整响应（否则还会误补终止块）。
         completed = not getattr(resp, "length", 0)
     except Exception as exc:
-        # 已经开始回写就不能重试了。刻意不补 chunked 终止块，
-        # 让客户端看到"未正常结束"，从而知道流被截断。
-        log("stream broken after %d bytes: %r" % (total, exc))
+        # 上游读错误/静默超时：如果只吐了 reasoning（没有正文/完整工具调用），
+        # 客户端还没有可用产出，丢弃本次尝试并内部重发（V0.2.6）。
+        # 客户端自己断开（关窗/取消）不能重发，否则只是空转。
+        if (is_sse and not client_gone and not saw_text and not tool_out
+                and not finish_seen):
+            early = True
+            log("early finish stream error: %s after %d bytes %s"
+                % (" ".join(repr(exc).split())[:120], total, path))
+        else:
+            if client_gone:
+                # 客户端关窗/取消导致的写失败，不是上游故障；日志要能一眼分清，
+                # 否则排查时会把它算到中转头上。
+                log("client gone after %d bytes %s" % (total, path))
+            else:
+                log("stream broken after %d bytes: %r" % (total, exc))
     finally:
         # 先让读取线程别再往队列里塞东西（它在 put 的 0.5 秒超时里能看到 stop），
         # 再写终止块/关连接。读取线程若正阻塞在 read1，只能等它自己的 socket 超时。
@@ -710,6 +760,8 @@ def pipe_response(handler, resp, conn, path, started, sse_started=False, heartbe
         except Exception:
             pass
 
+    if early:
+        return "early"
     if completed:
         log("ok %s status=%d bytes=%d first=%.2fs" % (
             path, resp.status, total, first if first is not None else -1))
@@ -779,22 +831,56 @@ class Handler(BaseHTTPRequestHandler):
         "主流程：解析路径选上游 → 读 body → 重试状态机 → 回写。"
         raw = urllib.parse.urlsplit(self.path)
         prefix = None
-        for p in UPSTREAMS:
-            if raw.path.startswith(p + "/") or raw.path == p:
-                prefix = p
-                break
-        if prefix is None:
-            # 400 之后不读 body 就会把它留在 keep-alive 连接里，下一次请求
-            # 会把残留字节当成请求行解析。直接标记关闭，由 http.server 收尾。
-            self.close_connection = True
-            self._reject(400, "unknown upstream prefix, use /ap/ or /cm/")
-            return
-        target = UPSTREAMS[prefix]
-        host, port = target[0], target[1]
-        scheme = target[2] if len(target) > 2 else "https"
-        path = raw.path[len(prefix):] or "/"
-        if raw.query:
-            path += "?" + raw.query
+        target = None
+        # 通用路由：/p/<base64url(原始 baseUrl)>/...（V0.2.6）。
+        # 安装器把任意 provider 的 baseUrl 改写成这种形式，代理解码后转发到
+        # 原始 host/路径；新增 provider 不需要再改代理的 UPSTREAMS 表。
+        if raw.path == "/p" or raw.path.startswith("/p/"):
+            rest = raw.path[3:] if raw.path.startswith("/p/") else ""
+            token, _, tail = rest.partition("/")
+            try:
+                pad = "=" * (-len(token) % 4)
+                base = base64.urlsafe_b64decode(
+                    (token + pad).encode("ascii")).decode("utf-8")
+                bu = urllib.parse.urlsplit(base)
+                if bu.scheme not in ("http", "https") or not bu.hostname:
+                    raise ValueError("bad base url")
+                scheme = bu.scheme
+                host = bu.hostname
+                # 端口解析也要在 try 内：urlsplit 之后访问 .port 会为非法端口
+                # （如 :abc / :99999）抛 ValueError，漏出去会变成 500。
+                explicit_port = bu.port
+                if explicit_port is not None and not (0 < explicit_port < 65536):
+                    raise ValueError("bad port")
+                port = explicit_port or (443 if scheme == "https" else 80)
+            except Exception:
+                self.close_connection = True
+                self._reject(400, "bad /p/ route token")
+                return
+            base_path = bu.path.rstrip("/")
+            base_query = bu.query
+            path = (base_path + "/" + tail) if tail else (base_path or "/")
+        else:
+            for p in UPSTREAMS:
+                if raw.path.startswith(p + "/") or raw.path == p:
+                    prefix = p
+                    break
+            if prefix is None:
+                # 400 之后不读 body 就会把它留在 keep-alive 连接里，下一次请求
+                # 会把残留字节当成请求行解析。直接标记关闭，由 http.server 收尾。
+                self.close_connection = True
+                self._reject(400, "unknown upstream prefix, use /ap/, /cm/, /cg/ or /p/<token>")
+                return
+            target = UPSTREAMS[prefix]
+            host, port = target[0], target[1]
+            scheme = target[2] if len(target) > 2 else "https"
+            path = raw.path[len(prefix):] or "/"
+            base_query = ""
+        # 原始 baseUrl 自带的查询串（如 ?api-version=...）和本次请求的查询串
+        # 都要保留：前者是 provider 配置的一部分，后者是调用参数。
+        for q in (base_query, raw.query):
+            if q:
+                path += ("&" if "?" in path else "?") + q
 
         body = read_body(self)
         if body is None:
@@ -876,13 +962,16 @@ class Handler(BaseHTTPRequestHandler):
                     sse_mode = True
                     reasons.append("early")
                     elapsed = time.time() - started
+                    nxt = time.time() + RETRY_INTERVAL
+                    # 先判窗口再写日志：静默 early 只在窗口到点时才被判定，
+                    # 这种情况下不会再发请求，日志不能写成“retry after”。
+                    if (elapsed >= RETRY_WINDOW or attempt >= MAX_ATTEMPTS
+                            or nxt - started >= RETRY_WINDOW):
+                        log("early finish, window exhausted attempt %d (%.0fs/%gs) %s"
+                            % (attempt, elapsed, RETRY_WINDOW, path))
+                        break
                     log("retry after early finish attempt %d (%.0fs/%gs) %s"
                         % (attempt, elapsed, RETRY_WINDOW, path))
-                    if elapsed >= RETRY_WINDOW or attempt >= MAX_ATTEMPTS:
-                        break
-                    nxt = time.time() + RETRY_INTERVAL
-                    if nxt - started >= RETRY_WINDOW:
-                        break
                     next_attempt_at = nxt
                     continue
 
@@ -957,8 +1046,13 @@ class Handler(BaseHTTPRequestHandler):
         # 探针给 ensure_proxy / doctor / 运维换进程脚本用：确认端口上是本代理，
         # 并靠 root 分辨跑的是哪一份代码（换进程后旧代码残留一眼能看出来）
         if self.path.split("?")[0] == "/__zp_health":
+            # features 是给自动迁移用的能力位：旧版代理不认识 /p 路由，
+            # ensure_proxy 必须先看到 p_route 才允许改写 provider 配置，
+            # 否则升级瞬间会把所有 provider 指向旧进程，全部请求 400。
             body = json.dumps({"name": "Zcode-Persistence",
                                "role": "retry_proxy",
+                               "version": PROXY_VERSION,
+                               "features": ["p_route", "cg_route"],
                                "root": os.path.dirname(os.path.abspath(__file__))},
                               ensure_ascii=False).encode()
             self.send_response(200)
