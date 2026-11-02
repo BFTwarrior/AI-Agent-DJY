@@ -1,4 +1,4 @@
-# Architecture Diagram (V0.2.3 patch release)
+# Architecture Diagram (V0.2.4 patch release)
 
 > Build line 0.4.0. Parameters and semantics follow the code in this project's `src/`;
 > this document sketches the relationships without repeating every detail.
@@ -47,6 +47,8 @@ main loop (window started .. started+180s, one attempt every RETRY_INTERVAL=20s)
                  then one every 80s, no cap (independent clock, not tied to attempt boundaries)
    │
    ├─ success → write response headers → read and flush
+   │    ├─ no text/tool yet and the stream ends without finish_reason, or sends {"error":...}
+   │    │    → discard and re-request into the same client response (V0.2.3/V0.2.4)
    │    ├─ stream breaks mid-way → stop; do not add a chunked terminator (the client must see truncation)
    │    └─ normal end → log ok
    └─ window expires with failures → streaming: SSE error event; non-streaming: 503 + OpenAI-shaped error body

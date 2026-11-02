@@ -94,6 +94,8 @@ write response headers (strip hop-by-hop) → read1 chunk by chunk, flush to the
    ├─ SSE ends ([DONE] / clean EOF) with no finish_reason, or an unknown reason,
    │   and no text/tool call yet ──► return "early"; _handle re-requests upstream and
    │   continues the same client response (V0.2.3)
+   ├─ upstream sends an SSE {"error":...} (stream_truncated) with no text/tool call
+   │   ──► swallow the event, mark early, re-request (V0.2.4)
    ├─ stream breaks mid-way ──► can only end; cannot retry (would duplicate content)
    ├─ fixed-length response delivers too few bytes ──► log truncated, no terminator
    └─ normal end ──► log ok
@@ -114,7 +116,10 @@ streaming. The one recoverable case is a stream that ends with **no text and no 
 (missing/unknown `finish_reason`, or literal `other`): the proxy discards that upstream
 attempt and re-requests it internally, and the new stream continues writing into the same
 client response. It does **not** send a mid-stream SSE error — production testing showed the
-client classifies that as `ProviderBusinessError` with `retryable=false`.
+client classifies that as `ProviderBusinessError` with `retryable=false`. The same
+recoverable shape is an explicit upstream SSE `{"error":...}` event (production:
+`stream_truncated`): it is swallowed and retried when no text/tool call has been
+emitted, and passed through once content exists (V0.2.4).
 
 **Where the 30-second silence timeout comes from**: the ZCode client declares failure if it
 has not received the first byte within 95 seconds. So the proxy first hangs an SSE heartbeat

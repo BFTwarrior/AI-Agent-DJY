@@ -3,7 +3,7 @@
 
 不碰真实中转：假上游在本机回环上按脚本吐字节，代理用临时副本 + 临时端口。
 
-验证十五件事（对应 2026-10-31 三轮复审与终验、2026-11-01 自动暂停修复）：
+验证十七件事（对应 2026-10-31 三轮复审与终验、2026-11-01 自动暂停修复）：
   1. 逐条透传：上游每 0.2 秒发一条 80 字节事件，客户端应当在每条到达后
      几十毫秒内收到，而不是攒到 8KB 或流结束才一起到
   2. 流中静默：响应头之后上游停 2.5 秒、空闲超时设 1 秒时，代理应当发
@@ -27,6 +27,10 @@
  12. 没给 `finish_reason`、也没发 `[DONE]`，直接正常关闭连接——EOF 判 early
  13. 有正文但没 `finish_reason` 的 `[DONE]`——原样放行，避免重复内容
  14. 第一次连接提前结束、第二次连接成功：代理内部重发，客户端只看到一条连续的流
+ 15. 字面 `finish_reason=other` 同样透明续写（场景 14 覆盖的是"缺失"形态）
+ 16. 上游不发 finish_reason、直接发 `{"error":...}`（stream_truncated），且无正文/
+     工具调用：代理吞掉错误事件并内部重发
+ 17. 已经有正文后上游才发 error：不能重试（会重复正文），原样转发
 
 用法：python tools/selftest_stream.py            （默认读同包 src/retry_proxy.py）
       python tools/selftest_stream.py --src X
@@ -262,7 +266,7 @@ def run_case(name, src, script, content_length=None, chunked=True,
 
 
 def main():
-    "依次跑 15 个场景并汇总；全部通过退出码 0。"
+    "依次跑 17 个场景并汇总；全部通过退出码 0。"
     ap = argparse.ArgumentParser()
     ap.add_argument("--src", default=os.path.join(
         os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -506,6 +510,57 @@ def main():
              '"error"' not in text, "retry after early finish" in logtext))
     print("   判定:", "PASS" if pass15 else "FAIL")
     ok = ok and pass15
+
+    # 16) 上游不发 finish_reason，直接发 {"error":...}（线上 stream_truncated）：
+    #     只有 reasoning、没有正文/工具时必须吞掉错误并内部重发。
+    first_err = [
+        (b'data: {"choices":[{"delta":{"reasoning_content":"thinking"}}]}\n\n', 0.05),
+        (b'data: {"error":{"message":"upstream broke","type":"upstream_error",'
+         b'"code":"stream_truncated"}}\n\n', 0.05),
+        (b"data: [DONE]\n\n", 0.0),
+    ]
+    second_err = [
+        (b'data: {"choices":[{"delta":{"content":"recovered answer"}}]}\n\n', 0.05),
+        (b'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\n', 0.05),
+        (b"data: [DONE]\n\n", 0.0),
+    ]
+    chunks, logtext, tail = run_case("上游 error 事件透明续写", args.src, first_err,
+                                     scripts=[first_err, second_err], read_seconds=8.0)
+    data = b"\n\n".join(c for _t, c in chunks) + tail
+    text = data.decode("utf-8", "replace")
+    pass16 = (b"recovered answer" in data and b'"finish_reason":"stop"' in data
+              and data.count(b"[DONE]") == 1
+              and data.find(b"recovered answer") < data.find(b"[DONE]")
+              and '"error"' not in text
+              and "early finish upstream error: stream_truncated" in logtext
+              and "retry after early finish" in logtext
+              and "stream broken" not in logtext)
+    print("   收到正文=%s stop=%s 无error=%s 日志重发=%s"
+          % (b"recovered answer" in data, b'"finish_reason":"stop"' in data,
+             '"error"' not in text, "retry after early finish" in logtext))
+    print("   判定:", "PASS" if pass16 else "FAIL")
+    ok = ok and pass16
+
+    # 17) 已经有正文后上游才发 error：不能重试（会重复正文），必须原样转发。
+    text_err = [
+        (b'data: {"choices":[{"delta":{"content":"partial answer"}}]}\n\n', 0.05),
+        (b'data: {"error":{"message":"upstream broke","type":"upstream_error",'
+         b'"code":"stream_truncated"}}\n\n', 0.05),
+        (b"data: [DONE]\n\n", 0.0),
+    ]
+    chunks, logtext, tail = run_case("有正文后 error 原样转发", args.src, text_err,
+                                     read_seconds=4.0)
+    data = b"\n\n".join(c for _t, c in chunks) + tail
+    text = data.decode("utf-8", "replace")
+    pass17 = (b"partial answer" in data and b"stream_truncated" in data
+              and b"0\r\n\r\n" in tail and "ok " in logtext
+              and "retry after early finish" not in logtext
+              and "stream broken" not in logtext)
+    print("   收到正文=%s 收到error=%s 未重发=%s"
+          % (b"partial answer" in data, b"stream_truncated" in data,
+             "retry after early finish" not in logtext))
+    print("   判定:", "PASS" if pass17 else "FAIL")
+    ok = ok and pass17
 
     print("\n总体:", "全部通过" if ok else "有失败项")
     return 0 if ok else 1

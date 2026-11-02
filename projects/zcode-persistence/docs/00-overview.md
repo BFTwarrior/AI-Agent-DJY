@@ -4,8 +4,8 @@
 
 It adds three things to ZCode: **automatically suggest a retry when a tool fails**, **automatically resend when a model request fails**, and (off by default) **email the reason when a session errors**.
 
-- Version: V0.2.3 patch release (build line 0.4.0)
-- Build date: 2026-11-02 (V0.2.3: internal retry for early-finished streams; V0.2.1: hook false-positive fix)
+- Version: V0.2.4 patch release (build line 0.4.0)
+- Build date: 2026-11-02 (V0.2.4: absorb upstream SSE `error`/`stream_truncated` and retry internally; V0.2.3: internal retry for early-finished streams; V0.2.1: hook false-positive fix)
 - Applies to: ZCode Desktop (Windows), Python 3.9+
 - Dependencies: Python standard library only; in proxy mode, TLS verification prefers certifi when it is installed
 
@@ -206,7 +206,7 @@ A slow-reading client only makes the whole stream slower (the proxy uses a queue
 a half-open connection that reads nothing and never disconnects blocks forever (until reading resumes or TCP reports an error) — that is the price of having no client write timeout.
 After that another heartbeat is added **every 80 seconds** without input, **with no cap on the number of heartbeats**. The heartbeat is driven by an independent clock and does not wait for an attempt to fail before being sent.
 
-**Early finish is retried**: if the upstream ends a streaming response before emitting any text or tool call — with `finish_reason=other`, an unknown value, or (the common production case) no `finish_reason` at all — the proxy withholds the ending event, discards that upstream attempt, and immediately re-requests it, continuing the same client response (V0.2.3), so the client sees the stream continue instead of ending the turn silently. The client maps a missing `finish_reason` to `other`, which is why watching only for the literal string misses the real case. An ending that arrives after real content is passed through unchanged, because resending would duplicate what the user already saw.
+**Early finish is retried**: if the upstream ends a streaming response before emitting any text or tool call — with `finish_reason=other`, an unknown value, or (the common production case) no `finish_reason` at all — the proxy withholds the ending event, discards that upstream attempt, and immediately re-requests it, continuing the same client response (V0.2.3), so the client sees the stream continue instead of ending the turn silently. The client maps a missing `finish_reason` to `other`, which is why watching only for the literal string misses the real case. An ending that arrives after real content is passed through unchanged, because resending would duplicate what the user already saw. The same rule covers an upstream SSE `{"error":...}` event (production: `stream_truncated`): with no text or tool call yet the event is swallowed and the attempt is re-requested; after real content it is forwarded unchanged (V0.2.4).
 
 **Not retried**: a stream break after bytes have already been written back to the client — resending at that point would duplicate content. In this case the proxy does not write the chunked terminating block, so the client sees the stream did not end normally and knows it was truncated instead of mistakenly believing it finished.
 

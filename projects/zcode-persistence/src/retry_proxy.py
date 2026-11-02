@@ -3,10 +3,14 @@
 
 ZCode 只看到最终结果，看不到中间失败。
 
-重试触发条件（三种，v0.4.0 起覆盖"任何报错"）：
+重试触发条件（五类，v0.4.0 起覆盖"任何报错"）：
   1. 连接失败 / 连接被断 / 任何异常
   2. 上游返回任何非 2xx 状态码（含 4xx —— 用户规格是"只要是报错就重试"）
   3. 上游 SILENCE_TIMEOUT 秒内一个字节都不吐
+  4. 流式提前结束：无正文/工具调用时缺 finish_reason、未知 finish_reason
+     （含字面 other），或只发 [DONE] / 正常 EOF（V0.2.3）
+  5. 上游直接发 SSE `{"error":...}`（如 stream_truncated），且尚无正文/工具调用
+     （V0.2.4）
 
 重试次数：
   不按次数，按时间窗：默认持续重试 180 秒，每 20 秒一次（窗口内约 9 次尝试）；
@@ -466,6 +470,24 @@ def pipe_response(handler, resp, conn, path, started, sse_started=False, heartbe
                                         if (fr not in safe_finish
                                                 and not saw_text and not saw_tool):
                                             return early_finish("reason=%s" % fr)
+                            # 先记账同一事件里的 choices/delta，再判断 error：若上游
+                            # 把正文和 error 塞进同一条事件，正文要算数，不能吞。
+                            # 上游有时不回 finish_reason，而是直接发一条 SSE
+                            # `{"error":{...}}`（线上实测 code=stream_truncated）。
+                            # 客户端会把它归成 ProviderBusinessError、
+                            # retryable=false，整轮直接失败。只要还没有正文/工具
+                            # 调用，就吞掉这条事件并走 early 重发；已经有内容时
+                            # 原样转发，重发会造成重复。
+                            err = obj.get("error")
+                            if err and not saw_text and not saw_tool and not finish_seen:
+                                if isinstance(err, dict):
+                                    why = err.get("code") or err.get("message") or "error"
+                                else:
+                                    why = err
+                                # 只记状态行：message 截断、去换行，避免把上游
+                                # 原文（可能很长）写进日志破坏一行一条的解析。
+                                why = " ".join(str(why).split())[:80]
+                                return early_finish("upstream error: %s" % why)
             if emit_lines:
                 emit(line)
         return False

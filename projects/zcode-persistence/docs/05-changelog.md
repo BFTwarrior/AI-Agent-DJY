@@ -2,6 +2,40 @@
 
 > 2026-11-01: migrated to the AI-Agent-DJY repository; documentation was translated to English and directories standardized to `docs/` and `diagrams/`. Historical entries keep paths as originally written.
 
+## V0.2.4 — 2026-11-02
+
+> Fixes another silent-stop path: instead of a missing `finish_reason`, the upstream
+> sends an SSE `{"error":{"code":"stream_truncated",...}}` event. The proxy used to
+> forward it unchanged; the client classified it as `ProviderBusinessError` with
+> `retryable=false` and failed the turn immediately. Now, as long as no text or tool
+> call has been emitted, the proxy swallows the event and retries internally.
+
+### Fix: upstream SSE error events were passed through
+
+**Symptom**: the pop-up says the upstream output was interrupted; details show
+`provider_code=stream_truncated ... retryable=false`; the client log has
+`lastChunkType=reasoning-delta`, `textDeltaChars=0`, `toolCallCount=0`.
+
+**Root cause**: after emitting only reasoning, the upstream sends
+`data: {"error":...}` (code `stream_truncated`). `process_sse` only inspected
+`finish_reason` and forwarded every non-`[DONE]` data line verbatim; the client
+failed on the error event before the proxy's early retry could help.
+
+**Fix** (`src/retry_proxy.py`):
+- on a top-level `error`, if `saw_text` / `saw_tool` / `finish_seen` are all false,
+  call `early_finish("upstream error: <code>")` and do not forward the line;
+- reuse the V0.2.3 early path: discard the attempt and re-request into the same
+  client response;
+- if text or a tool call already exists, forward unchanged to avoid duplication.
+
+### Verification
+
+- `selftest_stream.py` adds case 16 (reasoning + error → internal retry succeeds)
+  and case 17 (text + error → passed through, no retry); 17 scenarios pass.
+- The other four suites pass.
+- Production sample: the 18:55:53 `stream_truncated` request had only 188 reasoning
+  deltas (751 chars), `text=0`, `tool=0`, so it was safe to retry.
+
 ## V0.2.3 — 2026-11-02
 
 > Corrects the previous diagnosis: the upstream usually sends **no `finish_reason` at
