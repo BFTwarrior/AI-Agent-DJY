@@ -96,6 +96,9 @@ write response headers (strip hop-by-hop) → read1 chunk by chunk, flush to the
    │   continues the same client response (V0.2.3)
    ├─ upstream sends an SSE {"error":...} (stream_truncated) with no text/tool call
    │   ──► swallow the event, mark early, re-request (V0.2.4)
+   ├─ stream ends mid-tool-arguments (tool_args_invalid shape) with nothing written
+   │   out yet ──► drop the buffer, mark early, re-request (V0.2.5; tool deltas are
+   │   buffered and only written out at finish time)
    ├─ stream breaks mid-way ──► can only end; cannot retry (would duplicate content)
    ├─ fixed-length response delivers too few bytes ──► log truncated, no terminator
    └─ normal end ──► log ok

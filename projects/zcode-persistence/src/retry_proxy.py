@@ -3,7 +3,7 @@
 
 ZCode 只看到最终结果，看不到中间失败。
 
-重试触发条件（五类，v0.4.0 起覆盖"任何报错"）：
+重试触发条件（六类，v0.4.0 起覆盖"任何报错"）：
   1. 连接失败 / 连接被断 / 任何异常
   2. 上游返回任何非 2xx 状态码（含 4xx —— 用户规格是"只要是报错就重试"）
   3. 上游 SILENCE_TIMEOUT 秒内一个字节都不吐
@@ -11,6 +11,8 @@ ZCode 只看到最终结果，看不到中间失败。
      （含字面 other），或只发 [DONE] / 正常 EOF（V0.2.3）
   5. 上游直接发 SSE `{"error":...}`（如 stream_truncated），且尚无正文/工具调用
      （V0.2.4）
+  6. 流在工具调用参数中途结束（客户端会判 tool_args_invalid，V0.2.5）：
+     工具增量先缓冲，收尾时没有已写出内容就整体丢弃重发
 
 重试次数：
   不按次数，按时间窗：默认持续重试 180 秒，每 20 秒一次（窗口内约 9 次尝试）；
@@ -390,10 +392,17 @@ def pipe_response(handler, resp, conn, path, started, sse_started=False, heartbe
     is_sse = bool(sse_started or ctype.startswith("text/event-stream"))
     pending = b""
     saw_text = False
-    saw_tool = False
+    tool_out = False
     saw_choices = False
     finish_seen = False
     early = False
+    # 工具调用增量先缓冲、写完整再出手（V0.2.5）。线上实测：上游经常在工具参数
+    # 发到一半时就把流结束（无 finish_reason=tool_calls），客户端拿到"开了头没
+    # 结尾"的工具调用，判 tool_args_invalid、retryable=false，回合失败。
+    # 缓冲期间这些字节不出代理：流在工具调用中途结束且还没有任何已写出的
+    # 正文/完整工具调用时，可以整体丢弃并内部重发。key 是 tool_calls 的 index
+    # （legacy function_call 用 -1），保证多工具调用时各自按序、互不穿插。
+    tool_buf = {}
     # 正常/可接受的结束原因。其它未知值（含字面 "other"）在“没有正文/工具调用”
     # 时一律按异常提前结束处理：客户端会把未知值映射成 other，然后当正常完成收掉回合。
     safe_finish = ("stop", "length", "content_filter",
@@ -421,6 +430,17 @@ def pipe_response(handler, resp, conn, path, started, sse_started=False, heartbe
         log("early finish %s after %d bytes %s" % (why, total, path))
         return True
 
+    def flush_tools():
+        "把缓冲的完整工具调用增量按 index 顺序写出去（V0.2.5）。"
+        nonlocal tool_out
+        for idx in sorted(tool_buf):
+            for line in tool_buf[idx]:
+                emit(line)
+                emit(b"\n")
+        if tool_buf:
+            tool_out = True
+        tool_buf.clear()
+
     def process_sse(data, emit_lines=True):
         """边转发边检查结束原因。
 
@@ -429,22 +449,30 @@ def pipe_response(handler, resp, conn, path, started, sse_started=False, heartbe
         `Bto(undefined)` 会把它归成 other 并当正常完成（turn.completed），回合就停在
         半路；如果上游给的是字面 other / 其它未知值，结果一样。这里在 `[DONE]`
         或正常 EOF 之前截住，丢弃这次尝试并让 _handle 重发上游。
-        正常 stop/tool_calls，以及已经有正文/工具调用的流，一律原样转发——
+        正常 stop/tool_calls，以及已经有正文/完整工具调用的流，一律原样转发——
         重发会把用户已经看到的内容再写一遍。
+        工具调用增量是例外（V0.2.5）：先缓冲，等 finish_reason（或正文出现）再
+        整体写出；流在工具调用中途结束且尚无已写出内容时，可以整体丢弃重发。
         """
-        nonlocal pending, saw_text, saw_tool, saw_choices, finish_seen
+        nonlocal pending, saw_text, tool_out, saw_choices, finish_seen
         pending += data
         while b"\n" in pending:
             line, pending = pending.split(b"\n", 1)
             line += b"\n"
+            emit_this = True
             if line.startswith(b"data:"):
                 raw = line[5:].strip()
                 if raw:
                     if raw == b"[DONE]":
                         # 客户端收到 [DONE] 就结束流；此前没有任何结束原因时，
                         # 它会按 other 收掉回合，所以必须在这一行之前截住。
+                        if tool_buf:
+                            if (not saw_text and not tool_out
+                                    and not finish_seen):
+                                return early_finish("incomplete tool call at DONE")
+                            flush_tools()
                         if (saw_choices and not finish_seen
-                                and not saw_text and not saw_tool):
+                                and not saw_text and not tool_out):
                             return early_finish("missing finish_reason")
                     else:
                         try:
@@ -455,6 +483,10 @@ def pipe_response(handler, resp, conn, path, started, sse_started=False, heartbe
                             choices = obj.get("choices")
                             if isinstance(choices, list) and choices:
                                 saw_choices = True
+                                has_tc = False
+                                tc_keys = []
+                                fr = None
+                                has_payload = False
                                 for choice in choices:
                                     if not isinstance(choice, dict):
                                         continue
@@ -462,24 +494,56 @@ def pipe_response(handler, resp, conn, path, started, sse_started=False, heartbe
                                     if isinstance(delta, dict):
                                         if delta.get("content"):
                                             saw_text = True
-                                        if delta.get("tool_calls") or delta.get("function_call"):
-                                            saw_tool = True
-                                    fr = choice.get("finish_reason")
-                                    if isinstance(fr, str) and fr:
-                                        finish_seen = True
-                                        if (fr not in safe_finish
-                                                and not saw_text and not saw_tool):
-                                            return early_finish("reason=%s" % fr)
+                                            has_payload = True
+                                        tc = (delta.get("tool_calls")
+                                              or delta.get("function_call"))
+                                        if tc:
+                                            has_tc = True
+                                            has_payload = True
+                                            key = -1
+                                            if isinstance(tc, list):
+                                                for item in tc:
+                                                    if (isinstance(item, dict)
+                                                            and "index" in item):
+                                                        try:
+                                                            key = int(item["index"])
+                                                        except (TypeError, ValueError):
+                                                            key = -1
+                                                        break
+                                            if key not in tc_keys:
+                                                tc_keys.append(key)
+                                    f = choice.get("finish_reason")
+                                    if isinstance(f, str) and f:
+                                        fr = f
+                                if fr is not None:
+                                    finish_seen = True
+                                    # 先判安全性再 flush：未知结束原因 + 尚无已
+                                    # 写出内容时，缓冲里的残缺工具调用一并丢弃、
+                                    # 整体重发；已经有内容则照旧放行。
+                                    if (fr not in safe_finish
+                                            and not saw_text and not tool_out):
+                                        return early_finish("reason=%s" % fr)
+                                if has_tc:
+                                    # 工具调用增量：只入缓冲，不写出去。等到
+                                    # finish_reason / 正文 / 收尾时再 flush。
+                                    for key in tc_keys:
+                                        tool_buf.setdefault(key, []).append(line)
+                                    emit_this = False
+                                elif tool_buf and (has_payload or fr is not None):
+                                    # 正文或结束原因出现：缓冲的工具调用阶段结束。
+                                    flush_tools()
                             # 先记账同一事件里的 choices/delta，再判断 error：若上游
                             # 把正文和 error 塞进同一条事件，正文要算数，不能吞。
                             # 上游有时不回 finish_reason，而是直接发一条 SSE
                             # `{"error":{...}}`（线上实测 code=stream_truncated）。
                             # 客户端会把它归成 ProviderBusinessError、
-                            # retryable=false，整轮直接失败。只要还没有正文/工具
-                            # 调用，就吞掉这条事件并走 early 重发；已经有内容时
-                            # 原样转发，重发会造成重复。
+                            # retryable=false，整轮直接失败。只要还没有正文/完整
+                            # 工具调用，就吞掉这条事件并走 early 重发（缓冲中的
+                            # 残缺工具调用一并丢弃）；已经有内容时原样转发，
+                            # 重发会造成重复。
                             err = obj.get("error")
-                            if err and not saw_text and not saw_tool and not finish_seen:
+                            if (err and not saw_text and not tool_out
+                                    and not finish_seen):
                                 if isinstance(err, dict):
                                     why = err.get("code") or err.get("message") or "error"
                                 else:
@@ -488,7 +552,7 @@ def pipe_response(handler, resp, conn, path, started, sse_started=False, heartbe
                                 # 原文（可能很长）写进日志破坏一行一条的解析。
                                 why = " ".join(str(why).split())[:80]
                                 return early_finish("upstream error: %s" % why)
-            if emit_lines:
+            if emit_lines and emit_this:
                 emit(line)
         return False
 
@@ -607,8 +671,15 @@ def pipe_response(handler, resp, conn, path, started, sse_started=False, heartbe
             pending = b""
         # 上游既没发 [DONE] 也没给 finish_reason，只是正常关闭了连接：客户端同样会
         # 把它当成完成，所以同样丢弃这次尝试并重发。
+        # 缓冲里还有没写出去的工具调用（V0.2.5：流在工具参数中途结束）：还没有
+        # 任何已写出内容时整体丢弃重发；否则只能写出，让客户端按残缺收尾。
+        if is_sse and tool_buf:
+            if not saw_text and not tool_out and not finish_seen:
+                early_finish("incomplete tool call at EOF")
+                return "early"
+            flush_tools()
         if (is_sse and saw_choices and not finish_seen
-                and not saw_text and not saw_tool):
+                and not saw_text and not tool_out):
             early_finish("missing finish_reason at EOF")
             return "early"
         # Content-Length 定长响应：上游声明 N 字节却提前 EOF 时，http.client

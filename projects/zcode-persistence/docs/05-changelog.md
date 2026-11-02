@@ -2,6 +2,50 @@
 
 > 2026-11-01: migrated to the AI-Agent-DJY repository; documentation was translated to English and directories standardized to `docs/` and `diagrams/`. Historical entries keep paths as originally written.
 
+## V0.2.5 — 2026-11-02
+
+> Fixes a third silent-failure path: the upstream ends the stream **in the middle of
+> a tool call's arguments** (no `finish_reason=tool_calls`). The client receives a
+> dangling tool call, classifies it as `tool_args_invalid` with `retryable=false`,
+> and the turn fails (6 occurrences on 2026-11-02). Tool-call deltas are now
+> buffered inside the proxy and only written out when the call is complete; if the
+> stream ends while nothing has been written out, the attempt is discarded and
+> re-requested internally.
+
+### Fix: a partial tool call was passed through as if it were content
+
+**Symptom**: the pop-up says the tool arguments returned by the upstream are
+incomplete; details show `provider_code=tool_args_invalid ... retryable=false`;
+the client log has `lastChunkType=tool-input-delta`, `toolCallCount=0`.
+
+**Root cause**: after the reasoning, the upstream starts streaming tool arguments
+(`tool-input-start` plus deltas) and then ends the stream without finishing them.
+The proxy treated "tool deltas seen" as "real output" and passed everything
+through, but a dangling tool call cannot be executed by the client.
+
+**Fix** (`src/retry_proxy.py`):
+- tool-call deltas (grouped by `tool_calls[].index`, legacy `function_call` uses
+  key -1) go into a `tool_buf` buffer and are **not** written out;
+- the buffer is flushed, in index order, when a `finish_reason` (safe value) or
+  real content arrives, or at the end of the stream;
+- if the stream ends (`[DONE]`/EOF/error) while the buffer has not been written
+  out and no text or complete tool call has been emitted, the attempt is marked
+  `early` ("incomplete tool call ...") and re-requested;
+- once a complete tool call has been written out, no more retries: resending
+  would execute the same tools twice.
+
+**Trade-off**: tool arguments no longer stream character by character; they
+appear when the call finishes. Reasoning and text still pass through chunk by
+chunk.
+
+### Verification
+
+- `selftest_stream.py` adds case 18 (partial tool call → internal retry, the
+  client only receives the complete tool call, partial args never leak) and
+  case 19 (complete tool call + `tool_calls` finish → passed through unchanged);
+  19 scenarios pass. The other four suites pass.
+- `VERSION`, `tools/install.py` and `src/error_watch.py` bumped to 0.2.5.
+
 ## V0.2.4 — 2026-11-02
 
 > Fixes another silent-stop path: instead of a missing `finish_reason`, the upstream

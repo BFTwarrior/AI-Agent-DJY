@@ -3,7 +3,7 @@
 
 不碰真实中转：假上游在本机回环上按脚本吐字节，代理用临时副本 + 临时端口。
 
-验证十七件事（对应 2026-10-31 三轮复审与终验、2026-11-01 自动暂停修复）：
+验证十九件事（对应 2026-10-31 三轮复审与终验、2026-11-01 自动暂停修复）：
   1. 逐条透传：上游每 0.2 秒发一条 80 字节事件，客户端应当在每条到达后
      几十毫秒内收到，而不是攒到 8KB 或流结束才一起到
   2. 流中静默：响应头之后上游停 2.5 秒、空闲超时设 1 秒时，代理应当发
@@ -31,6 +31,9 @@
  16. 上游不发 finish_reason、直接发 `{"error":...}`（stream_truncated），且无正文/
      工具调用：代理吞掉错误事件并内部重发
  17. 已经有正文后上游才发 error：不能重试（会重复正文），原样转发
+ 18. 工具调用参数发到一半流就结束（线上 tool_args_invalid 形态，V0.2.5）：
+     工具增量先缓冲不写出，EOF 时整体丢弃并内部重发，客户端只收到完整的工具调用
+ 19. 完整工具调用 + `finish_reason=tool_calls`：缓冲在收尾时写出，原样透传不重试
 
 用法：python tools/selftest_stream.py            （默认读同包 src/retry_proxy.py）
       python tools/selftest_stream.py --src X
@@ -266,7 +269,7 @@ def run_case(name, src, script, content_length=None, chunked=True,
 
 
 def main():
-    "依次跑 17 个场景并汇总；全部通过退出码 0。"
+    "依次跑 19 个场景并汇总；全部通过退出码 0。"
     ap = argparse.ArgumentParser()
     ap.add_argument("--src", default=os.path.join(
         os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -561,6 +564,60 @@ def main():
              "retry after early finish" not in logtext))
     print("   判定:", "PASS" if pass17 else "FAIL")
     ok = ok and pass17
+
+    # 18) 工具调用参数发到一半流就结束（线上 tool_args_invalid 形态）：工具增量
+    #     已缓冲、未写出，EOF 时整体丢弃并重发；客户端只收到完整的工具调用。
+    first_partial = [
+        (b'data: {"choices":[{"delta":{"reasoning_content":"need a tool"}}]}\n\n', 0.05),
+        (b'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_1",'
+         b'"type":"function","function":{"name":"Bash","arguments":"PARTIALARGS"}}]}}]}\n\n', 0.05),
+        (b"data: [DONE]\n\n", 0.0),
+    ]
+    second_tool = [
+        (b'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_2",'
+         b'"type":"function","function":{"name":"Bash",'
+         b'"arguments":"{\\"command\\":\\"ls -la\\"}"}}]}}]}\n\n', 0.05),
+        (b'data: {"choices":[{"delta":{},"finish_reason":"tool_calls"}]}\n\n', 0.05),
+        (b"data: [DONE]\n\n", 0.0),
+    ]
+    chunks, logtext, tail = run_case("残缺工具调用透明续写", args.src, first_partial,
+                                     scripts=[first_partial, second_tool],
+                                     read_seconds=8.0)
+    data = b"\n\n".join(c for _t, c in chunks) + tail
+    text = data.decode("utf-8", "replace")
+    pass18 = (b"ls -la" in data and b'"finish_reason":"tool_calls"' in data
+              and b"PARTIALARGS" not in data and '"error"' not in text
+              and "early finish incomplete tool call at DONE" in logtext
+              and "retry after early finish" in logtext
+              and "stream broken" not in logtext)
+    print("   收到完整工具=%s tool_calls收尾=%s 残缺未泄漏=%s 日志重发=%s"
+          % (b"ls -la" in data, b'"finish_reason":"tool_calls"' in data,
+             b"PARTIALARGS" not in data, "retry after early finish" in logtext))
+    print("   判定:", "PASS" if pass18 else "FAIL")
+    ok = ok and pass18
+
+    # 19) 完整工具调用 + finish_reason=tool_calls：缓冲在收尾时写出，原样透传。
+    full_tool = [
+        (b'data: {"choices":[{"delta":{"reasoning_content":"run it"}}]}\n\n', 0.05),
+        (b'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_3",'
+         b'"type":"function","function":{"name":"Bash",'
+         b'"arguments":"{\\"command\\":\\"echo done\\"}"}}]}}]}\n\n', 0.05),
+        (b'data: {"choices":[{"delta":{},"finish_reason":"tool_calls"}]}\n\n', 0.05),
+        (b"data: [DONE]\n\n", 0.0),
+    ]
+    chunks, logtext, tail = run_case("完整工具调用透传", args.src, full_tool,
+                                     read_seconds=4.0)
+    data = b"\n\n".join(c for _t, c in chunks) + tail
+    text = data.decode("utf-8", "replace")
+    pass19 = (b"echo done" in data and b'"finish_reason":"tool_calls"' in data
+              and b"0\r\n\r\n" in tail and "ok " in logtext
+              and "retry after early finish" not in logtext
+              and "stream broken" not in logtext)
+    print("   收到工具=%s tool_calls收尾=%s 终止块=%s 未重发=%s"
+          % (b"echo done" in data, b'"finish_reason":"tool_calls"' in data,
+             b"0\r\n\r\n" in tail, "retry after early finish" not in logtext))
+    print("   判定:", "PASS" if pass19 else "FAIL")
+    ok = ok and pass19
 
     print("\n总体:", "全部通过" if ok else "有失败项")
     return 0 if ok else 1

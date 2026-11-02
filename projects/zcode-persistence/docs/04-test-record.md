@@ -242,7 +242,7 @@ from 22:57 to 22:59 the watcher sent 8 mails in a row for the same session (dedu
 | 7 | upstream produced no output | advise `sleep 180` first | ✅ |
 | 8 | the same command fails 4 times | 1/3, 2/3, 3/3 (with "do not stop the whole task"), 4th silent | ✅ |
 
-### Streaming early finish and upstream errors (V0.2.3 / V0.2.4)
+### Streaming early finish, upstream errors and partial tool calls (V0.2.3–V0.2.5)
 
 Production evidence: the `finishReason=other` events have no `rawFinishReason` field, so
 the upstream sent no `finish_reason`; the client maps `undefined` to `other`. The tests
@@ -264,7 +264,9 @@ design is an internal re-request, not a client-visible error.
 | 8 | same but the first connection ends with literal `finish_reason=other` | client receives `literal answer`, `stop`, `[DONE]`, no error; log `early finish reason=other` + retry | ✅ |
 | 9 | reasoning then an SSE `{"error":...}` (code=stream_truncated), no content/tool call | swallow the event and re-request; the client never sees the error; log `early finish upstream error: stream_truncated` + retry | ✅ |
 | 10 | an SSE error event after content | forward unchanged, no retry (retrying would duplicate content); log `ok` | ✅ |
+| 11 | the stream ends mid-tool-arguments (no `finish_reason=tool_calls`) | buffer not written out → discard and re-request; the client only receives the complete tool call, partial args never leak; log `early finish incomplete tool call at DONE/EOF` + retry | ✅ |
+| 12 | a complete tool call + `finish_reason=tool_calls` | buffer flushed at finish time, passed through unchanged, no retry; log `ok` | ✅ |
 
-Together with the original 1–7 cases, the ten new scenarios (8–17) make 17 in total; all pass;
+Together with the original 1–7 cases, the twelve new scenarios (8–19) make 19 in total; all pass;
 `selftest_hook.py`, `selftest_proxy_429.py`, `selftest_watch.py` and `selftest_ensure.py`
 also pass.
