@@ -41,6 +41,7 @@ Two main components plus one optional side path (off by default):
     such as `grep -q` with no match, `diff --quiet` with differences, or a false `test`; the client nevertheless marks the call
     `status="failed"`, so status alone is not enough. Any exit code other than 1, any output, a timeout, or cancellation still counts
     as a failure. The 2026-11-01 "pause once a minute" bug missed exactly this: three retry advices, and the third told the model to stop.
+23. **Tool-call deltas must be buffered and only written out at `finish_reason` (or when content appears)** (V0.2.5). A stream that ends mid-arguments with nothing written out must be discarded and re-requested; once a complete tool call has been written out, it must pass through (resending would run the tools twice). Reverting the buffer to direct streaming brings `tool_args_invalid` back.
 
 ## Current final parameters (v0.4.0)
 

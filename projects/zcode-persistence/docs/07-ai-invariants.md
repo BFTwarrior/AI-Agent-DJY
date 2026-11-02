@@ -37,6 +37,7 @@ Three components (the third is off by default):
 20. **`error_watch`'s `seen` advances only after the email is sent successfully**. Being blocked by cooldown/rate limiting, a failed send, `--once`/`--no-send` must never advance it, otherwise the error is lost forever (on 2026-10-31 it sent 8 emails in a row and then silently dropped one, for exactly this reason).
 21. **Proxy log timestamps must include the date** (`%Y-%m-%d %H:%M:%S`). Error reporting uses it to align `gave up` with the error moment; with time-of-day only, cross-day alignment goes wrong.
 22. **`exitCode == 1` with completely empty stdout/stderr is not a failure**. It is the normal negative result of predicate commands such as `grep -q` with no match, `diff --quiet` with differences, or a false `test`; the client nevertheless marks the call `status="failed"`, so status alone is not enough. Any exit code other than 1, any output, a timeout, or cancellation still counts as a failure. The 2026-11-01 "pause once a minute" bug missed exactly this: three retry advices, and the third told the model to stop.
+23. **Tool-call deltas must be buffered and only written out at `finish_reason` (or when content appears)** (V0.2.5). A stream that ends mid-arguments with nothing written out must be discarded and re-requested; once a complete tool call has been written out, it must pass through (resending would run the tools twice). Reverting the buffer to direct streaming brings `tool_args_invalid` back.
 
 ## Current finalized parameters (v0.4.0)
 
