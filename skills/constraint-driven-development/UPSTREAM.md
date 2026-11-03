@@ -9,4 +9,4 @@
 - License: MIT (see LICENSE in this directory, Copyright (c) 2025 Addy Osmani)
 - Local changes: none
 - Attached files:
-  - floor-guard.md sha256=59715dc6c3c6c36ec9177f9ced65c379e80a4539b36115456666bfabc43a6a9c
+  - references/floor-guard.md sha256=59715dc6c3c6c36ec9177f9ced65c379e80a4539b36115456666bfabc43a6a9c
