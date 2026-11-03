@@ -9,7 +9,7 @@ The audience for this document is an AI or engineer with **absolutely no context
 | Question | Answer |
 |---|---|
 | What is this | A two-piece "automatic retry on failure" kit for ZCode plus one optional bypass: hook + local proxy + error reporting (off by default) |
-| Version | See `VERSION` (currently formal release `0.2.7`; the build line is `0.4.0`, and the CHANGELOG maps the two) |
+| Version | See `VERSION` (currently formal release `0.2.7`; the build line is `0.4.0`, and the project `README.md` records the current build line) |
 | Where is the code | Four Python files in `src/` (hook / proxy / auto-start / error reporting), no third-party dependencies (certifi optional) |
 | Where it is installed | `C:\Program Files (x86)\AI\Zcode-Persistence\` |
 | Which system config is modified | `~/.zcode/cli/config.json` (hook), `~/.zcode/v2/provider_config.json` (the provider's baseUrl) |
@@ -227,7 +227,7 @@ Log locations: `%TEMP%\Zcode-Persistence\hook.log` (hook), `C:\Program Files (x8
    ```bash
    echo '{"tool_name":"Bash","tool_input":{"command":"curl x"},"error":"operation timed out"}' | python src/retry_hook.py
    ```
-4. Bump the version: both `VERSION` and `VERSION` in `tools/install.py`.
+4. Bump the version in all four places: `VERSION`, `VERSION` in `tools/install.py`, `PROXY_VERSION` in `src/retry_proxy.py`, and `clientInfo.version` in `src/error_watch.py`.
 5. Update `CHANGELOG.md` (state clearly what changed and why).
 6. Sync the affected parameter tables in `README.md` / `docs/02-maintenance.md`.
 7. Package: use the script below (put the script named `make_zip.py` next to the package directory and run it there; remember to change the version number).
@@ -278,7 +278,7 @@ the project `README.md` records the current build line.
 5. `python tools/install.py --with-proxy --provider-id new-provider`
 6. Restart the proxy (needed only if `retry_proxy.py` changed): follow "Restart the proxy" in `docs/02-maintenance.md`, and **do not kill the process while a request is in flight**
 7. `doctor.py` confirms that "proxy runtime parameters" match the script
-8. Update `CHANGELOG.md`; on a formal release bump `VERSION` and `VERSION` in `install.py`
+8. Update `CHANGELOG.md`; on a formal release bump all four version fields (`VERSION`, `install.py`, `PROXY_VERSION`, `clientInfo.version`)
 9. Repackage and confirm that the package / zip / installed copy have identical sha256
 
 **Common failure lookup**

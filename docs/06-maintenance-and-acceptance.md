@@ -69,9 +69,9 @@ git status
 - [ ] `VERSION` and `CHANGELOG.md` updated
 - [ ] Project tests pass
 - [ ] Release archive built and sha256 recorded
-- [ ] Tags created: repository `vX.Y.Z`, project `proj-<name>-vX.Y`
+- [ ] Tags created: repository `vX.Y.Z`, project `proj-<name>-vX.Y[.Z]`
 - [ ] Release uploaded, sha256 matches the local archive
-- [ ] History import archive uploaded when needed, tag `proj-<name>-vX.Y-history`
+- [ ] History import archive uploaded when needed, tag `proj-<name>-vX.Y[.Z]-history`
 - [ ] README index updated (links and status only)
 
 ## Periodic checks (monthly recommended)

@@ -29,7 +29,7 @@ AI-Agent-DJY/
 │  └─ <server-name>/
 │     ├─ README.md
 │     ├─ mcp.json.example
-│     └─ .env.example
+│     └─ .env.example       (optional; only when environment variables are needed)
 ├─ projects/
 │  ├─ README.md
 │  └─ <project-name>/

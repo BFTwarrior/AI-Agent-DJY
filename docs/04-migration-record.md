@@ -96,3 +96,9 @@ Later versions are recorded in the project `CHANGELOG` and Releases.
   - Asset: `zcode-persistence-history-import.zip` (1,300,705 bytes, 28 entries)
   - sha256: `f9aaed855ac2b538b298dc88477c2360ae95939477fbb386fd87d3d25a4b27d9`
   - Extracts to `history/`, matching the local `Zcode-Persistence` history directory
+
+**Public state after 2026-11-03:** every pre-sanitization release asset was removed when the
+repository became public. `proj-zcode-persistence-v0.2.7` carries the only downloadable asset
+(sanitized); `proj-zcode-persistence-v0.2.3`–`v0.2.6` and `v0.1-history` remain as Releases
+without assets; the `v0.2` and `v0.2.1` Releases were deleted (their tags remain). The upload
+records above describe 2026-11-01 and are kept for traceability.

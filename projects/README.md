@@ -19,4 +19,4 @@
    [02-Inclusion Rules](../docs/02-inclusion-rules.md).
 2. Write `README.md` (one line + version + links into `docs/`).
 3. Update this table and the root `README.md`.
-4. For the first release, tag `proj-<name>-vX.Y` and upload the archive.
+4. For the first release, tag `proj-<name>-vX.Y[.Z]` and upload the archive.

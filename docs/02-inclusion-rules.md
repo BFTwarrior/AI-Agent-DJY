@@ -124,9 +124,10 @@ projects/<name>/
 ### History and releases
 
 - **No `history/` directory**: old versions are fixed by tags and release archives.
-- Local history that predates migration is packaged as `*-history-import.zip`, attached to
-  the `proj-<project>-v<version>-history` Release, and its sha256 is recorded in
-  [04-Migration Record](04-migration-record.md).
+- Local history that predates migration is packaged as `*-history-import.zip`; its sha256
+  is recorded in [04-Migration Record](04-migration-record.md). The 2026-11-03 public
+  conversion removed the pre-sanitization archive from the
+  `proj-<project>-v<version>-history` Release, so that Release now has no downloadable asset.
 - Archive names match the local file; compare sha256 before upload.
 
 ## Archiving

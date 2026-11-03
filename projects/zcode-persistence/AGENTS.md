@@ -97,7 +97,7 @@ the project `README.md` records the current build line.
    so the health check gets answered by the old process: it looks like success while you are in fact running two copies). Add `--force` only when the quiet window never comes:
    it skips the waiting only, and not one of the checks above is dropped — the price is that in-flight requests get cut off once.
 6. Confirm with `doctor.py` that the "proxy runtime parameters" item matches the scripts
-7. Update `CHANGELOG.md`; for an official release, bump `VERSION` and the `VERSION` in `install.py`
+7. Update `CHANGELOG.md`; for an official release, bump all four version fields (`VERSION`, `install.py`, `PROXY_VERSION`, `clientInfo.version`)
 8. Repackage and confirm the package / zip / installed copy all share the same sha256
 
 **Common faults at a glance**

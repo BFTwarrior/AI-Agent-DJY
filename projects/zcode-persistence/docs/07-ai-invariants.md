@@ -91,7 +91,7 @@ the project `README.md` records the current build line.
    and counts it a success only when the old process is gone or port 8787 is released (the port is authoritative), exactly one listener remains, and `root` points at the install directory.
    When it cannot get a quiet window (other sessions keep holding upstream connections), add `--force`: it skips only the wait, and not one check is dropped.
 6. `doctor.py` confirms that "proxy runtime parameters" match the script
-7. Update `CHANGELOG.md`; on a formal release bump `VERSION` and `VERSION` in `install.py`
+7. Update `CHANGELOG.md`; on a formal release bump all four version fields (`VERSION`, `install.py`, `PROXY_VERSION`, `clientInfo.version`)
 8. Repackage and confirm that the package / zip / installed copy have identical sha256
 
 **Common failure lookup**
