@@ -251,9 +251,9 @@ with zipfile.ZipFile("Zcode-Persistence-vX.Y.zip", "w", zipfile.ZIP_DEFLATED) as
 
 ## Continuing development starts here (for the next AI / engineer)
 
-**First get the version numbers straight**: what you ship externally is the formal release number (V0.2); `0.4.0` in the code is the build-line iteration number,
-and the two are not the same thing. Both the `VERSION` file and `VERSION` in `tools/install.py` carry the formal release number;
-the mapping entry at the top of `CHANGELOG.md` tells you which build line the current formal release corresponds to.
+**First get the version numbers straight**: what you ship externally is the formal release number (currently V0.2.7); `0.4.0` is the build-line iteration number,
+and the two are not the same thing. `VERSION`, `tools/install.py`, `PROXY_VERSION` and `clientInfo.version` all carry the formal release number;
+the project `README.md` records the current build line.
 
 **Five-minute onboarding**
 

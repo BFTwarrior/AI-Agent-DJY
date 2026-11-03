@@ -73,7 +73,7 @@ Later versions are recorded in the project `CHANGELOG` and Releases.
 > Historical snapshot. It describes the state at migration time; current versions are in
 > the project `CHANGELOG` and Releases.
 
-- [x] Created the private GitHub repository and pushed the initial commit (`main`, 55 files)
+- [x] Created the private GitHub repository and pushed the initial commit (`main`, 55 files); the repository was made public on 2026-11-03
 - [x] Created tags: `v0.1.0`, `proj-zcode-persistence-v0.2`,
   `proj-zcode-persistence-v0.1-history`; later added `proj-zcode-persistence-v0.2.1`
 - [x] Uploaded the current archive to the `proj-zcode-persistence-v0.2` Release

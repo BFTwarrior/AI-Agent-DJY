@@ -54,7 +54,7 @@ Shared principles:
 │  ├─ <local docs>\ <local diagrams>\ <local history>\   Planning docs and local history
 │  └─ repo\                    ★ Repository workspace (the only git root)
 │     ├─ skills/ mcps/ projects/ shared/ docs/
-│     └─ README.md AGENTS.md .gitignore
+│     └─ README.md AGENTS.md LICENSE .gitignore .gitattributes
 └─ Zcode-Persistence\          Old folder, read-only backup after migration
    └─ <local history>\         Local history originals, kept
 ```

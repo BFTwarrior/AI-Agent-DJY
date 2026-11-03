@@ -68,9 +68,9 @@ Changing these defaults amounts to changing the product spec; you **must** updat
 
 ## Start here to continue development (for the next AI / engineer)
 
-**Get the version numbers straight first**: what is published externally is the official release number (V0.2); the `0.4.0` in the code is the build-line iteration number,
-and the two are not the same thing. Both the `VERSION` file and the `VERSION` in `tools/install.py` carry the official release number;
-the mapping entry at the top of `CHANGELOG.md` tells you which build line the current official release corresponds to.
+**Get the version numbers straight first**: what is published externally is the official release number (currently V0.2.7); the `0.4.0` in the code is the build-line iteration number,
+and the two are not the same thing. `VERSION`, `tools/install.py`, `PROXY_VERSION` and `clientInfo.version` all carry the official release number;
+the project `README.md` records the current build line.
 
 **Five-minute orientation**
 
