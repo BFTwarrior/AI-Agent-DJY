@@ -19,8 +19,9 @@ recorded for traceability only; the two may differ. Each directory has a `LICENS
 (MIT, Copyright (c) 2025 Addy Osmani) and an `UPSTREAM.md`.
 
 The current `code-review-and-quality/SKILL.md` hash differs from the import value because
-its two See Also links were repaired in V0.2.7; that directory's `UPSTREAM.md` records the
-current hash and the imported reference files.
+its two See Also links were repaired after the V0.2.7 release in the 2026-11-03 repository
+docs audit (commit `f6b9f9d`); that directory's `UPSTREAM.md` records the current hash and
+the imported reference files.
 
 ### MCP (2 templates)
 
@@ -38,7 +39,7 @@ not copied into the repository.
 |---|---|---|
 | `src/` | 4 | `retry_hook`, `retry_proxy`, `ensure_proxy`, `error_watch` |
 | `tools/` | 8 | install, uninstall, doctor, 4 self-tests, proxy restart |
-| `docs/` | 8 | 00–07 (Chinese at import; translated to English afterwards) |
+| `docs/` | 8 | 00–07 (English at V0.2.1) |
 | `diagrams/` | 1 | `architecture.md` |
 | Root | 4 | `README.md`, `CHANGELOG.md`, `VERSION`, `AGENTS.md` |
 
@@ -46,12 +47,13 @@ This table is the V0.2.1 import snapshot. The current tree has 28 files: `src/` 
 `route_providers.py`), `tools/` 10 (adds `selftest_route.py` and `selftest_ensure.py`),
 `docs/` 8 (English), `diagrams/` 1, root 4.
 
-25 files. The byte counts below are the 2026-11-01 import snapshot: 346,164 bytes in the
+25 files. The byte counts below are the initial import snapshot: 346,164 bytes in the
 original CRLF working copy, 330,150 bytes in git blobs after LF normalization (333,781 bytes
-in the checkout at import). At import time every file in `src/` and `tools/` matched the V0.2
-package. The V0.2.1 patch changed `src/retry_hook.py`, added `tools/selftest_hook.py`, and
-bumped `VERSION` / `tools/install.py`; at migration time the tree matched the V0.2.1 asset.
-Later versions are recorded in the project `CHANGELOG` and Releases.
+in the checkout at import). The initial import was the V0.2 package (24 files; legacy Chinese
+documentation paths). The V0.2.1 patch changed `src/retry_hook.py`, added
+`tools/selftest_hook.py`, and bumped `VERSION` / `tools/install.py`; by the V0.2.1 tag the
+tree had 25 files and the documentation had been translated to English. Later versions are
+recorded in the project `CHANGELOG` and Releases.
 
 ### Path and link adjustments
 

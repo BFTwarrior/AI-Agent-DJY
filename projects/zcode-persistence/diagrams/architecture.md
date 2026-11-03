@@ -58,7 +58,7 @@ main loop (window started .. started+300s, one attempt every RETRY_INTERVAL=20s)
    │    │    (the client must see truncation)
    │    └─ normal end → log ok
    └─ window expires with failures → response not started: 503;
-                                        response started in heartbeat mode (still no content): SSE error
+                                        response already started (heartbeat or early, still no content): SSE error
 ```
 
 **Key constraint**: once bytes have started flowing back to the client the proxy cannot retry

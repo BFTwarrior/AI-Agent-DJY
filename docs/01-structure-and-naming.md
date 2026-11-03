@@ -73,6 +73,9 @@ Constraints:
 - `docs/`: current documentation; old versions are not duplicated in the repository.
 - `diagrams/`: current diagrams, Markdown only. Original XMind files go to Releases or
   local disk.
+- `AGENTS.md`: hard constraints for AI maintainers.
+- `CHANGELOG.md`: change log.
+- `VERSION`: version number.
 - The project `README.md` is an index: one-line description, version, and links into
   `docs/`.
 

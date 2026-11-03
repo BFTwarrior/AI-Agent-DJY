@@ -198,7 +198,7 @@ After the change the client uses its own stream-recovery retry (at most 10 times
 the equivalent of automatically sending a "continue". **This only applies to 503 (the proxy exhausted its retries)**; for 400 (the client itself wrote a wrong prefix / request body)
 the proxy returns `invalid_request` + `retryable:false`, so that deterministic errors are not resent 10 times.
 
-If a streaming request has already entered heartbeat mode (the 200 has been sent), giving up can only stuff the same error body into an SSE `data:` event,
+If a streaming response has already started (heartbeat mode, or an early retry that already sent the 200 headers), giving up can only stuff the same error body into an SSE `data:` event,
 with a chunked terminating block appended at the end — scenario 7 in `tools/selftest_stream.py` watches exactly this part.
 
 **Heartbeat keep-alive**
