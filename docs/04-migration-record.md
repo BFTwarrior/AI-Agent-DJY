@@ -42,7 +42,8 @@ not copied into the repository.
 original CRLF working copy, 330,150 bytes in git blobs after LF normalization (333,781 bytes
 in the checkout at import). At import time every file in `src/` and `tools/` matched the V0.2
 package. The V0.2.1 patch changed `src/retry_hook.py`, added `tools/selftest_hook.py`, and
-bumped `VERSION` / `tools/install.py`; the current tree matches the V0.2.1 asset.
+bumped `VERSION` / `tools/install.py`; at migration time the tree matched the V0.2.1 asset.
+Later versions are recorded in the project `CHANGELOG` and Releases.
 
 ### Path and link adjustments
 
@@ -61,13 +62,16 @@ bumped `VERSION` / `tools/install.py`; the current tree matches the V0.2.1 asset
 
 | Content | Destination |
 |---|---|
-| Current release `*.zip` | GitHub Releases (`proj-zcode-persistence-v0.2.1`) |
+| Release current at migration time `*.zip` | GitHub Releases (`proj-zcode-persistence-v0.2.1`) |
 | Historical release zips (11 files) | History import archive → Release (`...-v0.1-history`) |
 | Historical docs (2 versions) and diagram (1 version) | Same history import archive |
 | `proxy.log`, `restart.log`, `install-state.json`, `__pycache__` | Local runtime data |
 | The whole local history directory | Kept locally, never deleted |
 
 ### Release record (2026-11-01)
+
+> Historical snapshot. It describes the state at migration time; current versions are in
+> the project `CHANGELOG` and Releases.
 
 - [x] Created the private GitHub repository and pushed the initial commit (`main`, 55 files)
 - [x] Created tags: `v0.1.0`, `proj-zcode-persistence-v0.2`,

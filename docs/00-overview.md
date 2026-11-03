@@ -16,15 +16,18 @@ It solves three problems:
 3. **Migration cost**: moving to a new machine or agent platform starts with guessing
    which files to take.
 
-## The three asset types
+## Layout
 
 ```text
 skills/     Reusable capability packages: SKILL.md + references + source record
 mcps/       Self-written MCP servers, or config templates for third-party servers
 projects/   Complete projects: source + current docs + current diagrams
-shared/     Cross-project scripts and prompts
+shared/     Cross-project scripts and prompts (reserved; nothing shared yet)
 docs/       Repository-level rules (this directory)
 ```
+
+`skills/`, `mcps/` and `projects/` are the three asset types; `shared/` and `docs/` support
+them.
 
 Shared principles:
 
@@ -73,14 +76,15 @@ repo projects/<name>/ ──tag/Release──►  GitHub Releases (archives)
 
 Details: [03-Deployment and Sync](03-deployment-and-sync.md).
 
-## Current contents (2026-11-01)
+## Current contents (2026-11-03)
 
 - 3 skills: `code-review-and-quality`, `code-simplification`, `constraint-driven-development`
 - 2 MCP entries: `github`, `ms365` (config templates only, no secrets)
-- 1 project: `zcode-persistence` (V0.2, source + docs + diagrams)
+- 1 project: `zcode-persistence` V0.2.7 (source + docs + diagrams; 32 streaming scenarios)
+- `shared/`: scaffold only; no cross-project scripts or prompts have been added yet
 
 ## Non-goals
 
-- This is not a public skill marketplace; visibility is a repository setting.
+- This is a personal asset repository, not a public skill marketplace.
 - It does not replace each project's own tests and release process.
 - It is not a secret store.

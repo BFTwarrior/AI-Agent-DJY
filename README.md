@@ -27,7 +27,7 @@ Skills, MCP servers and projects for AI agents — one repository, one source of
 
 | Project | Description | Version | Docs | Release |
 |---|---|---|---|---|
-| [zcode-persistence](projects/zcode-persistence/) | ZCode retry toolkit: hook suggestions, local retry proxy, optional error email reports | V0.2.1 | [Docs](projects/zcode-persistence/docs/00-overview.md) (English) | [Release](https://github.com/BFTwarrior/AI-Agent-DJY/releases/tag/proj-zcode-persistence-v0.2.1) |
+| [zcode-persistence](projects/zcode-persistence/) | ZCode retry toolkit: hook suggestions, local retry proxy, optional error email reports | V0.2.7 | [Docs](projects/zcode-persistence/docs/00-overview.md) (English) | [Release](https://github.com/BFTwarrior/AI-Agent-DJY/releases/tag/proj-zcode-persistence-v0.2.7) |
 
 ## How to use
 
@@ -65,10 +65,11 @@ Skills, MCP servers and projects for AI agents — one repository, one source of
 
 ## License and privacy
 
-This repository has no root LICENSE yet (all rights reserved). Third-party content under
-`skills/` keeps its own license; see [05-Licenses and Sources](docs/05-licenses-and-sources.md).
-If this repository is ever open-sourced, add a root `LICENSE` and verify each third-party entry.
+This repository is released under the [MIT License](LICENSE). The root license covers original
+content only; third-party content under `skills/` keeps its own license. See
+[05-Licenses and Sources](docs/05-licenses-and-sources.md).
 
-**The project source contains real email addresses** (`projects/zcode-persistence/src/error_watch.py`).
-This repository must remain private. Before publishing or sharing, move those addresses to
-environment variables and remove them from the documentation.
+The repository is public and contains **no real email addresses**. The error-reporting
+feature reads `ZCODE_PERSISTENCE_MAIL_TO` and `ZCODE_PERSISTENCE_MAIL_FROM` from the
+environment; the defaults are placeholders. Do not commit real addresses, tokens or
+machine-specific configuration.

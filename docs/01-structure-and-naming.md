@@ -6,6 +6,7 @@
 AI-Agent-DJY/
 ├─ README.md                  Overview (index only, no details)
 ├─ AGENTS.md                  Rules for AI maintainers
+├─ LICENSE                    MIT license for original content
 ├─ .gitignore
 ├─ .gitattributes
 ├─ docs/                      Repository-level rules (this directory)

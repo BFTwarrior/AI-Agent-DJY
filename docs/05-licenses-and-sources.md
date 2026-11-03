@@ -2,15 +2,15 @@
 
 ## Root license
 
-This repository has **no root LICENSE** and is therefore "all rights reserved".
-A root license, once chosen, covers original content only — not the third-party code
-vendored under `skills/`.
+This repository is released under the [MIT License](../LICENSE). The root license covers
+original content only — not the third-party code vendored under `skills/`, which keeps its
+own license.
 
-Before open-sourcing, confirm:
+Before adding third-party content, confirm:
 
-1. Which license applies to original content (MIT / Apache-2.0 / other).
-2. Whether each third-party directory may be redistributed.
-3. That every third-party directory keeps its `LICENSE` and copyright line, recorded here.
+1. The license permits redistribution.
+2. The directory keeps its `LICENSE` and copyright line.
+3. The source, license and handling are recorded in the register below.
 
 ## Third-party register
 
@@ -43,12 +43,13 @@ Before open-sourcing, confirm:
 
 ## Privacy requirement
 
-`projects/zcode-persistence/src/error_watch.py` contains real sender and recipient email
-addresses, and they are also referenced in the project README, CHANGELOG and docs.
-Therefore:
+The repository is public and must not contain real email addresses or other personal
+contact data. `projects/zcode-persistence/src/error_watch.py` reads the recipient and sender
+from `ZCODE_PERSISTENCE_MAIL_TO` / `ZCODE_PERSISTENCE_MAIL_FROM`; the committed defaults
+are placeholders.
 
-- **This repository must remain private** and must not be published or shared.
-- Before publishing, move the addresses to environment variables or local config; keep
-  only placeholders in the repository.
-- Do not add complete email addresses to documentation; clean up existing ones before any
-  public release.
+- Never commit a real address, token or machine-specific path.
+- Release assets are sanitized copies: scan every entry before uploading.
+- Do not add complete email addresses to documentation, changelogs or examples.
+- If an address is committed, remove it from the working tree; if it reached history,
+  rewrite history and force-push before relying on deletion.
