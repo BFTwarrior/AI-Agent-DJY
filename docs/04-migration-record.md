@@ -47,10 +47,11 @@ This table is the V0.2.1 import snapshot. The current tree has 28 files: `src/` 
 `route_providers.py`), `tools/` 10 (adds `selftest_route.py` and `selftest_ensure.py`),
 `docs/` 8 (English), `diagrams/` 1, root 4.
 
-25 files. The byte counts below are the initial import snapshot: 346,164 bytes in the
-original CRLF working copy, 330,150 bytes in git blobs after LF normalization (333,781 bytes
-in the checkout at import). The initial import was the V0.2 package (24 files; legacy Chinese
-documentation paths). The V0.2.1 patch changed `src/retry_hook.py`, added
+The table is the V0.2.1 snapshot (25 files). The byte counts below describe the initial V0.2
+import (24 files) from the pre-public local snapshot; the public history may differ after the
+email scrub: 346,164 bytes in the original CRLF working copy, 330,150 bytes in git blobs
+after LF normalization (333,781 bytes in the checkout at import). The initial import used
+legacy Chinese documentation paths. The V0.2.1 patch changed `src/retry_hook.py`, added
 `tools/selftest_hook.py`, and bumped `VERSION` / `tools/install.py`; by the V0.2.1 tag the
 tree had 25 files and the documentation had been translated to English. Later versions are
 recorded in the project `CHANGELOG` and Releases.
