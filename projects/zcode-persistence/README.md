@@ -3,9 +3,28 @@
 A ZCode failure-retry toolkit: **suggests a retry when a tool fails**, **automatically
 resends when a model request fails**, plus a default-off **email report of session errors**.
 
-- Version: V0.2.6 patch release (build line 0.4.0)
+- Version: V0.2.7 patch release (build line 0.4.0)
 - Applies to: ZCode Desktop (Windows), Python 3.9+
 - Dependencies: Python standard library only; proxy mode prefers certifi (if installed)
+
+### V0.2.7: recover after content has been written
+
+Two production failures are fixed by the same transport-level mechanism:
+
+- **`tool_args_invalid`**: the upstream ended the stream halfway through tool-call
+  arguments. V0.2.5 buffered tool deltas, but once text had been emitted it flushed the
+  incomplete JSON; the client's `JSON.parse` failed and the turn died with
+  `retryable=false`.
+- **`upstream_error` after content**: the gateway returned an in-stream
+  `{"error":{"message":"Upstream request failed"}}` after 67 characters. Passing it
+  through gives a `ProviderBusinessError`, also `retryable=false`.
+
+The proxy now validates every buffered tool call (name + JSON, rejecting
+`NaN`/`Infinity`) and never writes a partial one. When content has already been sent and
+the tool call is incomplete, or the upstream reports an error, it resets the client
+connection (`SO_LINGER=0`, after closing `wfile`/`rfile`). The ZCode client sees
+`ECONNRESET`, discards the partial output and retries with `previous-message-anchor`
+(up to 10 attempts). See [03-Architecture](docs/03-architecture.md).
 
 ## Documentation
 
@@ -59,6 +78,6 @@ addresses out of the documentation.
 
 ## Distribution
 
-The distribution package lives in the repository Releases: `proj-zcode-persistence-v0.2.6`.
+The distribution package lives in the repository Releases: `proj-zcode-persistence-v0.2.7`.
 The archive contains build artifacts; this directory is authoritative for the source, and
 if the two disagree, this directory plus the tag wins.

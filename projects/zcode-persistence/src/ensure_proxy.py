@@ -9,6 +9,7 @@
 
 import json
 import os
+import re
 import socket
 import subprocess
 import sys
@@ -195,9 +196,28 @@ def main():
     try:
         ensure_watch()
         if is_listening():
-            if not is_our_proxy():
+            info = health_info()
+            if not (info and info.get("name") == "Zcode-Persistence"):
                 note("端口 %d 被别的进程占用，且不是本代理；provider 会打到错误服务" % PORT)
             else:
+                # 只验身份不够：升级后旧进程还在跑时，两个版本的行为差异
+                # 不会被任何参数检查发现。这里记一条，doctor 会进一步对比。
+                live = str(info.get("version") or "")
+                disk = ""
+                try:
+                    with open(os.path.join(HERE, "VERSION"), encoding="utf-8") as fh:
+                        disk = fh.read().strip()
+                except Exception:
+                    try:
+                        with open(os.path.join(HERE, "retry_proxy.py"),
+                                  encoding="utf-8") as fh:
+                            m = re.search(r'PROXY_VERSION\s*=\s*"([^"]+)"', fh.read())
+                            disk = m.group(1) if m else ""
+                    except Exception:
+                        pass
+                if live and disk and live != disk:
+                    note("proxy version mismatch: running %s, installed %s; "
+                         "restart_proxy_idle.py required" % (live, disk))
                 route_providers_if_ready()
             return 0
         if not os.path.exists(PROXY):

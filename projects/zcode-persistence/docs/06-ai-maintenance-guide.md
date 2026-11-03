@@ -9,7 +9,7 @@ The audience for this document is an AI or engineer with **absolutely no context
 | Question | Answer |
 |---|---|
 | What is this | A two-piece "automatic retry on failure" kit for ZCode plus one optional bypass: hook + local proxy + error reporting (off by default) |
-| Version | See `VERSION` (currently formal release `0.2.5`; the build line is `0.4.0`, and the CHANGELOG maps the two) |
+| Version | See `VERSION` (currently formal release `0.2.7`; the build line is `0.4.0`, and the CHANGELOG maps the two) |
 | Where is the code | Four Python files in `src/` (hook / proxy / auto-start / error reporting), no third-party dependencies (certifi optional) |
 | Where it is installed | `C:\Program Files (x86)\AI\Zcode-Persistence\` |
 | Which system config is modified | `~/.zcode/cli/config.json` (hook), `~/.zcode/v2/provider_config.json` (the provider's baseUrl) |
@@ -260,7 +260,7 @@ the mapping entry at the top of `CHANGELOG.md` tells you which build line the cu
 1. Read the "What it is / Limitations" sections of `README.md`.
 2. Read this file (`docs/06-ai-maintenance-guide.md`), section 2 code map and section 3 invariants.
 3. Run a health check once: `python <install directory>/doctor.py`; expect 12 items passed, 0 failed.
-4. Run the self-tests: `tools/selftest_hook.py` (11 cases), `tools/selftest_proxy_429.py` (5 scenarios), `tools/selftest_stream.py` (23 scenarios), `tools/selftest_route.py` (13 checks),
+4. Run the self-tests: `tools/selftest_hook.py` (11 cases), `tools/selftest_proxy_429.py` (5 scenarios), `tools/selftest_stream.py` (32 scenarios), `tools/selftest_route.py` (13 checks),
    `tools/selftest_watch.py` (12 assertions); all should PASS.
 
 **Three things you must know before changing code**
@@ -341,10 +341,12 @@ These are all real problems that were hit and fixed. **Do not reintroduce them.*
     the ending must pass through unchanged: retrying there would duplicate visible
     output. An explicit upstream SSE error event (`{"error":...}`, production code
     `stream_truncated`) follows the same rule (V0.2.4): swallowed and retried when no
-    text/tool call exists, passed through once content exists. Tool-call deltas are
-    buffered until `finish_reason` (or content) arrives (V0.2.5): a stream that ends
-    mid-arguments with nothing written out is discarded and re-requested; once a
-    complete tool call has been written out, no more retries (tools would run twice).
+    text/tool call exists; once content exists, a client reset is used instead (V0.2.7).
+    Tool-call deltas are buffered until `finish_reason` or stream end (V0.2.5); the JSON
+    is validated before release (V0.2.7): a stream that ends mid-arguments with nothing
+    written out is discarded and re-requested; once a complete tool call has been written
+    out, no more retries (tools would run twice); if content exists but the call is
+    incomplete, reset the client.
 13. **`ensure_proxy` must hold a cross-process lock** (V0.2.3). Port probing alone races:
     two SessionStart hooks can both see an empty port and spawn a proxy, and Windows
     `SO_REUSEADDR` lets both listen on 8787. The named mutex

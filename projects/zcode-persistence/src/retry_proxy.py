@@ -46,6 +46,7 @@ import os
 import queue
 import re
 import socket
+import struct
 import sys
 import threading
 import time
@@ -86,7 +87,7 @@ def env_int(name, default, lo=1, hi=1000000):
 LISTEN_HOST = "127.0.0.1"
 LISTEN_PORT = env_int("PROXY_PORT", 8787, 1, 65535)
 # 只用于 /__zp_health 的能力标记，让 ensure_proxy 能分辨"跑的是不是支持 /p 的新代码"。
-PROXY_VERSION = "0.2.6"
+PROXY_VERSION = "0.2.7"
 
 # 重试策略：按"时间窗"而不是次数。默认持续重试 5 分钟，每 20 秒一次（窗口内约 15 次）。
 # MAX_ATTEMPTS 只保留为防跑飞的保险丝，正常永远碰不到。
@@ -408,20 +409,31 @@ def pipe_response(handler, resp, conn, path, started, sse_started=False, heartbe
     can_hb = bool(heartbeat) and (sse_started or ctype.startswith("text/event-stream"))
     is_sse = bool(sse_started or ctype.startswith("text/event-stream"))
     pending = b""
-    saw_text = False
+    # text_out：content 真的写给客户端了。客户端 Eqo() 只看“已丢弃的正文字节
+    # >0”，所以所有“能不能内部重发/RST”的判断必须用 text_out；上游发过 content
+    # 但还压在工具缓冲里（同事件带 tool_calls）不算。
+    text_out = False
     tool_out = False
     saw_choices = False
-    finish_seen = False
+    finish_out = False
     early = False
+    # V0.2.7：正文已经写出、后面却残缺/上游报错时，内部重发会重复正文，不能
+    # 再走 early。改为 RST 客户端连接：客户端把传输层 ECONNRESET 当作可重试
+    # 错误，丢弃这段残缺输出并用 previous-message-anchor 续写（Sqo=10 次预算）。
+    # 不能发 SSE 业务错误——客户端会包成 ProviderBusinessError，retryable 恒为 false。
+    client_reset = False
     # 客户端写失败（关窗/取消）不能当成上游失败去重发；emit() 置位。
     client_gone = False
     # 工具调用增量先缓冲、写完整再出手（V0.2.5）。线上实测：上游经常在工具参数
     # 发到一半时就把流结束（无 finish_reason=tool_calls），客户端拿到"开了头没
     # 结尾"的工具调用，判 tool_args_invalid、retryable=false，回合失败。
     # 缓冲期间这些字节不出代理：流在工具调用中途结束且还没有任何已写出的
-    # 正文/完整工具调用时，可以整体丢弃并内部重发。key 是 tool_calls 的 index
-    # （legacy function_call 用 -1），保证多工具调用时各自按序、互不穿插。
-    tool_buf = {}
+    # 正文/完整工具调用时，可以整体丢弃并内部重发。
+    # 必须是**按到达顺序**的 list，不能按 index 分组：分组后 sorted() 会把
+    # 后到的低 index 事件提前写出，多 index 的分片顺序就乱了，客户端按 index
+    # 拼出来的参数会变成非法 JSON（甚至拼成错误命令）。每项是
+    # (line, has_content, has_finish)，flush 时按原顺序逐行写出。
+    tool_buf = []
     # 正常/可接受的结束原因。其它未知值（含字面 "other"）在“没有正文/工具调用”
     # 时一律按异常提前结束处理：客户端会把未知值映射成 other，然后当正常完成收掉回合。
     safe_finish = ("stop", "length", "content_filter",
@@ -453,16 +465,129 @@ def pipe_response(handler, resp, conn, path, started, sse_started=False, heartbe
         log("early finish %s after %d bytes %s" % (why, total, path))
         return True
 
+    def reject_constant(value):
+        """JSON.parse 不接受 NaN/Infinity；Python 默认接受，这里必须对齐。"""
+        raise ValueError("non-finite JSON constant: %s" % value)
+
+    def tools_complete():
+        """缓冲里的每个工具调用都必须有名字 + 合法 JSON 参数。
+
+        V0.2.7：上游可能在 `finish_reason=tool_calls` 之后才结束，但参数仍是
+        残缺 JSON；V0.2.5 只按“流结束”判断，会把这种调用当完整调用放行。
+        客户端用 JSON.parse 判断完整性（iyn），解析失败就永远不发 tool-call，
+        最后判 tool_args_invalid。所以代理必须自己先按同样标准验一遍。
+        按到达顺序累加每个 index 的 arguments，与客户端拼接顺序一致。
+        """
+        names = {}
+        args = {}
+        for line, _hc, _hf in tool_buf:
+            if not line.startswith(b"data:"):
+                continue
+            try:
+                obj = json.loads(line[5:].strip().decode("utf-8", "replace"))
+            except Exception:
+                continue
+            for choice in obj.get("choices") or []:
+                if not isinstance(choice, dict):
+                    continue
+                delta = choice.get("delta") or {}
+                for item in delta.get("tool_calls") or []:
+                    if not isinstance(item, dict):
+                        continue
+                    k = -1
+                    if "index" in item:
+                        try:
+                            k = int(item["index"])
+                        except (TypeError, ValueError):
+                            k = -1
+                    fn = item.get("function") or {}
+                    if isinstance(fn.get("name"), str) and fn["name"]:
+                        names[k] = fn["name"]
+                    a = fn.get("arguments")
+                    if isinstance(a, str) and a:
+                        args[k] = args.get(k, "") + a
+                fc = delta.get("function_call")
+                if isinstance(fc, dict):
+                    if isinstance(fc.get("name"), str) and fc["name"]:
+                        names[-1] = fc["name"]
+                    a = fc.get("arguments")
+                    if isinstance(a, str) and a:
+                        args[-1] = args.get(-1, "") + a
+        for key in set(names) | set(args):
+            if key not in names:
+                return False
+            text = (args.get(key) or "").strip()
+            if not text:
+                return False
+            try:
+                json.loads(text, parse_constant=reject_constant)
+            except Exception:
+                return False
+        return True
+
     def flush_tools():
-        "把缓冲的完整工具调用增量按 index 顺序写出去（V0.2.5）。"
-        nonlocal tool_out
-        for idx in sorted(tool_buf):
-            for line in tool_buf[idx]:
-                emit(line)
-                emit(b"\n")
+        """把缓冲的工具调用按到达顺序写出；参数不完整时一个字节都不写。
+
+        V0.2.7：不再“到收尾就 flush”。残缺参数一旦写给客户端，客户端就
+        必然判 tool_args_invalid。返回 False 表示缓冲里有调用不完整。
+        """
+        nonlocal tool_out, text_out, finish_out
+        if not tools_complete():
+            return False
+        for line, has_content, has_finish in tool_buf:
+            emit(line)
+            emit(b"\n")
+            if has_content:
+                text_out = True
+            if has_finish:
+                finish_out = True
         if tool_buf:
             tool_out = True
         tool_buf.clear()
+        return True
+
+    def reset_for_recovery(why):
+        """正文已写出、工具调用残缺：RST 客户端连接，让客户端自己续写。
+
+        V0.2.7：内部重发会把用户已经看到的正文再写一遍，不能再走 early。
+        发 SSE 业务错误也没用：客户端把它包成 ProviderBusinessError，
+        retryable 恒为 false（2026-11-02 实测）。客户端唯一认的恢复入口是
+        **传输层错误**：它看到 ECONNRESET 且有 partial 输出时，会丢弃这段
+        输出、用 previous-message-anchor 重新请求（最多 10 次）。
+        所以这里不给终止块，直接 SO_LINGER=0 关客户端 socket 制造 RST。
+        """
+        nonlocal client_reset
+        client_reset = True
+        handler._zp_client_reset = True
+        # 必须同时置 close_connection：BaseHTTPRequestHandler.handle() 是
+        # while not close_connection 的循环。只关 socket 不置位的话，下一轮
+        # handle_one_request 会对已关闭的 rfile readline，ValueError 被兜底
+        # 吞掉后继续循环——每次 RST 泄漏一个 100% CPU 的空转线程（实测）。
+        handler.close_connection = True
+        log("reset client for recovery (%s) %s" % (why, path))
+        try:
+            sock = handler.connection
+            try:
+                sock.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER,
+                                struct.pack("ii", 1, 0))
+            except Exception as exc:
+                # 设不上也要继续关连接：宁可让客户端看到 FIN，也不能挂着。
+                log("client reset setsockopt failed: %r %s" % (exc, path))
+            # 只关 socket 对象不够：handler.wfile/rfile 还持有同一个 fd 的引用，
+            # CPython 要等引用计数归零才真正 close，结果客户端既收不到 RST、
+            # 也收不到 FIN，只会一直挂着（2026-11-03 Node 端到端实测）。
+            # 先关这两个文件对象，再关 socket，SO_LINGER=0 才会真的发 RST。
+            for name in ("wfile", "rfile"):
+                stream = getattr(handler, name, None)
+                try:
+                    if stream is not None and not stream.closed:
+                        stream.close()
+                except Exception:
+                    pass
+            sock.close()
+        except Exception as exc:
+            log("client reset failed: %r %s" % (exc, path))
+        return True
 
     def process_sse(data, emit_lines=True):
         """边转发边检查结束原因。
@@ -474,15 +599,18 @@ def pipe_response(handler, resp, conn, path, started, sse_started=False, heartbe
         或正常 EOF 之前截住，丢弃这次尝试并让 _handle 重发上游。
         正常 stop/tool_calls，以及已经有正文/完整工具调用的流，一律原样转发——
         重发会把用户已经看到的内容再写一遍。
-        工具调用增量是例外（V0.2.5）：先缓冲，等 finish_reason（或正文出现）再
-        整体写出；流在工具调用中途结束且尚无已写出内容时，可以整体丢弃重发。
+        工具调用增量是例外（V0.2.5）：先缓冲，等 finish_reason 或收尾时整体写出；
+        流在工具调用中途结束且尚无已写出内容时，可以整体丢弃重发。已经有正文
+        但工具参数残缺时（V0.2.7），RST 客户端让它丢弃残缺输出自行续写。
         """
-        nonlocal pending, saw_text, tool_out, saw_choices, finish_seen
+        nonlocal pending, text_out, tool_out, saw_choices, finish_out
         pending += data
         while b"\n" in pending:
             line, pending = pending.split(b"\n", 1)
             line += b"\n"
             emit_this = True
+            has_content = False
+            has_finish = False
             if line.startswith(b"data:"):
                 raw = line[5:].strip()
                 if raw:
@@ -490,12 +618,20 @@ def pipe_response(handler, resp, conn, path, started, sse_started=False, heartbe
                         # 客户端收到 [DONE] 就结束流；此前没有任何结束原因时，
                         # 它会按 other 收掉回合，所以必须在这一行之前截住。
                         if tool_buf:
-                            if (not saw_text and not tool_out
-                                    and not finish_seen):
+                            if (not text_out and not tool_out
+                                    and not finish_out):
                                 return early_finish("incomplete tool call at DONE")
-                            flush_tools()
-                        if (saw_choices and not finish_seen
-                                and not saw_text and not tool_out):
+                            if not flush_tools():
+                                if (not text_out and not tool_out
+                                        and not finish_out):
+                                    return early_finish("incomplete tool call at DONE")
+                                if not tool_out and not finish_out:
+                                    return reset_for_recovery("incomplete tool call at DONE")
+                                # 已经有完整工具调用写出，重试会重复执行；
+                                # 丢掉这次的残缺调用，让回合按已写出的内容收尾。
+                                tool_buf.clear()
+                        if (saw_choices and not finish_out
+                                and not text_out and not tool_out):
                             return early_finish("missing finish_reason")
                     else:
                         try:
@@ -507,66 +643,57 @@ def pipe_response(handler, resp, conn, path, started, sse_started=False, heartbe
                             if isinstance(choices, list) and choices:
                                 saw_choices = True
                                 has_tc = False
-                                tc_keys = []
                                 fr = None
-                                has_payload = False
                                 for choice in choices:
                                     if not isinstance(choice, dict):
                                         continue
                                     delta = choice.get("delta")
                                     if isinstance(delta, dict):
                                         if delta.get("content"):
-                                            saw_text = True
-                                            has_payload = True
-                                        tc = (delta.get("tool_calls")
-                                              or delta.get("function_call"))
-                                        if tc:
+                                            has_content = True
+                                        if (delta.get("tool_calls")
+                                                or delta.get("function_call")):
                                             has_tc = True
-                                            has_payload = True
-                                            key = -1
-                                            if isinstance(tc, list):
-                                                for item in tc:
-                                                    if (isinstance(item, dict)
-                                                            and "index" in item):
-                                                        try:
-                                                            key = int(item["index"])
-                                                        except (TypeError, ValueError):
-                                                            key = -1
-                                                        break
-                                            if key not in tc_keys:
-                                                tc_keys.append(key)
                                     f = choice.get("finish_reason")
                                     if isinstance(f, str) and f:
                                         fr = f
                                 if fr is not None:
-                                    finish_seen = True
+                                    has_finish = True
                                     # 先判安全性再 flush：未知结束原因 + 尚无已
                                     # 写出内容时，缓冲里的残缺工具调用一并丢弃、
                                     # 整体重发；已经有内容则照旧放行。
                                     if (fr not in safe_finish
-                                            and not saw_text and not tool_out):
+                                            and not text_out and not tool_out):
                                         return early_finish("reason=%s" % fr)
                                 if has_tc:
-                                    # 工具调用增量：只入缓冲，不写出去。等到
-                                    # finish_reason / 正文 / 收尾时再 flush。
-                                    for key in tc_keys:
-                                        tool_buf.setdefault(key, []).append(line)
+                                    # 工具调用增量：只入缓冲，不写出去。按到达
+                                    # 顺序保存整行（含同事件里的 content/finish），
+                                    # flush 时原序写出，避免多 index 乱序。
+                                    tool_buf.append((line, has_content, has_finish))
                                     emit_this = False
-                                elif tool_buf and (has_payload or fr is not None):
-                                    # 正文或结束原因出现：缓冲的工具调用阶段结束。
-                                    flush_tools()
+                                elif tool_buf and fr is not None:
+                                    # 只在结束原因出现时结算工具调用阶段。
+                                    # 正文出现后仍可能再补参数，提前 flush
+                                    # 会把“还没传完”误判成残缺。
+                                    if not flush_tools():
+                                        if (not text_out and not tool_out
+                                                and not finish_out):
+                                            return early_finish("incomplete tool call")
+                                        if not tool_out and not finish_out:
+                                            return reset_for_recovery("incomplete tool call at finish")
+                                        tool_buf.clear()
                             # 先记账同一事件里的 choices/delta，再判断 error：若上游
                             # 把正文和 error 塞进同一条事件，正文要算数，不能吞。
                             # 上游有时不回 finish_reason，而是直接发一条 SSE
                             # `{"error":{...}}`（线上实测 code=stream_truncated）。
                             # 客户端会把它归成 ProviderBusinessError、
-                            # retryable=false，整轮直接失败。只要还没有正文/完整
-                            # 工具调用，就吞掉这条事件并走 early 重发（缓冲中的
-                            # 残缺工具调用一并丢弃）；已经有内容时原样转发，
-                            # 重发会造成重复。
+                            # retryable=false，整轮直接失败。没有正文/完整工具
+                            # 调用时吞掉并 early 重发；已有正文但还没有完整工具
+                            # 调用时 RST，让客户端丢弃这段输出自行续写（V0.2.7）；
+                            # 已有完整工具调用或已经收到结束原因时原样转发，
+                            # 重发会造成重复/重复执行工具。
                             err = obj.get("error")
-                            if (err and not saw_text and not tool_out
-                                    and not finish_seen):
+                            if err and not finish_out:
                                 if isinstance(err, dict):
                                     why = err.get("code") or err.get("message") or "error"
                                 else:
@@ -574,9 +701,17 @@ def pipe_response(handler, resp, conn, path, started, sse_started=False, heartbe
                                 # 只记状态行：message 截断、去换行，避免把上游
                                 # 原文（可能很长）写进日志破坏一行一条的解析。
                                 why = " ".join(str(why).split())[:80]
-                                return early_finish("upstream error: %s" % why)
+                                if not text_out and not tool_out:
+                                    return early_finish("upstream error: %s" % why)
+                                if text_out and not tool_out:
+                                    return reset_for_recovery(
+                                        "upstream error after content: %s" % why)
             if emit_lines and emit_this:
                 emit(line)
+                if has_content:
+                    text_out = True
+                if has_finish:
+                    finish_out = True
         return False
 
     # 响应头之后的静默处理。
@@ -684,12 +819,14 @@ def pipe_response(handler, resp, conn, path, started, sse_started=False, heartbe
                 emit(chunk)
         # 提前结束：丢掉这次上游响应，由 _handle 立刻再发一次；客户端连接保持打开，
         # 已经转发出去的 reasoning 不会撤回，新流的正文会接着写进同一个响应。
+        if client_reset:
+            return "client_reset"
         if early:
             return "early"
         # pending 只可能是“最后一行没有换行”。它可能是完整事件，也可能在 JSON
         # 中间被断开：半截 data: 行绝不能转发（重试流再追加时会合成非法事件）。
-        # 完整行必须正常转发——否则正文被解析成 saw_text 却没写给客户端，
-        # 后面的“缺 finish_reason”判定会因为 saw_text=True 放行，变成静默截断。
+        # 完整行必须正常转发——否则正文被解析出来却没写给客户端，
+        # 后面的“缺 finish_reason”判定会因为 text_out 仍为 False 而误判。
         if is_sse and pending:
             complete = True
             if pending.startswith(b"data:"):
@@ -700,7 +837,7 @@ def pipe_response(handler, resp, conn, path, started, sse_started=False, heartbe
                     except Exception:
                         complete = False
             if process_sse(b"\n", emit_lines=complete):
-                return "early"
+                return "client_reset" if client_reset else "early"
             if complete:
                 # SSE 以空行分事件。最后一行补的 \n 只结束行、不结束事件；
                 # 若随后 early 重发，新流的第一行会粘进同一个事件，data 里
@@ -712,12 +849,17 @@ def pipe_response(handler, resp, conn, path, started, sse_started=False, heartbe
         # 缓冲里还有没写出去的工具调用（V0.2.5：流在工具参数中途结束）：还没有
         # 任何已写出内容时整体丢弃重发；否则只能写出，让客户端按残缺收尾。
         if is_sse and tool_buf:
-            if not saw_text and not tool_out and not finish_seen:
-                early_finish("incomplete tool call at EOF")
-                return "early"
-            flush_tools()
-        if (is_sse and saw_choices and not finish_seen
-                and not saw_text and not tool_out):
+            if not flush_tools():
+                if not text_out and not tool_out and not finish_out:
+                    early_finish("incomplete tool call at EOF")
+                    return "early"
+                if not tool_out and not finish_out:
+                    reset_for_recovery("incomplete tool call at EOF")
+                    return "client_reset"
+                # 已有完整工具调用/结束原因写出：重试会重复执行，只能丢掉这次残缺调用。
+                tool_buf.clear()
+        if (is_sse and saw_choices and not finish_out
+                and not text_out and not tool_out):
             early_finish("missing finish_reason at EOF")
             return "early"
         # Content-Length 定长响应：上游声明 N 字节却提前 EOF 时，http.client
@@ -727,8 +869,8 @@ def pipe_response(handler, resp, conn, path, started, sse_started=False, heartbe
         # 上游读错误/静默超时：如果只吐了 reasoning（没有正文/完整工具调用），
         # 客户端还没有可用产出，丢弃本次尝试并内部重发（V0.2.6）。
         # 客户端自己断开（关窗/取消）不能重发，否则只是空转。
-        if (is_sse and not client_gone and not saw_text and not tool_out
-                and not finish_seen):
+        if (is_sse and not client_gone and not text_out and not tool_out
+                and not finish_out):
             early = True
             log("early finish stream error: %s after %d bytes %s"
                 % (" ".join(repr(exc).split())[:120], total, path))
@@ -739,11 +881,22 @@ def pipe_response(handler, resp, conn, path, started, sse_started=False, heartbe
                 log("client gone after %d bytes %s" % (total, path))
             else:
                 log("stream broken after %d bytes: %r" % (total, exc))
+                # V0.2.7：上游在读错误/静默里结束，但正文已经写出（工具参数
+                # 残缺或纯文本截断都一样）。只发 FIN 时客户端把截断当普通流
+                # 错误（retryable=false）；必须 RST，客户端才会丢弃这段输出
+                # 并用锚点续写。已收到 finish 或已有完整工具调用则不 RST。
+                if (is_sse and text_out and not tool_out
+                        and not finish_out):
+                    reset_for_recovery("stream error after content")
     finally:
         # 先让读取线程别再往队列里塞东西（它在 put 的 0.5 秒超时里能看到 stop），
         # 再写终止块/关连接。读取线程若正阻塞在 read1，只能等它自己的 socket 超时。
         stop.set()
-        if early:
+        if client_reset:
+            # 已经用 SO_LINGER=0 关掉客户端 socket 制造 RST；这里不能再写
+            # 终止块，也无需再标记关闭。
+            pass
+        elif early:
             # 只关上游连接；客户端连接留给下一次尝试继续写，不能补终止块、
             # 也不能置 close_connection，否则客户端会把流当成正常结束。
             pass
@@ -760,6 +913,8 @@ def pipe_response(handler, resp, conn, path, started, sse_started=False, heartbe
         except Exception:
             pass
 
+    if client_reset:
+        return "client_reset"
     if early:
         return "early"
     if completed:
@@ -778,6 +933,21 @@ class Handler(BaseHTTPRequestHandler):
     def log_message(self, *args):
         "屏蔽 http.server 自带的访问日志，避免重复刷屏。"
         pass
+
+    def handle_one_request(self):
+        """RST 恢复时 wfile/rfile 已被主动关闭，基类收尾 flush 会抛 ValueError。
+
+        这是预期路径（连接已经被重置），不该被 socketserver 记成 thread error。
+        """
+        try:
+            BaseHTTPRequestHandler.handle_one_request(self)
+        except ValueError:
+            # 只有主动重置的那次才吞；其它 ValueError 仍按原样抛出，
+            # 不能被这个兜底掩盖真正的代码错误。同时置 close_connection，
+            # 防止基类 handle() 继续循环、对已关闭的 rfile 反复 readline。
+            if not getattr(self, "_zp_client_reset", False):
+                raise
+            self.close_connection = True
 
     # ---------- 输出辅助 ----------
     def _reject(self, code, msg):

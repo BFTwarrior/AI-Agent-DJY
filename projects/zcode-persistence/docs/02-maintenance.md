@@ -148,7 +148,7 @@ When the install directory is empty (nothing is listening on the port) no restar
 |---|---|---|
 | Hook log | `%TEMP%\Zcode-Persistence\hook.log` | `advise: n/3`, `cap: limit reached`, `skip: reason`, `error: exception` |
 | Hook state | `%TEMP%\Zcode-Persistence\state.json` | Counters keyed by "session + command"; safe to delete to reset |
-| Proxy log | `<install directory>\proxy.log` | `ok path status=200 bytes=... first=x.xxs`, `attempt fail (...)`, `early finish ...` + `retry after early finish ...` (the attempt was discarded and re-requested internally), `truncated ...` |
+| Proxy log | `<install directory>\proxy.log` | `ok path status=200 bytes=... first=x.xxs`, `attempt fail (...)`, `early finish ...` + `retry after early finish ...` (discarded and re-requested internally), `reset client for recovery (...)` (V0.2.7: the client connection was reset so the client can retry with its anchor), `truncated ...` |
 
 An `attempt fail` followed by `ok` in the log is a good sign — the resend succeeded. Only `gave up after N attempts in Ns` is a genuine failure (it only stops once the retry window expires).
 

@@ -2,6 +2,19 @@
 
 > 2026-11-01: migrated to the AI-Agent-DJY repository; documentation was translated to English and directories standardized to `docs/` and `diagrams/`. Historical entries keep paths as originally written.
 
+## V0.2.7 — 2026-11-03
+
+Recover after content has been written. Buffered tool calls are validated as JSON
+(names required, `NaN`/`Infinity` rejected) and never released partially. If content
+was emitted and the tool call is incomplete, or the upstream sends an SSE
+`{"error":...}` after content, the proxy resets the client connection (`SO_LINGER=0`,
+closing `wfile`/`rfile`, `close_connection=True`); the client sees `ECONNRESET`,
+discards the partial output and retries with `previous-message-anchor`. This fixes
+recurring `tool_args_invalid` and `upstream_error` failures that previously ended the
+turn with `retryable=false`. 32 streaming scenarios, the other suites, and a
+Node/undici probe pass; independent review 4.7/5 overall, 4.4/5 code. See
+`CHANGELOG.md` for details.
+
 ## V0.2.6 — 2026-11-03
 
 Generic `/p/<base64url>` routing for any provider, automatic provider migration

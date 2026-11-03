@@ -290,3 +290,32 @@ migrate; uninstall restores `/p` from the sidecar (dry-run writes nothing).
 
 Also passing: `selftest_hook.py` (11), `selftest_proxy_429.py` (5),
 `selftest_watch.py` (12), `selftest_ensure.py` (serialization).
+
+## V0.2.7 — reset after content, 32 scenarios
+
+Two production failures share one recovery path:
+
+- `tool_args_invalid`: text had been written, then the upstream ended mid-arguments;
+  V0.2.5 flushed the incomplete buffer.
+- `upstream_error` (`request=<request-id>-…`, `<model>`): the gateway sent
+  `{"error":{"message":"Upstream request failed","type":"upstream_error"}}` after
+  67 characters; V0.2.4 forwarded it, and the client wrapped it in
+  `ProviderBusinessError` (`retryable=false`).
+
+| # | Case | Expected | Result |
+|---|---|---|---|
+| 17 | text, then an SSE error | error not forwarded; `reset client for recovery (upstream error after content: …)`; client receives RST; no internal re-request | ✅ |
+| 24 | text, incomplete tool args, clean EOF | zero bytes of the partial call; RST; no chunked terminator | ✅ |
+| 25 | same, with `finish_reason=tool_calls` and `[DONE]` | invalid JSON is never released; RST | ✅ |
+| 26 | same, upstream RSTs mid-arguments | read-error branch also RSTs (FIN alone is not retryable) | ✅ |
+| 27 | multi-index tool calls (index 1 first, then a 0/1 mixed event) | arrival order preserved; client-side concatenation yields `{}` and `{"a":1}` | ✅ |
+| 28 | text, no tool call, upstream RST | pure-text truncation also RSTs | ✅ |
+| 29 | CPU of the proxy process after a reset | <0.3 s CPU in a 0.6 s window | ✅ 0.000 s |
+| 30 | `NaN` in arguments | rejected like the client's `JSON.parse` | ✅ |
+| 31 | legacy `function_call` (no index) | validated under `-1` and passed through | ✅ |
+| 32 | empty `arguments` | treated as incomplete; RST | ✅ |
+
+`selftest_stream.py`: 32 scenarios pass. The other suites (hook 11, 429 5, watch 12,
+route 13, ensure serialization) also pass. A Node/undici probe against the real proxy
+receives `TypeError: terminated` with cause `read ECONNRESET` after 61 content bytes;
+the client's `sqa()` matches. Independent review: overall 4.7/5, code 4.4/5.

@@ -41,11 +41,13 @@ Two main components plus one optional side path (off by default):
     such as `grep -q` with no match, `diff --quiet` with differences, or a false `test`; the client nevertheless marks the call
     `status="failed"`, so status alone is not enough. Any exit code other than 1, any output, a timeout, or cancellation still counts
     as a failure. The 2026-11-01 "pause once a minute" bug missed exactly this: three retry advices, and the third told the model to stop.
-23. **Tool-call deltas must be buffered and only written out at `finish_reason` (or when content appears)** (V0.2.5). A stream that ends mid-arguments with nothing written out must be discarded and re-requested; once a complete tool call has been written out, it must pass through (resending would run the tools twice). Reverting the buffer to direct streaming brings `tool_args_invalid` back.
-24. **A read error may be retried only when nothing has been written out** (V0.2.6). Check SSE, `client_gone`, `saw_text`, `tool_out`, `finish_seen`; content already sent must never be retried, and a client disconnect is not an upstream failure.
+23. **Tool-call deltas must be buffered and only written out at `finish_reason` or at the end** (V0.2.5; JSON validation from V0.2.7). A stream that ends mid-arguments with nothing written out must be discarded and re-requested; once a complete tool call has been written out, it must pass through (resending would run the tools twice). Reverting the buffer to direct streaming brings `tool_args_invalid` back.
+24. **A read error may be retried internally only when nothing has been written out** (V0.2.6; V0.2.7 resets the client when content exists). Check SSE, `client_gone`, `text_out`, `tool_out`, `finish_out`: only when all are false may the attempt be marked early and re-requested. If content was emitted but there is no complete tool call or finish reason, reset the client (see 29). Content already sent must never be retried internally, and a client disconnect is not an upstream failure.
 25. **`/p/<token>` is base64url of the original baseUrl** (V0.2.6); validate scheme/host/port after decoding, preserve base and request queries, include non-default ports in Host, and return 400 for a bad token.
 26. **Provider migration is idempotent, sidecar-first and restorable** (V0.2.6); compare proxy addresses with `urlsplit` host+port, skip unusable URLs, write the sidecar before the config.
 27. **Automatic migration requires `features` containing `p_route` and a matching non-empty `root`** (V0.2.6, fail-closed); `uninstall` must restore `/p` from the sidecar, including before `--purge`.
+28. **Tool-call completeness must use the client's own standard** (V0.2.7). Every buffered call needs a non-empty `name`; the concatenated `arguments` must parse with `json.loads(..., parse_constant=reject)` (the client's `JSON.parse` rejects `NaN`/`Infinity`). Keep the buffer as an **arrival-ordered list**, never group by `index` and `sorted()` it: reordering multi-index fragments makes the client concatenate invalid JSON (or even a wrong shell command); scenario 27 pins this. `flush_tools()` must write **zero bytes** when validation fails.
+29. **Content written + later truncation or upstream SSE error: reset the client** (V0.2.7). Two triggers: tool arguments are not valid JSON; the upstream sends `{"error":...}` (e.g. `upstream_error`) after content. Do not re-request internally (duplicates content) and do not forward an SSE business error (the client wraps it in `ProviderBusinessError` with `retryable=false`). RST with `SO_LINGER=0`, close `wfile`/`rfile`, then the socket, **and set `handler.close_connection=True`** — otherwise `handle()` keeps calling `readline` on the closed `rfile`, leaking a 100%-CPU thread per reset (scenario 29: 0.000 s CPU in a 0.6 s window). Never RST after a complete tool call or an emitted `finish_reason` (tool re-execution); pass through or drop only the malformed fragment.
 
 ## Current final parameters (v0.4.0)
 
@@ -57,12 +59,12 @@ Changing these defaults amounts to changing the product spec; you **must** updat
 
 1. Run the accelerated test in section 4 of `docs/06-ai-maintenance-guide.md` (all four assertions must pass).
 2. Run `python -I tools/selftest_hook.py`, `tools/selftest_proxy_429.py`, `tools/selftest_stream.py`, `tools/selftest_watch.py`
-   (11 hook cases + 5 retry scenarios + 19 streaming scenarios + 12 error-reporting assertions must all pass). If you changed `pipe_response` you must run the streaming suite;
+   (11 hook cases + 5 retry scenarios + 32 streaming scenarios + 12 error-reporting assertions + 13 migration checks must all pass). If you changed `pipe_response` you must run the streaming suite;
    if you changed `error_watch.py` you must run the third suite.
-3. Bump `VERSION` and the `VERSION` in `tools/install.py`.
+3. Bump `VERSION`, `tools/install.py`, `src/retry_proxy.py` (`PROXY_VERSION`) and `src/error_watch.py` (`clientInfo.version`); all four must agree.
 4. Record "what changed + why" in `CHANGELOG.md`.
 5. Repackage, **excluding** `__pycache__`, `*.pyc`, `*.log`.
-6. Hand it to an independent subagent for review: it is only released when both the overall and the code score are ≥4.5/5; if either is lower, fix it and start over.
+6. Hand it to an independent subagent for review: released only when the overall score is ≥4.5/5 and the code score is ≥4.0/5; if lower, fix it and start over.
 
 ## Start here to continue development (for the next AI / engineer)
 

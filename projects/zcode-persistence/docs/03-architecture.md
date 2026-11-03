@@ -94,14 +94,18 @@ write response headers (strip hop-by-hop) → read1 chunk by chunk, flush to the
    ├─ SSE ends ([DONE] / clean EOF) with no finish_reason, or an unknown reason,
    │   and no text/tool call yet ──► return "early"; _handle re-requests upstream and
    │   continues the same client response (V0.2.3)
-   ├─ upstream sends an SSE {"error":...} (stream_truncated) with no text/tool call
-   │   ──► swallow the event, mark early, re-request (V0.2.4)
-   ├─ stream ends mid-tool-arguments (tool_args_invalid shape) with nothing written
-   │   out yet ──► drop the buffer, mark early, re-request (V0.2.5; tool deltas are
-   │   buffered and only written out at finish time)
-   ├─ read error with no text/tool call/finish reason and the client still connected
+   ├─ upstream sends an SSE {"error":...} (stream_truncated/upstream_error)
+   │   ├─ no text/complete tool call ──► swallow, mark early, re-request (V0.2.4)
+   │   ├─ text written, no complete tool call ──► RST the client (V0.2.7)
+   │   └─ complete tool call / finish emitted ──► pass through
+   ├─ stream ends mid-tool-arguments (tool_args_invalid shape)
+   │   ├─ nothing written out yet ──► drop the buffer, mark early, re-request (V0.2.5)
+   │   └─ text written, incomplete JSON ──► write zero bytes, RST the client (V0.2.7)
+   ├─ read error/silence with no text/tool call/finish reason and the client connected
    │   ──► mark early, re-request (V0.2.6; a client disconnect is logged as
    │   `client gone` and never retried)
+   ├─ read error/silence after text was written, no complete tool call
+   │   ──► RST the client (V0.2.7; FIN alone is not retryable for the client)
    ├─ stream breaks after content was written ──► can only end; cannot retry (would duplicate content)
    ├─ fixed-length response delivers too few bytes ──► log truncated, no terminator
    └─ normal end ──► log ok
@@ -124,8 +128,22 @@ attempt and re-requests it internally, and the new stream continues writing into
 client response. It does **not** send a mid-stream SSE error — production testing showed the
 client classifies that as `ProviderBusinessError` with `retryable=false`. The same
 recoverable shape is an explicit upstream SSE `{"error":...}` event (production:
-`stream_truncated`): it is swallowed and retried when no text/tool call has been
-emitted, and passed through once content exists (V0.2.4).
+`stream_truncated`/`upstream_error`): it is swallowed and retried when no text/tool call
+has been emitted (V0.2.4); once content exists but no complete tool call has been sent,
+the client is reset instead (V0.2.7). If a complete tool call or a `finish_reason` has
+already been written, the event is passed through — a retry would run tools twice.
+
+**Recovering after content (V0.2.7)**: an internal re-request would duplicate the text,
+and an SSE business error becomes `ProviderBusinessError` (`retryable` always false). The
+client's `Eqo()` only recovers when discarded reasoning/text bytes > 0 and `sqa(error)` is
+true; `sqa()` walks the `cause` chain and accepts `ECONNRESET`. The proxy therefore
+validates every buffered tool call as JSON (`NaN`/`Infinity` rejected) and, if content was
+written and the call is incomplete or the upstream errored, sets `SO_LINGER=0`, closes
+`wfile`/`rfile`, then the socket, and sets `handler.close_connection=True`. Closing only
+the socket object does not release the fd because the makefiles hold references, so the
+client would hang; not setting `close_connection` makes `handle()` spin on the closed
+`rfile` at 100% CPU. The client sees `ECONNRESET`, discards the partial output and retries
+with `previous-message-anchor` (max 10).
 
 **Where the 30-second silence timeout comes from**: the ZCode client declares failure if it
 has not received the first byte within 95 seconds. So the proxy first hangs an SSE heartbeat

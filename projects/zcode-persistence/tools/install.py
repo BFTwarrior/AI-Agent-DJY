@@ -24,7 +24,7 @@ import sys
 import time
 import urllib.parse
 
-VERSION = "0.2.6"
+VERSION = "0.2.7"
 DEFAULT_PREFIX = r"C:\Program Files (x86)\AI\Zcode-Persistence"
 PROXY_HOST = "127.0.0.1:8787"
 PROXY_PORT = int(PROXY_HOST.rsplit(":", 1)[1])
@@ -271,6 +271,12 @@ def main():
     if os.path.exists(readme_src):
         shutil.copy2(readme_src, os.path.join(prefix, "README.md"))
         placed.append("README.md")
+    # VERSION 也要落盘：doctor 用它和 /__zp_health 的运行版本对比，
+    # 抓“装了新版但旧代理进程还在跑”。
+    version_src = os.path.join(os.path.dirname(SRC), "VERSION")
+    if os.path.exists(version_src):
+        shutil.copy2(version_src, os.path.join(prefix, "VERSION"))
+        placed.append("VERSION")
     print("[1/4] 脚本已复制到 " + prefix)
 
     py = sys.executable

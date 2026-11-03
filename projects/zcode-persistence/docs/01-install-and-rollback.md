@@ -62,6 +62,12 @@ in `provider_config.json.proxy-origins.json`, is idempotent, and supports
 `--restore`. SessionStart also migrates automatically once the proxy reports
 the `p_route` feature.
 
+**After an upgrade, restart the proxy.** `install.py` replaces files but does not stop the
+running process, and the timing defaults may be identical between versions. Run
+`python "C:/Program Files (x86)/AI/Zcode-Persistence/restart_proxy_idle.py"`, then confirm
+`/__zp_health` reports `version=0.2.7`. Since V0.2.7 `doctor.py` compares the running
+version with the installed `VERSION` and warns on a mismatch.
+
 **Do not guess a prefix for an unknown address**: `--proxy-prefix ap` would send
 that provider's requests to `upstream-a.example.com`. Use `route_providers.py` instead.
 The prefix is derived from the original address only for known AP/UPSTREAM-B hosts;

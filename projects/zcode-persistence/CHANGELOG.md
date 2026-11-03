@@ -2,6 +2,65 @@
 
 > 2026-11-01: migrated to the AI-Agent-DJY repository; documentation was translated to English and directories standardized to `docs/` and `diagrams/`. Historical entries keep paths as originally written.
 
+## V0.2.7 — 2026-11-03
+
+> Recover after content has been written: validate buffered tool calls as JSON and
+> reset the client connection when the tool call is incomplete or the upstream reports
+> an SSE business error. Fixes recurring `tool_args_invalid` and `upstream_error`
+> failures that previously ended the turn with `retryable=false`.
+
+### `tool_args_invalid`
+
+**Symptom**: `provider_code=tool_args_invalid`, `lastChunkType=tool-input-delta`,
+`toolCallCount=0`, `retryable=false`; 66 occurrences in history.
+
+**Cause**: the upstream ends the stream halfway through the tool-call arguments, after
+text has been emitted. V0.2.5 only discarded the buffer when nothing had been written;
+with content present it flushed the incomplete JSON. The client's `JSON.parse` fails,
+no `tool-call` is emitted, and the turn dies.
+
+**Fix**:
+- `tools_complete()` requires a name and parseable JSON for every buffered call
+  (rejecting `NaN`/`Infinity`, which `JSON.parse` rejects); `flush_tools()` writes zero
+  bytes when validation fails.
+- The buffer is an arrival-ordered list, not a per-index dict: reordering multi-index
+  fragments with `sorted()` made the client concatenate invalid JSON, or worse, a wrong
+  command.
+- When content was emitted and the call is incomplete, the proxy resets the client with
+  `SO_LINGER=0` (closing `wfile`/`rfile` first). The client sees `ECONNRESET`, discards
+  the partial output, and retries with `previous-message-anchor` (max 10).
+- `handler.close_connection=True` is mandatory; otherwise `handle()` loops on the
+  closed `rfile`, leaking a 100%-CPU thread per reset.
+
+### `upstream_error` after content
+
+**Symptom**: `provider=<provider-id>`, `model=<model>`, `reason=unknown`,
+`retryable=false`; `responseStatus=200`, `textDeltaChars=67`, then
+`{"error":{"message":"Upstream request failed","type":"upstream_error"}}`.
+
+**Cause**: the gateway returned an in-stream SSE error after content. V0.2.4 forwarded
+it to avoid duplication; the client wrapped it in `ProviderBusinessError`
+(`retryable` always false) and ended the turn without a retry.
+
+**Fix**: the error branch now splits by what was actually written:
+- no content and no complete tool call: swallow the event and re-request internally;
+- content written, no complete tool call: reset the client (same mechanism as above);
+- complete tool call or emitted `finish_reason`: pass through (no duplicate tool run).
+
+A pure-text read error/timeout after content also resets the client now; previously it
+only sent FIN, which the client treats as a non-retryable truncation.
+
+### Verification
+
+- `selftest_stream.py`: 32 scenarios (17/24–32 cover RST, multi-index order, pure text
+  read errors, CPU after RST, `NaN`, legacy `function_call`, empty arguments).
+- Node/undici end-to-end probe: `TypeError: terminated` → cause `read ECONNRESET`
+  (`code=ECONNRESET`) after 61 content bytes; the client's `sqa()` matches.
+- Independent review: overall 4.7/5, code 4.4/5.
+- `VERSION`, `install.py`, `PROXY_VERSION`, `error_watch.clientInfo` are all 0.2.7.
+- `install.py` copies `VERSION` into the install directory; `doctor.py` compares the
+  running `/__zp_health.version` with it and warns on a stale process.
+
 ## V0.2.6 — 2026-11-03
 
 > Three changes so that **any relay/provider** benefits from retries: a generic

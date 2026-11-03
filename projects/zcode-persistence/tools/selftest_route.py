@@ -178,17 +178,22 @@ def main():
             "baseUrl": rp.proxy_url(orig_url)}}}])
         with open(pcfg + ".proxy-origins.json", "w", encoding="utf-8") as fh:
             json.dump({"gone": orig_url}, fh)
-        env = dict(os.environ, USERPROFILE=fake_home, HOME=fake_home)
+        # 子进程的输出编码固定成 UTF-8：本机 PYTHONUTF8 会让子进程写 UTF-8，
+        # 而 text=True 按 GBK 解码会直接抛 UnicodeDecodeError（2026-11-03 实测）。
+        env = dict(os.environ, USERPROFILE=fake_home, HOME=fake_home,
+                   PYTHONIOENCODING="utf-8")
         uninstall = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                  "uninstall.py")
         inst = os.path.join(work, "inst")
         os.makedirs(inst, exist_ok=True)
         dry = subprocess.run([sys.executable, uninstall, "--prefix", inst,
-                              "--dry-run"], env=env, capture_output=True, text=True)
+                              "--dry-run"], env=env, capture_output=True, text=True,
+                             encoding="utf-8", errors="replace")
         unchanged = (rules_of(read_cfg(pcfg))[0]["config"]["api"]["baseUrl"]
                      == rp.proxy_url(orig_url))
         real = subprocess.run([sys.executable, uninstall, "--prefix", inst],
-                              env=env, capture_output=True, text=True)
+                              env=env, capture_output=True, text=True,
+                              encoding="utf-8", errors="replace")
         restored_url = rules_of(read_cfg(pcfg))[0]["config"]["api"]["baseUrl"]
         backups = [n for n in os.listdir(os.path.dirname(pcfg))
                    if n.startswith("provider_config.json.bak-")]

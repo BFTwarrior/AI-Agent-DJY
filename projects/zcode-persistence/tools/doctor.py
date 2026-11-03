@@ -37,8 +37,8 @@ def points_to_proxy(url):
         return False
 
 
-def is_our_proxy():
-    "端口上的服务是不是本代理（/__zp_health 返回 name=Zcode-Persistence）。"
+def health_info():
+    "读 /__zp_health；失败返回空 dict。"
     try:
         s = socket.create_connection(("127.0.0.1", PORT), timeout=1.0)
         try:
@@ -51,10 +51,14 @@ def is_our_proxy():
                 data += chunk
         finally:
             s.close()
-        info = json.loads(data.split(b"\r\n\r\n", 1)[-1].decode("utf-8", "replace"))
-        return info.get("name") == "Zcode-Persistence"
+        return json.loads(data.split(b"\r\n\r\n", 1)[-1].decode("utf-8", "replace"))
     except Exception:
-        return False
+        return {}
+
+
+def is_our_proxy():
+    "端口上的服务是不是本代理（/__zp_health 返回 name=Zcode-Persistence）。"
+    return health_info().get("name") == "Zcode-Persistence"
 
 
 def count_listeners():
@@ -357,6 +361,29 @@ def main():
     else:
         add("WARN", "代理端口 %d" % PORT,
             "未监听（provider 指向代理时会导致请求失败）")
+
+    # 5.1) 运行中的代理版本必须与安装目录一致。只比启动参数抓不到“装了新版
+    # 但旧进程还在跑”——V0.2.7 的默认参数和 V0.2.6 完全一样。
+    live_version = str(health_info().get("version") or "")
+    try:
+        with open(os.path.join(prefix, "VERSION"), encoding="utf-8") as fh:
+            disk_version = fh.read().strip()
+    except Exception:
+        disk_version = ""
+    if not disk_version:
+        # 旧安装目录没有 VERSION：退回读已安装脚本里的 PROXY_VERSION。
+        try:
+            with open(os.path.join(prefix, "retry_proxy.py"), encoding="utf-8") as fh:
+                m = re.search(r'PROXY_VERSION\s*=\s*"([^"]+)"', fh.read())
+                disk_version = m.group(1) if m else ""
+        except Exception:
+            pass
+    if live_version and disk_version and live_version != disk_version:
+        add("WARN", "代理版本",
+            "运行中的是 %s，安装目录是 %s；请运行 restart_proxy_idle.py 重启"
+            % (live_version, disk_version))
+    elif live_version:
+        add("PASS", "代理版本", "%s（与安装目录一致）" % live_version)
 
     # 6) 正在跑的代理是不是当前脚本（改完代码没重启是很常见的坑）
     log = os.path.join(prefix, "proxy.log")

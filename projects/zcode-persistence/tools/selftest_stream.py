@@ -3,7 +3,7 @@
 
 不碰真实中转：假上游在本机回环上按脚本吐字节，代理用临时副本 + 临时端口。
 
-验证二十三件事（对应 2026-10-31 三轮复审与终验、2026-11-01 自动暂停修复）：
+验证三十二件事（对应 2026-10-31 三轮复审与终验、2026-11-01 自动暂停修复）：
   1. 逐条透传：上游每 0.2 秒发一条 80 字节事件，客户端应当在每条到达后
      几十毫秒内收到，而不是攒到 8KB 或流结束才一起到
   2. 流中静默：响应头之后上游停 2.5 秒、空闲超时设 1 秒时，代理应当发
@@ -30,7 +30,8 @@
  15. 字面 `finish_reason=other` 同样透明续写（场景 14 覆盖的是"缺失"形态）
  16. 上游不发 finish_reason、直接发 `{"error":...}`（stream_truncated），且无正文/
      工具调用：代理吞掉错误事件并内部重发
- 17. 已经有正文后上游才发 error：不能重试（会重复正文），原样转发
+ 17. 已经有正文后上游才发 error：不能内部重发（会重复正文），也不能原样转发
+     （客户端会当 retryable=false 直接失败）；必须 RST 客户端让它自行续写（V0.2.7）
  18. 工具调用参数发到一半流就结束（线上 tool_args_invalid 形态，V0.2.5）：
      工具增量先缓冲不写出，EOF 时整体丢弃并内部重发，客户端只收到完整的工具调用
  19. 完整工具调用 + `finish_reason=tool_calls`：缓冲在收尾时写出，原样透传不重试
@@ -40,6 +41,19 @@
  22. 通用 `/p/<base64url(原始 baseUrl)>` 路由：base 带路径、请求带 query 时
      路径拼成 `/relay/v1/...?...`，Host 带非默认端口（V0.2.6）
  23. `/p` 坏 token（空、非 base64、非 http(s)、非法端口）必须回 400
+ 24. 正文已写出后工具参数中途 EOF：代理 RST 客户端连接（不是发 SSE 错误——客户端把
+     业务错误当 retryable=false，只有传输层 CONNRESET 才会丢弃残缺输出续写），
+     且一个字节的残缺参数都不写出（V0.2.7）
+ 25. 同上但上游给了 finish_reason=tool_calls：参数不是合法 JSON 也不能放行，
+     客户端同样必须看到连接被重置（V0.2.7）
+ 26. 正文已写出、工具参数发到一半，上游直接 RST：读错误分支也必须 RST 客户端
+     （只发 FIN 客户端会当普通截断，retryable=false，V0.2.7）
+ 27. 多 index 工具调用：缓冲按到达顺序写出，不能按 index 排序重排（V0.2.7）
+ 28. 正文后没有工具调用、上游直接 RST：纯文本截断同样要 RST 客户端（V0.2.7）
+ 29. RST 之后代理进程不能空转：0.6 秒 CPU 增量必须 <0.3 秒（V0.2.7）
+ 30. `NaN`/`Infinity` 参数不是合法 JSON：必须判残缺并 RST（V0.2.7）
+ 31. legacy `function_call`（无 index）完整时能校验并原样透传（V0.2.7）
+ 32. `arguments` 为空字符串：客户端 `JSON.parse("")` 必失败，代理也判残缺（V0.2.7）
 
 用法：python tools/selftest_stream.py            （默认读同包 src/retry_proxy.py）
       python tools/selftest_stream.py --src X
@@ -219,11 +233,13 @@ class FakeUpstream(object):
 
 
 def call_stream(proxy_port, read_seconds, idle=0.15, start_delay=0.0, prefix="ap",
-                query=""):
+                query="", meta=None):
     """发一个流式请求，返回 (每条数据到达的时刻, 原始字节)。
 
     start_delay > 0 时先不读（模拟慢客户端/卡住的界面），用来验证背压不丢数据。
     query 非空时拼在请求路径后面，用来验证 baseUrl 查询串是否保留。
+    meta 非空时记录传输层事实：reset=True 表示 recv 收到 WSAECONNRESET，
+    这是“代理真的发了 RST”的唯一证据（只缺终止块可能是挂住或 FIN）。
     """
     body = (b'{"model":"t","stream":true,"messages":'
             b'[{"role":"user","content":"hi"}]}')
@@ -245,6 +261,12 @@ def call_stream(proxy_port, read_seconds, idle=0.15, start_delay=0.0, prefix="ap
             d = s.recv(65536)
         except socket.timeout:
             continue
+        except ConnectionError:
+            # V0.2.7：代理在"正文已写出 + 工具参数残缺"时会 RST 客户端，
+            # 这里按真实客户端的行为收下已读字节后结束。
+            if meta is not None:
+                meta["reset"] = True
+            break
         if not d:
             break
         raw += d
@@ -275,11 +297,46 @@ def call_raw(proxy_port, path):
     return data
 
 
+def proc_cpu_seconds(pid):
+    """取进程累计 CPU 秒数（Windows）。用于验证 RST 后没有空转线程。"""
+    import ctypes
+    from ctypes import wintypes
+    k32 = ctypes.windll.kernel32
+    # 64 位下 HANDLE 是指针宽度，不设 restype 会被截断成 c_int。
+    k32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+    k32.OpenProcess.restype = wintypes.HANDLE
+    k32.GetProcessTimes.argtypes = (
+        [wintypes.HANDLE] + [ctypes.POINTER(wintypes.FILETIME)] * 4)
+    k32.GetProcessTimes.restype = wintypes.BOOL
+    k32.CloseHandle.argtypes = [wintypes.HANDLE]
+    k32.CloseHandle.restype = wintypes.BOOL
+    handle = k32.OpenProcess(0x1000, False, pid)  # QUERY_LIMITED_INFORMATION
+    if not handle:
+        return None
+    try:
+        creation = wintypes.FILETIME()
+        exited = wintypes.FILETIME()
+        kernel = wintypes.FILETIME()
+        user = wintypes.FILETIME()
+        ok = k32.GetProcessTimes(handle, ctypes.byref(creation),
+                                 ctypes.byref(exited), ctypes.byref(kernel),
+                                 ctypes.byref(user))
+        if not ok:
+            return None
+
+        def ticks(ft):
+            return (ft.dwHighDateTime << 32) | ft.dwLowDateTime
+
+        return (ticks(kernel) + ticks(user)) / 1e7
+    finally:
+        k32.CloseHandle(handle)
+
+
 def run_case(name, src, script, content_length=None, chunked=True,
              env_extra=None, read_seconds=4.0, heartbeat_start="100",
              hold_after=0, start_delay=0.0, no_response=False, scripts=None,
              rst_after=0, prefix="ap", generic=False, generic_path="",
-             echo=False, query=""):
+             echo=False, query="", meta=None, cpu_probe=False):
     "跑一个用例：起假上游 → 起代理副本 → 发流式请求 → 收日志与字节。"
     workdir = tempfile.mkdtemp(prefix="streamtest-")
     proxy_port = free_pair()
@@ -316,7 +373,13 @@ def run_case(name, src, script, content_length=None, chunked=True,
                         time.sleep(0.05)
                 chunks, tail = call_stream(proxy_port, read_seconds,
                                            start_delay=start_delay, prefix=prefix,
-                                           query=query)
+                                           query=query, meta=meta)
+                if cpu_probe and meta is not None:
+                    c0 = proc_cpu_seconds(proc.pid)
+                    time.sleep(0.6)
+                    c1 = proc_cpu_seconds(proc.pid)
+                    if c0 is not None and c1 is not None:
+                        meta["cpu_delta"] = c1 - c0
             finally:
                 proc.terminate()
                 try:
@@ -329,7 +392,8 @@ def run_case(name, src, script, content_length=None, chunked=True,
         for t, ev in chunks[:6]:
             print("   %.2fs  %r" % (t, ev[:60]))
         for line in logtext.splitlines():
-            if any(k in line for k in ("ok ", "truncated", "keepalive", "stream broken")):
+            if any(k in line for k in ("ok ", "truncated", "keepalive",
+                                       "stream broken", "reset client")):
                 print("   log| " + line.strip())
         return chunks, logtext, tail
     finally:
@@ -337,7 +401,7 @@ def run_case(name, src, script, content_length=None, chunked=True,
 
 
 def main():
-    "依次跑 23 个场景并汇总；全部通过退出码 0。"
+    "依次跑 32 个场景并汇总；全部通过退出码 0。"
     ap = argparse.ArgumentParser()
     ap.add_argument("--src", default=os.path.join(
         os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -620,23 +684,29 @@ def main():
     print("   判定:", "PASS" if pass16 else "FAIL")
     ok = ok and pass16
 
-    # 17) 已经有正文后上游才发 error：不能重试（会重复正文），必须原样转发。
+    # 17) 已经有正文后上游才发 error（线上 2026-11-03 网关 upstream_error）：
+    #     不能内部重发（会重复正文），也不能原样转发（客户端判 retryable=false
+    #     直接失败）；必须 RST 客户端，让它丢弃部分输出并带锚点续写。
     text_err = [
         (b'data: {"choices":[{"delta":{"content":"partial answer"}}]}\n\n', 0.05),
         (b'data: {"error":{"message":"upstream broke","type":"upstream_error",'
          b'"code":"stream_truncated"}}\n\n', 0.05),
         (b"data: [DONE]\n\n", 0.0),
     ]
-    chunks, logtext, tail = run_case("有正文后 error 原样转发", args.src, text_err,
-                                     read_seconds=4.0)
+    meta17 = {}
+    chunks, logtext, tail = run_case("有正文后 error 改为 RST", args.src, text_err,
+                                     read_seconds=4.0, meta=meta17)
     data = b"\n\n".join(c for _t, c in chunks) + tail
     text = data.decode("utf-8", "replace")
-    pass17 = (b"partial answer" in data and b"stream_truncated" in data
-              and b"0\r\n\r\n" in tail and "ok " in logtext
+    pass17 = (b"partial answer" in data and b"stream_truncated" not in data
+              and "reset client for recovery (upstream error after content: stream_truncated)" in logtext
+              and meta17.get("reset") is True
+              and b"0\r\n\r\n" not in tail
               and "retry after early finish" not in logtext
               and "stream broken" not in logtext)
-    print("   收到正文=%s 收到error=%s 未重发=%s"
-          % (b"partial answer" in data, b"stream_truncated" in data,
+    print("   收到正文=%s 未泄漏error=%s 已RST=%s 未重发=%s"
+          % (b"partial answer" in data, b"stream_truncated" not in data,
+             meta17.get("reset") is True,
              "retry after early finish" not in logtext))
     print("   判定:", "PASS" if pass17 else "FAIL")
     ok = ok and pass17
@@ -755,6 +825,220 @@ def main():
           % (want_path in text, "Host=127.0.0.1:" in text, "ok " in logtext))
     print("   判定:", "PASS" if pass22 else "FAIL")
     ok = ok and pass22
+
+    # 24) 正文已写出后，上游在工具参数中途 EOF（线上 tool_args_invalid 的
+    #     残形）。内部重发会重复正文，代理必须改为 RST 客户端连接，让客户端
+    #     丢弃残缺输出并带锚点续写；残缺工具参数一个字节都不能泄漏。
+    def sse(obj):
+        return ("data: " + json.dumps(obj, ensure_ascii=False) + "\n\n").encode("utf-8")
+
+    partial_tool = sse({"choices": [{"delta": {"tool_calls": [{
+        "index": 0, "id": "call_1", "type": "function",
+        "function": {"name": "Bash", "arguments": "{\"command\":\"echo"}}]}}]})
+    first_text = sse({"choices": [{"delta": {"content": "partial answer"}}]})
+    finish_tool = sse({"choices": [{"delta": {}, "finish_reason": "tool_calls"}]})
+
+    meta24 = {}
+    chunks, logtext, tail = run_case(
+        "正文后工具参数残缺(EOF)", args.src,
+        [(first_text, 0.05), (partial_tool, 0.05)], read_seconds=4.0,
+        meta=meta24)
+    data = b"\n\n".join(c for _t, c in chunks) + tail
+    text = data.decode("utf-8", "replace")
+    pass24 = (b"partial answer" in data
+              and "model_server_error" not in text
+              and "tool_calls" not in text
+              and "reset client for recovery" in logtext
+              and meta24.get("reset") is True
+              and b"0\r\n\r\n" not in tail)
+    print("   正文保留=%s 未泄漏工具参数=%s 已RST=%s 未正常终止=%s"
+          % (b"partial answer" in data, "tool_calls" not in text,
+             meta24.get("reset") is True, b"0\r\n\r\n" not in tail))
+    print("   判定:", "PASS" if pass24 else "FAIL")
+    ok = ok and pass24
+
+    # 25) 上游给了 finish_reason=tool_calls，但参数仍是残缺 JSON：不能因为
+    #     “有结束原因”就当完整调用放行。
+    meta25 = {}
+    chunks, logtext, tail = run_case(
+        "正文后工具参数残缺(finish)", args.src,
+        [(first_text, 0.05), (partial_tool, 0.05), (finish_tool, 0.05),
+         (b"data: [DONE]\n\n", 0.0)], read_seconds=4.0, meta=meta25)
+    data = b"\n\n".join(c for _t, c in chunks) + tail
+    text = data.decode("utf-8", "replace")
+    pass25 = (b"partial answer" in data
+              and "model_server_error" not in text
+              and "tool_calls" not in text
+              and "reset client for recovery" in logtext
+              and meta25.get("reset") is True
+              and b"0\r\n\r\n" not in tail)
+    print("   正文保留=%s 未泄漏工具参数=%s 已RST=%s 未正常终止=%s"
+          % (b"partial answer" in data, "tool_calls" not in text,
+             meta25.get("reset") is True, b"0\r\n\r\n" not in tail))
+    print("   判定:", "PASS" if pass25 else "FAIL")
+    ok = ok and pass25
+
+    # 26) 正文已写出、工具参数发到一半，上游直接 RST（不是正常 EOF）：
+    #     读错误分支同样必须 RST 客户端，不能只发 FIN 让客户端按普通截断收尾。
+    meta26 = {}
+    chunks, logtext, tail = run_case(
+        "正文后工具参数残缺(上游RST)", args.src,
+        [(first_text, 0.05), (partial_tool, 0.05)], read_seconds=4.0,
+        rst_after=1, meta=meta26)
+    data = b"\n\n".join(c for _t, c in chunks) + tail
+    text = data.decode("utf-8", "replace")
+    pass26 = (b"partial answer" in data
+              and "tool_calls" not in text
+              and "reset client for recovery (stream error after content)" in logtext
+              and meta26.get("reset") is True
+              and b"0\r\n\r\n" not in tail)
+    print("   正文保留=%s 未泄漏工具参数=%s 读错误后RST=%s 未正常终止=%s"
+          % (b"partial answer" in data, "tool_calls" not in text,
+             meta26.get("reset") is True, b"0\r\n\r\n" not in tail))
+    print("   判定:", "PASS" if pass26 else "FAIL")
+    ok = ok and pass26
+
+    # 27) 多 index 工具调用：缓冲必须按到达顺序写出，不能按 index 排序重排。
+    #     事件 A（index 1 先到）→ 事件 B（index 0/1 混合）。按 index 分组排序会
+    #     把 B 提前，客户端按 index 拼 index1 得到 `1}{"a":`，合法 JSON 反而更危险。
+    tool_idx1_a = sse({"choices": [{"delta": {"tool_calls": [{
+        "index": 1, "id": "call_1", "type": "function",
+        "function": {"name": "Bash", "arguments": "{\"a\":"}}]}}]})
+    tool_mixed = sse({"choices": [{"delta": {"tool_calls": [
+        {"index": 0, "id": "call_0", "type": "function",
+         "function": {"name": "Read", "arguments": "{}"}},
+        {"index": 1, "id": "call_1", "type": "function",
+         "function": {"arguments": "1}"}}]}}]})
+    chunks, logtext, tail = run_case(
+        "多 index 工具调用保持到达顺序", args.src,
+        [(tool_idx1_a, 0.05), (tool_mixed, 0.05), (finish_tool, 0.05),
+         (b"data: [DONE]\n\n", 0.0)], read_seconds=4.0)
+    data = b"\n\n".join(c for _t, c in chunks) + tail
+    pos_a = data.find(b'"index": 1, "id": "call_1"')
+    pos_b = data.find(b'"index": 0')
+    # 按客户端的规则（收到顺序、按 index 拼 arguments）复算一遍，确认不是
+    # “顺序对了但拼出来仍非法”。只比字符串位置不够。
+    acc = {}
+    for line in data.split(b"\n"):
+        if not line.startswith(b"data:"):
+            continue
+        try:
+            obj = json.loads(line[5:].strip())
+        except Exception:
+            continue
+        for choice in obj.get("choices") or []:
+            for item in ((choice.get("delta") or {}).get("tool_calls") or []):
+                idx = item.get("index")
+                arg = ((item.get("function") or {}).get("arguments") or "")
+                if isinstance(idx, int) and isinstance(arg, str):
+                    acc[idx] = acc.get(idx, "") + arg
+    joined = {}
+    for idx, text in acc.items():
+        try:
+            joined[idx] = json.loads(text)
+        except Exception:
+            joined[idx] = None
+    pass27 = (pos_a != -1 and pos_b != -1 and pos_a < pos_b
+              and joined.get(0) == {} and joined.get(1) == {"a": 1}
+              and "ok " in logtext
+              and "reset client for recovery" not in logtext
+              and b"0\r\n\r\n" in tail)
+    print("   先到先写=%s 参数可解析=%s 正常收尾=%s 未误RST=%s"
+          % (pos_a != -1 and pos_b != -1 and pos_a < pos_b,
+             joined.get(0) == {} and joined.get(1) == {"a": 1},
+             b"0\r\n\r\n" in tail, "reset client for recovery" not in logtext))
+    print("   判定:", "PASS" if pass27 else "FAIL")
+    ok = ok and pass27
+
+    # 28) 正文之后没有工具调用，上游直接 RST：纯文本截断也必须 RST 客户端，
+    #     不能只发 FIN（客户端会把 FIN 当普通截断，retryable=false）。
+    meta28 = {}
+    chunks, logtext, tail = run_case(
+        "正文后纯文本读错误", args.src,
+        [(first_text, 0.05)], read_seconds=4.0, rst_after=1, meta=meta28)
+    data = b"\n\n".join(c for _t, c in chunks) + tail
+    pass28 = (b"partial answer" in data
+              and "reset client for recovery (stream error after content)" in logtext
+              and meta28.get("reset") is True
+              and b"0\r\n\r\n" not in tail)
+    print("   正文保留=%s 已RST=%s 未正常终止=%s"
+          % (b"partial answer" in data, meta28.get("reset") is True,
+             b"0\r\n\r\n" not in tail))
+    print("   判定:", "PASS" if pass28 else "FAIL")
+    ok = ok and pass28
+
+    # 29) RST 之后代理进程不能空转：只关 socket 不置 close_connection 时，
+    #     handle() 会反复对已关闭的 rfile readline，0.6 秒里 CPU 增长约 0.6 秒。
+    meta29 = {}
+    chunks, logtext, tail = run_case(
+        "RST 后进程不空转", args.src,
+        [(first_text, 0.05), (partial_tool, 0.05)], read_seconds=4.0,
+        meta=meta29, cpu_probe=True)
+    cpu = meta29.get("cpu_delta")
+    pass29 = (meta29.get("reset") is True and cpu is not None and cpu < 0.3)
+    print("   已RST=%s 0.6秒CPU增量=%s（阈值<0.3s）"
+          % (meta29.get("reset") is True,
+             "%.3f" % cpu if cpu is not None else "None"))
+    print("   判定:", "PASS" if pass29 else "FAIL")
+    ok = ok and pass29
+
+    # 30) NaN/Infinity 不是合法 JSON：Python 默认接受，客户端 JSON.parse 不接受。
+    #     代理必须按客户端标准判残缺并 RST，不能放行。
+    nan_tool = sse({"choices": [{"delta": {"tool_calls": [{
+        "index": 0, "id": "call_1", "type": "function",
+        "function": {"name": "Bash", "arguments": "{\"n\":NaN}"}}]}}]})
+    meta30 = {}
+    chunks, logtext, tail = run_case(
+        "NaN 参数不算合法 JSON", args.src,
+        [(first_text, 0.05), (nan_tool, 0.05), (finish_tool, 0.05),
+         (b"data: [DONE]\n\n", 0.0)], read_seconds=4.0, meta=meta30)
+    data = b"\n\n".join(c for _t, c in chunks) + tail
+    pass30 = (b"partial answer" in data and b"NaN" not in data
+              and "reset client for recovery" in logtext
+              and meta30.get("reset") is True
+              and b"0\r\n\r\n" not in tail)
+    print("   未泄漏NaN=%s 已RST=%s" % (b"NaN" not in data,
+                                      meta30.get("reset") is True))
+    print("   判定:", "PASS" if pass30 else "FAIL")
+    ok = ok and pass30
+
+    # 31) legacy function_call（没有 tool_calls/index）也必须能校验并通过。
+    legacy_call = sse({"choices": [{"delta": {"function_call": {
+        "name": "Bash", "arguments": "{\"command\":\"echo ok\"}"}}}]})
+    legacy_finish = sse({"choices": [{"delta": {},
+                                      "finish_reason": "function_call"}]})
+    chunks, logtext, tail = run_case(
+        "legacy function_call 透传", args.src,
+        [(first_text, 0.05), (legacy_call, 0.05), (legacy_finish, 0.05),
+         (b"data: [DONE]\n\n", 0.0)], read_seconds=4.0)
+    data = b"\n\n".join(c for _t, c in chunks) + tail
+    pass31 = (b"function_call" in data and b"echo ok" in data
+              and "ok " in logtext
+              and "reset client for recovery" not in logtext
+              and b"0\r\n\r\n" in tail)
+    print("   function_call透传=%s 正常收尾=%s"
+          % (b"function_call" in data, b"0\r\n\r\n" in tail))
+    print("   判定:", "PASS" if pass31 else "FAIL")
+    ok = ok and pass31
+
+    # 32) arguments 为空字符串：客户端 JSON.parse("") 必失败，代理也必须判残缺。
+    empty_tool = sse({"choices": [{"delta": {"tool_calls": [{
+        "index": 0, "id": "call_1", "type": "function",
+        "function": {"name": "Bash", "arguments": ""}}]}}]})
+    meta32 = {}
+    chunks, logtext, tail = run_case(
+        "空 arguments 判残缺", args.src,
+        [(first_text, 0.05), (empty_tool, 0.05), (finish_tool, 0.05),
+         (b"data: [DONE]\n\n", 0.0)], read_seconds=4.0, meta=meta32)
+    data = b"\n\n".join(c for _t, c in chunks) + tail
+    pass32 = (b"partial answer" in data and b"tool_calls" not in data
+              and "reset client for recovery" in logtext
+              and meta32.get("reset") is True
+              and b"0\r\n\r\n" not in tail)
+    print("   未泄漏空调用=%s 已RST=%s" % (b"tool_calls" not in data,
+                                         meta32.get("reset") is True))
+    print("   判定:", "PASS" if pass32 else "FAIL")
+    ok = ok and pass32
 
     # 23) /p 坏 token 必须回 400（空 token / 非 base64 / 非 http(s) / 非法端口），
     #     不能落到 8787 上无限重试，也不能 500。
