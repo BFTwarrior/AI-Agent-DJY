@@ -114,7 +114,7 @@ cannot merge two JSON payloads into one SSE event.
   sidecar, restore, old proxy / missing root / mismatched root do not migrate,
   `08787` is treated as 8787, uninstall restores via sidecar).
 - Also passing: hook 11, 429 5, watch 12, ensure serialization.
-- `VERSION`, `tools/install.py`, `src/error_watch.py` bumped to 0.2.6.
+- `VERSION`, `tools/install.py`, `src/retry_proxy.py` (`PROXY_VERSION`), `src/error_watch.py` bumped to 0.2.6.
 
 ## V0.2.5 — 2026-11-02
 
@@ -243,7 +243,7 @@ client's auto-continuation.
 
 **Verification**: `selftest_stream.py` has 15 scenarios (eight new, 8–15: missing
 `finish_reason` with `[DONE]`, missing `finish_reason` at EOF, content + missing reason,
-and transparent continuations for both the missing-reason and literal-`other` forms); `selftest_hook.py` has 11 cases plus the third-attempt wording;
+and transparent continuations for both the missing-reason and literal-`other` forms); `selftest_hook.py` has 10 cases plus the third-attempt wording (11 checks total);
 `selftest_proxy_429.py` and `selftest_watch.py` still pass. The new
 `selftest_ensure.py` proves two processes serialize on the mutex (2.45 s). Local install
 runs a single proxy. Live traffic also confirmed it twice: the `early finish` events at
@@ -261,7 +261,7 @@ and 01:01:28 with `attempt=1` (`finishReason=tool-calls`), with no `turn.failed`
 **Fix**:
 - `failure_of()` now treats `exitCode == 1`, not timed out, not cancelled, and empty stdout/stderr as **not a failure**. Any other exit code, any output, a timeout, or cancellation still counts as a failure.
 - The third-attempt wording in both branches now says "report the result and continue with the other steps of the current task ... do not stop the whole task".
-- New `tools/selftest_hook.py`: 11 boundary cases plus the third-attempt wording check, covering exit 1 with no output / stderr / stdout, exit 2, exit 0, timeout, cancellation, `status="failed"` with exit 1, `status="failed"` with exit 0, and upstream-no-output.
+- New `tools/selftest_hook.py`: 10 boundary cases plus the third-attempt wording check (11 checks total), covering exit 1 with no output / stderr / stdout, exit 2, exit 0, timeout, cancellation, `status="failed"` with exit 1, `status="failed"` with exit 0, and upstream-no-output.
 
 **Verification**: the 10 hook cases pass; `selftest_proxy_429`, `selftest_stream` and `selftest_watch` still pass; a live `grep -q` with no match produces no hook advice, while `ls` on a missing directory (exit 2) still does.
 

@@ -3,11 +3,11 @@
 This record documents the hook's v0.4.0 decision semantics (any Bash failure is advised to retry; the single exception is exit 1 with completely empty output) and the later proxy streaming fixes. After a change, re-run the relevant suites and only release once everything passes.
 The old expectations of v0.3.x (filtering out by error type, no retry on `permission denied`) are void; do not change the code back according to the old tables.
 
-> **Reading order**: Sections 1 through 14 are historical batches kept as-is for traceability
-> (fixed-count retries, the v1.1.0 heartbeat parameters, the v0.4.0 build line, and the 2026-10-31 fixes).
-> **Section 15 (V0.2.7) is the current result.** The current defaults are a 300-second retry window,
-> one attempt every 20 seconds, a 30-second silence timeout and 80-second heartbeats; the
-> "180-second window" and "503 after 3 retries" wording in old batches is historical only.
+> **Reading order**: Sections 1 through 16 are historical batches kept as-is for traceability
+> (fixed-count retries, the v1.1.0 heartbeat parameters, the v0.4.0 build line, the 2026-10-31 fixes,
+> and the V0.2.1–V0.2.6 changes). **Section 17 (V0.2.7) is the current result.** The current defaults
+> are a 300-second retry window, one attempt every 20 seconds, a 30-second silence timeout and
+> 80-second heartbeats; the "180-second window" and "503 after 3 retries" wording in old batches is historical only.
 
 ## 1. Hook (retry_hook.py)
 
@@ -228,7 +228,7 @@ from 22:57 to 22:59 the watcher sent 8 mails in a row for the same session (dedu
 | 6 | The kill fails and the port is still occupied | `abort`, `spawn` called 0 times | ✅ |
 | 7 | The health re-check fails after spawning and the leftovers cannot be cleaned up | Logs a `cleanup:` failure, `abort`s, and does not continue spawning | ✅ |
 | 8 | Health re-check fails + `netstat_rows()` returns `None` during cleanup | `abort`s directly, no further `spawn` (`port_free()` also treats the port as occupied at this point) | ✅ |
-## 2026-11-01 auto-pause fix batch
+## 15. 2026-11-01 auto-pause fix batch
 
 ### Hook false positive (V0.2.1)
 
@@ -272,7 +272,7 @@ Together with the original 1–7 cases, the twelve new scenarios (8–19) make 1
 `selftest_hook.py`, `selftest_proxy_429.py`, `selftest_watch.py` and `selftest_ensure.py`
 also pass.
 
-## V0.2.6 — generic routing, read-error retry, 23 scenarios
+## 16. V0.2.6 — generic routing, read-error retry, 23 scenarios
 
 | # | Case | Expected | Result |
 |---|---|---|---|
@@ -292,7 +292,7 @@ migrate; uninstall restores `/p` from the sidecar (dry-run writes nothing).
 Also passing: `selftest_hook.py` (11), `selftest_proxy_429.py` (5),
 `selftest_watch.py` (12), `selftest_ensure.py` (serialization).
 
-## V0.2.7 — reset after content, 32 scenarios
+## 17. V0.2.7 — reset after content, 32 scenarios
 
 Two production failures share one recovery path:
 

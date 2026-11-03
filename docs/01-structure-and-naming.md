@@ -23,7 +23,7 @@ AI-Agent-DJY/
 │     ├─ SKILL.md
 │     ├─ LICENSE
 │     ├─ UPSTREAM.md
-│     └─ references/
+│     └─ references/     (optional)
 ├─ mcps/
 │  ├─ README.md
 │  └─ <server-name>/
@@ -34,6 +34,9 @@ AI-Agent-DJY/
 │  ├─ README.md
 │  └─ <project-name>/
 │     ├─ README.md
+│     ├─ AGENTS.md
+│     ├─ CHANGELOG.md
+│     ├─ VERSION
 │     ├─ src/
 │     ├─ tools/
 │     ├─ docs/

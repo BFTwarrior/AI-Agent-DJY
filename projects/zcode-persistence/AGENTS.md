@@ -59,8 +59,8 @@ Changing these defaults amounts to changing the product spec; you **must** updat
 
 1. Run the accelerated test in section 4 of `docs/06-ai-maintenance-guide.md` (all four assertions must pass).
 2. Run `python -I tools/selftest_hook.py`, `tools/selftest_proxy_429.py`, `tools/selftest_stream.py`, `tools/selftest_watch.py`, `tools/selftest_route.py`
-   (11 hook cases + 5 retry scenarios + 32 streaming scenarios + 12 error-reporting assertions + 13 migration checks must all pass; run `tools/selftest_ensure.py` after changing `ensure_proxy.py`). If you changed `pipe_response` you must run the streaming suite;
-   if you changed `error_watch.py` you must run the third suite.
+   (11 hook checks (10 cases + third-attempt wording) + 5 retry scenarios + 32 streaming scenarios + 12 error-reporting assertions + 13 migration checks must all pass; run `tools/selftest_ensure.py` after changing `ensure_proxy.py`). If you changed `pipe_response` you must run the streaming suite;
+   if you changed `error_watch.py` you must run the fourth suite.
 3. Bump `VERSION`, `tools/install.py`, `src/retry_proxy.py` (`PROXY_VERSION`) and `src/error_watch.py` (`clientInfo.version`); all four must agree.
 4. Record "what changed + why" in `CHANGELOG.md`.
 5. Repackage, **excluding** `__pycache__`, `*.pyc`, `*.log`.
@@ -75,7 +75,7 @@ the project `README.md` records the current build line.
 **Five-minute orientation**
 
 1. Read the "What it is / Limitations" sections of `README.md`.
-2. Read section 2 (code map) and section 3 (invariants) of this file (`docs/06-ai-maintenance-guide.md`).
+2. Read section 2 (code map) and section 3 (invariants) of `docs/06-ai-maintenance-guide.md`.
 3. Run a health check once: `python <install directory>/doctor.py`; it must show 0 failed (16 items on the reference machine; the count depends on how many providers are configured).
 4. Run a self-test once: `python tools/selftest_proxy_429.py`; all 5 scenarios should PASS.
 

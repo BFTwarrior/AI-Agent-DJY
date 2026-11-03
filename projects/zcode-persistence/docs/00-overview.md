@@ -100,7 +100,7 @@ projects/zcode-persistence/
 │  ├─ install.py            Install (idempotent, automatic backup)
 │  ├─ uninstall.py          Uninstall (exact restore)
 │  ├─ doctor.py             Health check
-│  ├─ selftest_hook.py      Self-test: 11 hook decision cases (exit 1 with no output is not a failure)
+│  ├─ selftest_hook.py      Self-test: 11 hook checks (10 decision cases + third-attempt wording; exit 1 with no output is not a failure)
 │  ├─ selftest_proxy_429.py Self-test: five retry-semantics scenarios (including 400 not retryable)
 │  ├─ selftest_stream.py    Self-test: 32 streaming scenarios (including RST recovery, multi-index order, CPU, NaN)
 │  ├─ selftest_watch.py     Self-test: 12 error-reporting assertions (cooldown/rate limit/send failure/cause attribution/--once does not persist)
@@ -232,7 +232,7 @@ After that another heartbeat is added **every 80 seconds** without input, **with
 python tools/doctor.py
 ```
 
-It checks each item in turn: whether the scripts are all present, whether the interpreter exists, whether the hooks are registered, where the provider points, whether the proxy port is listening, and it prints the last 5 lines of `proxy.log`.
+It checks each item in turn: whether the scripts are all present, whether the interpreter exists, whether the hooks are registered, where the provider points, whether the proxy port is listening, whether the running proxy version matches the installed `VERSION`, the proxy runtime parameters, the error-watch status, and it prints the last 5 lines of `proxy.log`.
 
 **Three typical failures**
 

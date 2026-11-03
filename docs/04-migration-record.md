@@ -8,7 +8,7 @@ versions and runtime data stay on the local machine or go to Releases.
 
 ### Skills (3)
 
-| Skill | SKILL.md sha256 | Upstream blob | Source |
+| Skill | SKILL.md sha256 (at import) | Upstream blob | Source |
 |---|---|---|---|
 | code-review-and-quality | `2db1e850379f255fd3091ef278cde24cd6c7d2ba23e360cc52ea522c40d4396e` | `08209ff2208d2883d48d945f7754c428b77f8d87` | addyosmani/agent-skills, MIT |
 | code-simplification | `f0c5ed754057eb0c1e027e2587f59de816651feb5e837242296c43ea21cf621d` | `c4f794aa3fc63ea041989b30be7a3887c79c53ed` | addyosmani/agent-skills, MIT |
@@ -17,6 +17,10 @@ versions and runtime data stay on the local machine or go to Releases.
 The imported files are **installed snapshots**, not upstream HEAD. The upstream blob is
 recorded for traceability only; the two may differ. Each directory has a `LICENSE`
 (MIT, Copyright (c) 2025 Addy Osmani) and an `UPSTREAM.md`.
+
+The current `code-review-and-quality/SKILL.md` hash differs from the import value because
+its two See Also links were repaired in V0.2.7; that directory's `UPSTREAM.md` records the
+current hash and the imported reference files.
 
 ### MCP (2 templates)
 
@@ -34,9 +38,13 @@ not copied into the repository.
 |---|---|---|
 | `src/` | 4 | `retry_hook`, `retry_proxy`, `ensure_proxy`, `error_watch` |
 | `tools/` | 8 | install, uninstall, doctor, 4 self-tests, proxy restart |
-| `docs/` | 8 | 00–07, current documentation (English) |
+| `docs/` | 8 | 00–07 (Chinese at import; translated to English afterwards) |
 | `diagrams/` | 1 | `architecture.md` |
 | Root | 4 | `README.md`, `CHANGELOG.md`, `VERSION`, `AGENTS.md` |
+
+This table is the V0.2.1 import snapshot. The current tree has 28 files: `src/` 5 (adds
+`route_providers.py`), `tools/` 10 (adds `selftest_route.py` and `selftest_ensure.py`),
+`docs/` 8 (English), `diagrams/` 1, root 4.
 
 25 files. The byte counts below are the 2026-11-01 import snapshot: 346,164 bytes in the
 original CRLF working copy, 330,150 bytes in git blobs after LF normalization (333,781 bytes

@@ -49,8 +49,8 @@ Shared principles:
 ## Relationship to the local workspace
 
 ```text
-<local workspace>\
-├─ AI-Agent-DJY\                Project folder (contains docs/diagrams/history)
+<workspace>\
+├─ 归档\AI-Agent-DJY\           Project folder (contains docs/diagrams/history)
 │  ├─ <local docs>\ <local diagrams>\ <local history>\   Planning docs and local history
 │  └─ repo\                    ★ Repository workspace (the only git root)
 │     ├─ skills/ mcps/ projects/ shared/ docs/
@@ -59,9 +59,10 @@ Shared principles:
    └─ <local history>\         Local history originals, kept
 ```
 
-**The repository root is `AI-Agent-DJY\repo`.** Do not initialize git in the
-`AI-Agent-DJY` parent folder, or planning documents and local history would be committed
-along with the repository.
+**The repository root is `AI-Agent-DJY\repo`.** On this machine `<workspace>` is
+`<workspace>`, so the repository is `<workspace>\归档\AI-Agent-DJY\repo`. Do not
+initialize git in the `AI-Agent-DJY` parent folder, or planning documents and local history
+would be committed along with the repository.
 
 ## Data flow
 

@@ -6,7 +6,7 @@
 python tools/doctor.py
 ```
 
-Checks: scripts all present, interpreter exists, `hooks.enabled`, the three hook entries (`PostToolUse` primary + `PostToolUseFailure` fallback + `SessionStart`; the first two require `matcher == "Bash"`, all three require the script path to really exist), the provider target, the proxy port, **whether the running proxy parameters match the current script**, and the tail of the log. If there is a FAIL, act on the path it points at; ignore the rest.
+Checks: scripts all present, interpreter exists, `hooks.enabled`, the three hook entries (`PostToolUse` primary + `PostToolUseFailure` fallback + `SessionStart`; the first two require `matcher == "Bash"`, all three require the script path to really exist), the provider target, the proxy port, **the running proxy version against the installed `VERSION`**, **whether the running proxy parameters match the current script**, error-watch status, and the tail of the log. If there is a FAIL, act on the path it points at; ignore the rest.
 
 The "proxy runtime parameters" check exists specifically to catch the "changed the code but forgot to restart the proxy" trap: it compares the four values `retry <N>s window` / `every Ns` / `silence=Ns` / `heartbeat>=Ns` from the last startup line in `proxy.log` against the defaults in the script source, one by one, and issues a WARN if any single one differs.
 

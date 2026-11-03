@@ -13,7 +13,7 @@ The audience for this document is an AI or engineer with **absolutely no context
 | Where is the code | Five Python files in `src/` (hook / proxy / auto-start / route migration / error reporting), no third-party dependencies (certifi optional) |
 | Where it is installed | `C:\Program Files (x86)\AI\Zcode-Persistence\` |
 | Which system config is modified | `~/.zcode/cli/config.json` (hook), `~/.zcode/v2/provider_config.json` (the provider's baseUrl) |
-| How to confirm the state | `python <install directory>\doctor.py` (script, interpreter, hooks.enabled, the three hooks, provider, port, proxy runtime parameters, whether error watching is installed / on or off / PID-locked, log tail; the two tool hooks also validate matcher=Bash) |
+| How to confirm the state | `python <install directory>\doctor.py` (script, interpreter, hooks.enabled, the three hooks, provider, port, proxy version (running vs installed), proxy runtime parameters, whether error watching is installed / on or off / PID-locked, log tail; the two tool hooks also validate matcher=Bash) |
 | How to roll back | `python tools/uninstall.py`, or use the `.bak-*` backups in the same directory |
 
 The two main components are **independent of each other** (hook / proxy); you may install only one or both.
@@ -97,8 +97,8 @@ Error reporting: polls `session.last_outcome` in `~/.zcode/cli/db/db.sqlite`; wh
 - `install.py`: validate first (config exists, source files exist, provider exists, prefix can be determined) → then write to disk (copy scripts, write hooks, modify provider) → finally write `install-state.json`. A config parse failure exits before anything is written to disk.
 - `route_providers.py` (in `src/`): rewrite every provider's baseUrl to `/p/<base64url>`; idempotent, backs up first, records original URLs in a sidecar, `--restore`. SessionStart calls it only after the proxy reports the `p_route` feature and a matching `root`.
 - `uninstall.py`: delete hooks by exact basename; the provider is restored only when "current value == the recorded proxyBaseUrl"; `/p` migrations are restored from `provider_config.json.proxy-origins.json`, including before `--purge`; `--purge` verifies the process command line before killing, and only accepts prefix records whose directory really contains this tool's files.
-- `doctor.py`: script, interpreter, `hooks.enabled`, the three hooks (the two tool hooks validate matcher=Bash, all three validate the script path), provider, port, proxy runtime parameters, log tail. The log tail reads only the last 64KB; finding the "start line" walks back from the end of the file in 64KB blocks, up to 8MB.
-- `selftest_hook.py`: 11 hook decision cases (including exit 1 with no output, timeouts, cancelled calls and the third-attempt wording).
+- `doctor.py`: script, interpreter, `hooks.enabled`, the three hooks (the two tool hooks validate matcher=Bash, all three validate the script path), provider, port, proxy version (running vs installed), proxy runtime parameters, error-watch status, log tail. The log tail reads only the last 64KB; finding the "start line" walks back from the end of the file in 64KB blocks, up to 8MB.
+- `selftest_hook.py`: 11 hook checks (10 decision cases + third-attempt wording; including exit 1 with no output, timeouts and cancelled calls).
 - `selftest_proxy_429.py`: five retry-semantics scenarios (429 recovers / persistent 429 / 400 recovers / persistent 400 / unknown prefix 400 must be `retryable:false`).
 - `selftest_stream.py`: 32 streaming scenarios (including missing-finish-reason, upstream-error, partial-tool-call, RST-after-content, multi-index ordering, CPU after reset, `NaN` and legacy `function_call` cases).
 - `selftest_watch.py`: 12 assertions for error reporting (new red dot / dedupe / historical baseline / completed and stopped are not reported / rate limit / multiple sessions merged / wording when there are no relevant records / failure but not given up · new format / same · old format / cooldown and expiry / send failure retry / `--once` writes nothing to disk).
@@ -249,7 +249,7 @@ with zipfile.ZipFile("Zcode-Persistence-vX.Y.zip", "w", zipfile.ZIP_DEFLATED) as
                     os.path.relpath(os.path.join(dp, fn), root)))
 ```
 
-8. Hand it to an independent sub-agent for review (released only when both the overall and code scores are ≥4.5/5); if below standard, fix it and start over.
+8. Hand it to an independent sub-agent for review (released only when the overall score is ≥4.5/5 and the code score is ≥4.0/5); if below standard, fix it and start over.
 
 ---
 
@@ -264,7 +264,7 @@ the project `README.md` records the current build line.
 1. Read the "What it is / Limitations" sections of `README.md`.
 2. Read this file (`docs/06-ai-maintenance-guide.md`), section 2 code map and section 3 invariants.
 3. Run a health check once: `python <install directory>/doctor.py`; it must show 0 failed (16 items on the reference machine; the count depends on how many providers are configured).
-4. Run the self-tests: `tools/selftest_hook.py` (11 cases), `tools/selftest_proxy_429.py` (5 scenarios), `tools/selftest_stream.py` (32 scenarios), `tools/selftest_route.py` (13 checks),
+4. Run the self-tests: `tools/selftest_hook.py` (11 checks), `tools/selftest_proxy_429.py` (5 scenarios), `tools/selftest_stream.py` (32 scenarios), `tools/selftest_route.py` (13 checks),
    `tools/selftest_watch.py` (12 assertions), `tools/selftest_ensure.py` (serialization); all should PASS.
 
 **Three things you must know before changing code**

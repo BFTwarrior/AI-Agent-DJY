@@ -57,8 +57,8 @@ main loop (window started .. started+300s, one attempt every RETRY_INTERVAL=20s)
    │    ├─ stream breaks after a complete tool call / finish → stop; no terminator
    │    │    (the client must see truncation)
    │    └─ normal end → log ok
-   └─ window expires with failures → no content: streaming SSE error / non-streaming 503;
-                                        content already written: SSE error (cannot retry internally)
+   └─ window expires with failures → response not started: 503;
+                                        response started in heartbeat mode (still no content): SSE error
 ```
 
 **Key constraint**: once bytes have started flowing back to the client the proxy cannot retry
@@ -85,7 +85,7 @@ UPSTREAM_PATTERNS match (upstream produced nothing)
 any other failure
   └─► advise: retry the same command immediately
   ↓
-count reaches 3 → stop advising; ask the model to explain the blocker to the user
+third failure (3/3) still advises "report the result and continue"; the fourth failure is silent
 ```
 
 **No error-type allowlist**: the FATAL filter from v0.3.x has been deleted, and the proxy

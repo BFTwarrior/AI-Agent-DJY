@@ -115,6 +115,9 @@ Notes:
 ```text
 projects/<name>/
 ├─ README.md        Index: one line + version + links into docs/
+├─ AGENTS.md        Hard constraints for AI maintainers
+├─ CHANGELOG.md     Change log
+├─ VERSION          Version number
 ├─ src/             Executable source
 ├─ tools/           Install/self-test/operations scripts
 ├─ docs/            Current documentation

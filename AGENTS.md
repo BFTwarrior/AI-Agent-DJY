@@ -31,7 +31,8 @@ before making changes.
 3. Project changed: run the test recipes in the project's `docs/`, update `CHANGELOG`.
 4. Run the full-worktree secret scan before committing (command in
    `docs/06-maintenance-and-acceptance.md`).
-5. Release: update `VERSION`/`CHANGELOG`, create tags, upload Release assets.
+5. Release: update all version fields (`VERSION`, `tools/install.py`, `PROXY_VERSION`,
+   `clientInfo.version`) and `CHANGELOG`, create tags, upload Release assets.
 
 ## Commit messages
 

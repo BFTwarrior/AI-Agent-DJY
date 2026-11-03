@@ -84,7 +84,8 @@ the same rules.
 
 ## Restoring on a new machine
 
-1. Clone the repository to `<local workspace>\AI-Agent-DJY\repo`.
+1. Clone the repository to `<workspace>\归档\AI-Agent-DJY\repo` (on this machine:
+   `<workspace>\归档\AI-Agent-DJY\repo`).
 2. Verify third-party licenses and sources using each `skills/*/UPSTREAM.md`.
 3. Copy skills to `AI\AI-Agent-DJY\skills\`, then sync to `~\.zcode\skills\`.
 4. Install servers and configuration following `mcps/*/README.md`; inject secrets from

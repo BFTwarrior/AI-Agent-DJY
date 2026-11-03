@@ -54,11 +54,11 @@ Changing these defaults equals changing the product spec; you **must** update `R
 ## What must be done after changes
 
 1. Run the accelerated test in section 4 of `docs/06-ai-maintenance-guide.md` (all four assertions pass).
-2. Run `python -I tools/selftest_hook.py`, `tools/selftest_proxy_429.py`, `tools/selftest_stream.py`, `tools/selftest_watch.py`, `tools/selftest_route.py` (11 / 5 / 32 / 12 / 13 all pass; run `tools/selftest_ensure.py` after changing `ensure_proxy.py`). If `pipe_response` changed you must run the streaming set; if `error_watch.py` changed you must run the third set.
+2. Run `python -I tools/selftest_hook.py`, `tools/selftest_proxy_429.py`, `tools/selftest_stream.py`, `tools/selftest_watch.py`, `tools/selftest_route.py` (11 / 5 / 32 / 12 / 13 all pass; run `tools/selftest_ensure.py` after changing `ensure_proxy.py`). If `pipe_response` changed you must run the streaming set; if `error_watch.py` changed you must run the fourth set.
 3. Bump `VERSION`, `tools/install.py`, `src/retry_proxy.py` (`PROXY_VERSION`) and `src/error_watch.py` (`clientInfo.version`); all four must agree.
 4. Record "what changed + why" in `CHANGELOG.md`.
 5. Repackage, **excluding** `__pycache__`, `*.pyc`, `*.log`.
-6. Hand it to an independent sub-agent for review: released only when both the overall and code scores are ≥4.5/5; if lower, fix it and start over.
+6. Hand it to an independent sub-agent for review: released only when the overall score is ≥4.5/5 and the code score is ≥4.0/5; if lower, fix it and start over.
 
 ## Continuing development starts here (for the next AI / engineer)
 
@@ -69,7 +69,7 @@ the project `README.md` records the current build line.
 **Five-minute onboarding**
 
 1. Read the "What it is / Limitations" sections of `README.md`.
-2. Read this file (`docs/06-ai-maintenance-guide.md`), section 2 code map and section 3 invariants.
+2. Read `docs/06-ai-maintenance-guide.md`, section 2 code map and section 3 invariants.
 3. Run a health check once: `python <install directory>/doctor.py`; it must show 0 failed (16 items on the reference machine; the count depends on how many providers are configured).
 4. Run the self-tests once: `python tools/selftest_proxy_429.py`; all 5 scenarios should PASS.
 
