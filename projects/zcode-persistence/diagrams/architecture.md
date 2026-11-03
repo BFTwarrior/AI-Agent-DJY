@@ -58,7 +58,7 @@ main loop (window started .. started+300s, one attempt every RETRY_INTERVAL=20s)
    │    │    (the client must see truncation)
    │    └─ normal end → log ok
    └─ window expires with failures → no content: streaming SSE error / non-streaming 503;
-                                        content already written: RST the client
+                                        content already written: SSE error (cannot retry internally)
 ```
 
 **Key constraint**: once bytes have started flowing back to the client the proxy cannot retry

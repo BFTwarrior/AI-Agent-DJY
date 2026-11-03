@@ -13,7 +13,7 @@ The old expectations of v0.3.x (filtering out by error type, no retry on `permis
 
 Test method: `echo '<payload>' | python src/retry_hook.py`, with the state directory isolated via `ZCODE_RETRY_HOOK_STATE_DIR`.
 
-Automated regression: `python tools/selftest_hook.py` (11 decision cases plus the third-attempt wording check, including the exit-1-with-no-output false positive).
+Automated regression: `python tools/selftest_hook.py` (10 decision cases plus the third-attempt wording check; 11 checks total, including the exit-1-with-no-output false positive).
 
 | # | Input | Expected (v0.4.0) | Observed |
 |---|---|---|---|
