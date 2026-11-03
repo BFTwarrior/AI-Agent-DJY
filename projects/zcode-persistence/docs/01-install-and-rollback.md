@@ -23,7 +23,7 @@ python tools/install.py
 
 The installer does four things:
 
-1. Copies the four scripts under `src/` (retry_hook / retry_proxy / ensure_proxy / error_watch) to `C:\Program Files (x86)\AI\Zcode-Persistence\`
+1. Copies the five scripts under `src/` (retry_hook / retry_proxy / ensure_proxy / route_providers / error_watch) to `C:\Program Files (x86)\AI\Zcode-Persistence\`
 2. Appends the primary hook (`matcher: "Bash"`) to `hooks.events.PostToolUse` in `config.json`, and appends the same script to `hooks.events.PostToolUseFailure` as a fallback
 3. Appends a self-start check to `hooks.events.SessionStart`
 4. Writes the install information to `install-state.json`
@@ -36,7 +36,7 @@ Running it again does not add duplicates. Everything is backed up automatically 
 python tools/doctor.py
 ```
 
-You should see `PostToolUse hook (primary): registered`, `PostToolUseFailure hook (fallback): registered`, `hooks.enabled: True`. Then **open a new ZCode session** (the hook list is snapshotted when the session starts, so an old window will not pick it up).
+The `PostToolUse` (primary) hook, the `PostToolUseFailure` (fallback) hook and `hooks.enabled` should all show PASS. Then **open a new ZCode session** (the hook list is snapshotted when the session starts, so an old window will not pick it up).
 
 ---
 
@@ -86,7 +86,7 @@ EOF
 
 **Verification order**:
 
-1. `python tools/doctor.py` → should show "provider goes through the proxy" and "proxy port 8787 listening"
+1. `python tools/doctor.py` → the provider check and the proxy-port check should both PASS
 2. `python src/retry_proxy.py` (run it once in the foreground to see whether it throws any errors)
 3. In another terminal, `curl http://127.0.0.1:8787/ap/v1/models` (or a `/p/<b64>` URL) — returning 401/404 is normal (it means the proxy is forwarding); only a failure to connect is a problem
 4. Open a new ZCode session, ask anything, and a normal reply means success

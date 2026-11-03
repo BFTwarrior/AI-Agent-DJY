@@ -134,8 +134,7 @@ python "C:/Program Files (x86)/AI/Zcode-Persistence/restart_proxy_idle.py" --for
 
 `--force` only skips "waiting for the idle window" (the three criteria: in-flight connections, `proxy.log` silence, `MIN_ALIVE`),
 and after `kill:` it must still satisfy "old process gone or port 8787 released", exactly one listener, and `root` pointing at the install directory — not one item fewer.
-**Cost**: in-flight requests get cut off and the corresponding session receives one connection reset; whether the client resumes writing on its own is up to the client,
-and there is no measured evidence yet. Before `--force` starts it writes the target PID, the number of in-flight connections and the seconds of log silence into `restart.log`,
+**Cost**: in-flight requests get cut off and the corresponding session receives one connection reset; the client's `ECONNRESET` recognition has been verified with a Node/undici probe, but whether a real ZCode turn resumes writing on its own has not been measured end-to-end. Before `--force` starts it writes the target PID, the number of in-flight connections and the seconds of log silence into `restart.log`,
 so the blast radius can be checked afterwards. The first hot update on 2026-11-01 was done exactly this way: the new PID came up and immediately caught the requests that followed.
 
 When the install directory is empty (nothing is listening on the port) no restart is needed; the session-start hook of the next session will bring it up on its own.
@@ -157,7 +156,7 @@ An `attempt fail` followed by `ok` in the log is a good sign — the resend succ
 ## Release process
 
 1. Change the code
-2. Update `VERSION` (semver: a bug fix bumps 0.0.1, a feature bumps 0.1.0)
+2. Update all four version fields (`VERSION`, `tools/install.py`, `PROXY_VERSION`, `clientInfo.version`; semver: a bug fix bumps 0.0.1, a feature bumps 0.1.0)
 3. Update `CHANGELOG.md`, stating clearly "what changed + why"
 4. Run every case in `docs/04-test-record.md`
 5. Repackage the ZIP and move the old version to the local history directory (do not create a `history/` directory inside the repo; release packages go through Releases) — never overwrite, never delete

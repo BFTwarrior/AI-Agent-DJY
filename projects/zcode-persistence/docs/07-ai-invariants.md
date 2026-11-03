@@ -45,7 +45,7 @@ Three components (the third is off by default):
 28. **Tool-call completeness must use the client's own standard** (V0.2.7). Every buffered call needs a non-empty `name`; the concatenated `arguments` must parse with `json.loads(..., parse_constant=reject)` (`JSON.parse` rejects `NaN`/`Infinity`). Keep the buffer as an arrival-ordered list, never group by `index` and `sorted()` it — reordering multi-index fragments makes the client concatenate invalid JSON, or a wrong command. `flush_tools()` must write zero bytes when validation fails.
 29. **Content written + later truncation or upstream SSE error: reset the client** (V0.2.7). Triggers: invalid tool-argument JSON; or an upstream `{"error":...}` (e.g. `upstream_error`) after content. Do not re-request internally (duplicates content), do not forward an SSE business error (`ProviderBusinessError`, `retryable=false`). Use `SO_LINGER=0`, close `wfile`/`rfile`, then the socket, and set `handler.close_connection=True`; otherwise `handle()` spins on the closed `rfile` at 100% CPU. Never reset after a complete tool call or an emitted `finish_reason`.
 
-## Current finalized parameters (v0.4.0)
+## Current finalized parameters
 
 `RETRY_WINDOW=300` (seconds, the time window), `RETRY_INTERVAL=20` (seconds, fixed interval; `MAX_ATTEMPTS` is only a runaway fuse, default 200), `SILENCE_TIMEOUT=30`, `HEARTBEAT_START=80`, `HEARTBEAT_INTERVAL=80` (no cap on count), `PROXY_RETRY_WINDOW` / `PROXY_RETRY_INTERVAL` override the window and the interval, `RETRY_AFTER_CAP=60`, port 8787.
 
@@ -70,7 +70,7 @@ the project `README.md` records the current build line.
 
 1. Read the "What it is / Limitations" sections of `README.md`.
 2. Read this file (`docs/06-ai-maintenance-guide.md`), section 2 code map and section 3 invariants.
-3. Run a health check once: `python <install directory>/doctor.py`; expect 12 items passed, 0 failed.
+3. Run a health check once: `python <install directory>/doctor.py`; it must show 0 failed (16 items on the reference machine; the count depends on how many providers are configured).
 4. Run the self-tests once: `python tools/selftest_proxy_429.py`; all 5 scenarios should PASS.
 
 **Three things you must know before changing code**

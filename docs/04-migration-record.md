@@ -53,8 +53,8 @@ Later versions are recorded in the project `CHANGELOG` and Releases.
 - The package's `docs/05` maintenance guide corresponds to `docs/06-ai-maintenance-guide.md`;
   links were mapped by number.
 - Historical entries in `CHANGELOG.md` keep the paths as originally written; a note at the
-  top of the file explains this. `docs/05-changelog.md` carries the same content as the root
-  `CHANGELOG.md` (only the page title differs).
+  top of the file explains this. `docs/05-changelog.md` is a condensed version; the root
+  `CHANGELOG.md` is authoritative for full detail.
 - Overlapping content between the package `docs/` and the local documentation was not
   imported twice; the local documentation is canonical.
 

@@ -10,7 +10,7 @@ The audience for this document is an AI or engineer with **absolutely no context
 |---|---|
 | What is this | A two-piece "automatic retry on failure" kit for ZCode plus one optional bypass: hook + local proxy + error reporting (off by default) |
 | Version | See `VERSION` (currently formal release `0.2.7`; the build line is `0.4.0`, and the project `README.md` records the current build line) |
-| Where is the code | Four Python files in `src/` (hook / proxy / auto-start / error reporting), no third-party dependencies (certifi optional) |
+| Where is the code | Five Python files in `src/` (hook / proxy / auto-start / route migration / error reporting), no third-party dependencies (certifi optional) |
 | Where it is installed | `C:\Program Files (x86)\AI\Zcode-Persistence\` |
 | Which system config is modified | `~/.zcode/cli/config.json` (hook), `~/.zcode/v2/provider_config.json` (the provider's baseUrl) |
 | How to confirm the state | `python <install directory>\doctor.py` (script, interpreter, hooks.enabled, the three hooks, provider, port, proxy runtime parameters, whether error watching is installed / on or off / PID-locked, log tail; the two tool hooks also validate matcher=Bash) |
@@ -23,7 +23,7 @@ The third component `error_watch.py` (error reporting) depends on the proxy log 
 
 ## 2. Code map
 
-### `src/retry_hook.py` (about 340 lines)
+### `src/retry_hook.py` (about 360 lines)
 
 A ZCode hook, mounted primarily on `PostToolUse`, with `PostToolUseFailure` as the fallback, `matcher="Bash"`.
 
@@ -35,13 +35,13 @@ main()
  ├─ no failure → exit 0
  ├─ same toolCallId already advised within 120s → exit 0
  ├─ count already 3 → exit 0
- ├─ UPSTREAM_RE match → advise "wait 3 minutes, then retry"
+ ├─ UPSTREAM_PATTERNS match → advise "wait 3 minutes, then retry"
  └─ any other failure → advise "retry the same command immediately"
 ```
 
 Since v0.4.0 only a single pattern list remains, `UPSTREAM_PATTERNS` (a hit means: advise waiting 3 minutes before sending again); **whether to retry is not decided by the pattern** — every failure is advised to retry, up to 3 times (single exception: exit 1 with completely empty output). Counter state lives in `%TEMP%\Zcode-Persistence\state.json`, keyed by `sha1(session|command)`.
 
-### `src/retry_proxy.py` (about 710 lines)
+### `src/retry_proxy.py` (about 1,280 lines)
 
 Local HTTP proxy. A request comes in → resolve the upstream from a fixed prefix or `/p/<b64>` → forward → resend on failure.
 
@@ -73,7 +73,7 @@ pipe_response()                 ← response headers already sent; no more retri
 
 `fetch_once()` returns `Attempt(reason=...)`, and reason has five values: `ok` / `connect` / `silence` / `status` / `other`. **reason decides the subsequent behavior**: only `silence` triggers the "waited too long" semantics.
 
-### `src/error_watch.py` (about 620 lines)
+### `src/error_watch.py` (about 700 lines)
 
 Error reporting: polls `session.last_outcome` in `~/.zcode/cli/db/db.sqlite`; when the value is `error`
 (the UI red dot) it emails the cause to `ZCODE_PERSISTENCE_MAIL_TO` (sender: `ZCODE_PERSISTENCE_MAIL_FROM`). It is not auto-started by default; only SessionStart starts it when `ZCODE_PERSISTENCE_WATCH=1`.
@@ -88,7 +88,7 @@ Error reporting: polls `session.last_outcome` in `~/.zcode/cli/db/db.sqlite`; wh
 - Cause parsing relies on the **date-bearing** timestamps in `proxy.log` (`LOG_TS_RE`), and only accepts `gave up` / `attempt fail` within
   `CAUSE_WINDOW=900` seconds before or after the error moment; the old format (time-of-day only) is still supported, but logs older than one day may be computed wrongly.
 
-### `src/ensure_proxy.py` (about 110 lines)
+### `src/ensure_proxy.py` (about 270 lines)
 
 `SessionStart` hook. If the port is already listening → exit 0; otherwise launch the proxy with `DETACHED_PROCESS`. Any exception is swallowed, so session startup is never slowed down.
 
@@ -98,9 +98,13 @@ Error reporting: polls `session.last_outcome` in `~/.zcode/cli/db/db.sqlite`; wh
 - `route_providers.py` (in `src/`): rewrite every provider's baseUrl to `/p/<base64url>`; idempotent, backs up first, records original URLs in a sidecar, `--restore`. SessionStart calls it only after the proxy reports the `p_route` feature and a matching `root`.
 - `uninstall.py`: delete hooks by exact basename; the provider is restored only when "current value == the recorded proxyBaseUrl"; `/p` migrations are restored from `provider_config.json.proxy-origins.json`, including before `--purge`; `--purge` verifies the process command line before killing, and only accepts prefix records whose directory really contains this tool's files.
 - `doctor.py`: script, interpreter, `hooks.enabled`, the three hooks (the two tool hooks validate matcher=Bash, all three validate the script path), provider, port, proxy runtime parameters, log tail. The log tail reads only the last 64KB; finding the "start line" walks back from the end of the file in 64KB blocks, up to 8MB.
+- `selftest_hook.py`: 11 hook decision cases (including exit 1 with no output, timeouts, cancelled calls and the third-attempt wording).
 - `selftest_proxy_429.py`: five retry-semantics scenarios (429 recovers / persistent 429 / 400 recovers / persistent 400 / unknown prefix 400 must be `retryable:false`).
-- `selftest_stream.py`: nineteen streaming write-back scenarios (including missing-finish-reason, upstream-error and partial-tool-call cases) (pass through chunk by chunk / keep alive during mid-stream silence / short read on a fixed length judged truncated / normal finish / silence until the window is judged truncated / slow client loses no data / give up in heartbeat mode must carry a retryable error body).
+- `selftest_stream.py`: 32 streaming scenarios (including missing-finish-reason, upstream-error, partial-tool-call, RST-after-content, multi-index ordering, CPU after reset, `NaN` and legacy `function_call` cases).
 - `selftest_watch.py`: 12 assertions for error reporting (new red dot / dedupe / historical baseline / completed and stopped are not reported / rate limit / multiple sessions merged / wording when there are no relevant records / failure but not given up · new format / same · old format / cooldown and expiry / send failure retry / `--once` writes nothing to disk).
+- `selftest_route.py`: 13 `/p` routing and provider-migration checks.
+- `selftest_ensure.py`: cross-process serialization of the proxy-start lock.
+- `restart_proxy_idle.py`: restart only in an idle window; `--force` skips the wait but not the safety checks.
 
 ---
 
@@ -201,7 +205,7 @@ print("assert 4: error event    :", b"server_error" in raw)
 
 Non-streaming control: set `stream` to `False`; expect **no** `keepalive`, and an HTTP **503** after the window expires (plain JSON, not SSE; about 3 seconds with the accelerated parameters).
 
-**The response body (streaming write-back) has its own self-test**: `python tools/selftest_stream.py`, whose nineteen scenarios each stress "pass through chunk by chunk / keep alive during mid-stream silence / short read on a fixed length judged truncated / normal finish / silence until the window is judged truncated / slow client loses no data / give up in heartbeat mode must carry a retryable error body". You must run it after changing `pipe_response` — behavior after the response headers cannot be tested with this recipe.
+**The response body (streaming write-back) has its own self-test**: `python tools/selftest_stream.py`, whose 32 scenarios each stress "pass through chunk by chunk / keep alive during mid-stream silence / short read on a fixed length judged truncated / normal finish / silence until the window is judged truncated / slow client loses no data / give up in heartbeat mode must carry a retryable error body". You must run it after changing `pipe_response` — behavior after the response headers cannot be tested with this recipe.
 
 ## 5. Troubleshooting
 
@@ -259,9 +263,9 @@ the project `README.md` records the current build line.
 
 1. Read the "What it is / Limitations" sections of `README.md`.
 2. Read this file (`docs/06-ai-maintenance-guide.md`), section 2 code map and section 3 invariants.
-3. Run a health check once: `python <install directory>/doctor.py`; expect 12 items passed, 0 failed.
+3. Run a health check once: `python <install directory>/doctor.py`; it must show 0 failed (16 items on the reference machine; the count depends on how many providers are configured).
 4. Run the self-tests: `tools/selftest_hook.py` (11 cases), `tools/selftest_proxy_429.py` (5 scenarios), `tools/selftest_stream.py` (32 scenarios), `tools/selftest_route.py` (13 checks),
-   `tools/selftest_watch.py` (12 assertions); all should PASS.
+   `tools/selftest_watch.py` (12 assertions), `tools/selftest_ensure.py` (serialization); all should PASS.
 
 **Three things you must know before changing code**
 
@@ -305,7 +309,7 @@ These are all real problems that were hit and fixed. **Do not reintroduce them.*
 | Send timeout reused the connect timeout | Requests with hundreds of KB of body could not finish writing and were judged failed | Separate `SEND_TIMEOUT=90` |
 | Re-running provider switched to the wrong upstream | `/cm` was switched to `/ap` | Determine the prefix automatically from the original address; error out if it cannot be determined |
 | Hook substring matching | `my_retry_hook.py` was wrongly deleted | Exact basename equality |
-| Unlimited retries | Requests hung forever when the upstream died | Tried in v1.1.0 then reverted; now a 3-minute time window + one attempt every 20 seconds, always finishing at the deadline |
+| Unlimited retries | Requests hung forever when the upstream died | Tried in v1.1.0 then reverted; now a 5-minute time window + one attempt every 20 seconds, always finishing at the deadline |
 
 ---
 

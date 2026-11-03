@@ -70,7 +70,7 @@ python tools/doctor.py
 
 **Prefix selection rule**: when `--proxy-prefix` is omitted, the prefix is derived from the original `baseUrl` — if it contains `upstream-b.example.com` the prefix is `/cm`, if it contains `upstream-a.example.com` it is `/ap`; if neither matches the installer **errors out and makes no changes at all**. It never silently defaults to some upstream, which would send channel A's requests to channel B. **Do not guess a prefix for an unknown address** — use `route_providers.py` (`/p`) instead.
 
-After opening a new ZCode session, `doctor.py` should report "provider goes through the proxy" and "proxy port listening".
+After opening a new ZCode session, `doctor.py` should show the provider check and the proxy-port check as PASS.
 
 ### Uninstall
 
@@ -94,15 +94,18 @@ projects/zcode-persistence/
 │  ├─ retry_hook.py         Hook: PostToolUse primary + PostToolUseFailure fallback (mode A)
 │  ├─ retry_proxy.py        Local retry proxy (mode B)
 │  ├─ ensure_proxy.py       SessionStart hook: keeps the proxy running; error watch is off by default
+│  ├─ route_providers.py    Migrate providers to /p/<base64url> (V0.2.6)
 │  └─ error_watch.py        Error reporting: red dot → email (off by default; needs ZCODE_PERSISTENCE_WATCH=1)
 ├─ tools/
 │  ├─ install.py            Install (idempotent, automatic backup)
 │  ├─ uninstall.py          Uninstall (exact restore)
 │  ├─ doctor.py             Health check
-│  ├─ selftest_hook.py      Self-test: ten hook decision cases (exit 1 with no output is not a failure)
+│  ├─ selftest_hook.py      Self-test: 11 hook decision cases (exit 1 with no output is not a failure)
 │  ├─ selftest_proxy_429.py Self-test: five retry-semantics scenarios (including 400 not retryable)
-│  ├─ selftest_stream.py    Self-test: seven streaming write-back scenarios (including the retryable error body on give-up)
+│  ├─ selftest_stream.py    Self-test: 32 streaming scenarios (including RST recovery, multi-index order, CPU, NaN)
 │  ├─ selftest_watch.py     Self-test: 12 error-reporting assertions (cooldown/rate limit/send failure/cause attribution/--once does not persist)
+│  ├─ selftest_route.py     Self-test: 13 /p routing and migration checks
+│  ├─ selftest_ensure.py    Self-test: cross-process serialization of the proxy lock
 │  └─ restart_proxy_idle.py Restart the process: only in an idle window (--force switches immediately); never start a new one until the old one is gone
 ├─ docs/
 │  ├─ 00-overview.md        This document: what it is, how to use it, limitations
@@ -212,7 +215,7 @@ After that another heartbeat is added **every 80 seconds** without input, **with
 
 **Early finish is retried**: if the upstream ends a streaming response before emitting any text or tool call — with `finish_reason=other`, an unknown value, or (the common production case) no `finish_reason` at all — the proxy withholds the ending event, discards that upstream attempt, and immediately re-requests it, continuing the same client response (V0.2.3), so the client sees the stream continue instead of ending the turn silently. The client maps a missing `finish_reason` to `other`, which is why watching only for the literal string misses the real case. An ending that arrives after real content is passed through unchanged, because resending would duplicate what the user already saw. The same rule covers an upstream SSE `{"error":...}` event (production: `stream_truncated`): with no text or tool call yet the event is swallowed and the attempt is re-requested (V0.2.4). Tool-call deltas are buffered until the call is complete (V0.2.5): a stream that dies mid-arguments leaves nothing written out, so it can be retried instead of failing the turn with `tool_args_invalid`. A streaming read error (V0.2.6) is treated the same way when the client is still connected and no text, tool call or finish reason has been written. Since V0.2.7, buffered tool calls are also validated as JSON, and if content was already written when the call is incomplete or the upstream sends an SSE business error, the proxy resets the client connection so the client discards the partial output and retries with its anchor.
 
-**Not retried**: a stream break after bytes have already been written back to the client — resending at that point would duplicate content. In this case the proxy does not write the chunked terminating block, so the client sees the stream did not end normally and knows it was truncated instead of mistakenly believing it finished.
+**Not retried internally**: a stream break after bytes have already been written back to the client — resending at that point would duplicate content. Since V0.2.7, if the stream is incomplete and no complete tool call or `finish_reason` has been sent, the proxy instead resets the client connection so the client discards the partial output and retries with its anchor (see above). If a complete tool call or `finish_reason` has already been written, it only ends the stream.
 
 **Known requirements**
 
@@ -246,8 +249,8 @@ It checks each item in turn: whether the scripts are all present, whether the in
 ## Boundaries and limitations (must read)
 
 1. **Mode A cannot really resend.** The hook can only inject a suggestion, and the model decides whether to retry. If the model does not listen, nothing happened.
-2. **Mode B cannot cover every failure.** It covers "the request failed before returning data" and "the upstream ended with `finish_reason=other` before producing any content". If the failure happens after content has been written back, the proxy cannot retry without duplicating that content.
-3. **The 95 seconds is the client timeout.** A streaming request gets a heartbeat at 80 seconds without data, so the 3-minute window holds; non-streaming requests cannot take heartbeats, so the client may give up at its own timeout first.
+2. **Mode B cannot cover every failure.** It covers failures before data is returned, and incomplete output before a complete tool call or `finish_reason`. If a complete tool call or finish reason has already been written, the proxy cannot retry without duplicating that content; for incomplete output it resets the client so the client can retry.
+3. **The 95 seconds is the client timeout.** A streaming request gets a heartbeat at 80 seconds without data, so the 5-minute window holds; non-streaming requests cannot take heartbeats, so the client may give up at its own timeout first.
 4. **The provider config may be rewritten by the ZCode UI.** If you have changed channel settings in the UI, `baseUrl` may have been overwritten back to the official address, in which case just run `install.py --with-proxy` again.
 5. **Paths of the two config files**: `~/.zcode/cli/config.json` (hooks) and `~/.zcode/v2/provider_config.json` (provider). The installer touches only these two places, and backs both up before changing them.
 6. **Error reporting does not run by default.** `error_watch.py` is installed into the install directory, but SessionStart only starts it when `ZCODE_PERSISTENCE_WATCH=1` is set;
@@ -256,8 +259,7 @@ It checks each item in turn: whether the scripts are all present, whether the in
 7. **The mail sender must be an Outlook address when the recipient is QQ.** Set `ZCODE_PERSISTENCE_MAIL_FROM`
    explicitly; if the account's own QQ address is used as `From`, the mail only stays in "Sent" and QQ never receives it (verified on 2026-10-31).
 8. **This project is not an official component**; the ultimate fallback on failure is always `uninstall.py` + the config backups.
-9. **The following two things have not been tested in practice, only asserted on this side**: the real ZCode client's
-   "automatic continuation" for 503 / SSE error bodies (it can only be observed the next time retries are genuinely exhausted), and the recovery behaviour of the MCP send-failure path.
+9. **The following things have not been verified end-to-end in a real ZCode turn**: the client's automatic continuation for 503 / SSE error bodies, and the V0.2.7 RST path when retries are genuinely exhausted. The RST → `ECONNRESET` recognition is verified with a Node/undici probe, but the full client continuation has not been observed in ZCode. The recovery behaviour of the MCP send-failure path is also unverified.
    The actual process swap performed by `restart_proxy_idle.py` has been verified on 2026-11-01 02:58 (old process terminated, single listener, correct `root`).
 
 ---
@@ -267,7 +269,7 @@ It checks each item in turn: whether the scripts are all present, whether the in
 **Before taking over maintenance, read `AGENTS.md` (hard constraints) and `docs/06-ai-maintenance-guide.md` (full manual).** The latter contains the code map, the complete list of invariants, directly runnable test recipes, a fault-localisation table and a regression-prevention checklist of past traps.
 
 
-- Update `VERSION` and `CHANGELOG.md` with every change.
+- Update all four version fields (`VERSION`, `tools/install.py`, `PROXY_VERSION`, `clientInfo.version`) and `CHANGELOG.md` with every change.
 - Adding wording rules: change only `UPSTREAM_PATTERNS` at the top of `src/retry_hook.py` (on a match it suggests waiting 3 minutes first). Since v0.4.0 there is no longer a "decide by error type whether to retry" list: every failure is retried (except exit 1 with no output). Re-run `install.py` afterwards (idempotent, it overwrites the scripts).
 - Adding an upstream: prefer `python src/route_providers.py` (any address via `/p/<b64>`, no code change); only add a fixed prefix to `UPSTREAMS`/`PREFIXES` when you really need one.
 - After any change you must run the cases in `docs/04-test-record.md`, and only release once they all pass.

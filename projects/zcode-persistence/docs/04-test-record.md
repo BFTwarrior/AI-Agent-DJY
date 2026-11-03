@@ -1,12 +1,13 @@
 # 04 Test Record
 
-This section records the **decision semantics of v0.4.0** (any Bash failure is advised to retry; the single exception is exit 1 with completely empty output). After a change, re-run it and only release once everything passes.
+This record documents the hook's v0.4.0 decision semantics (any Bash failure is advised to retry; the single exception is exit 1 with completely empty output) and the later proxy streaming fixes. After a change, re-run the relevant suites and only release once everything passes.
 The old expectations of v0.3.x (filtering out by error type, no retry on `permission denied`) are void; do not change the code back according to the old tables.
 
-> **Reading order**: Sections 1 through 9 are historical batches (run under "fixed 4 attempts / progressive backoff" and under the v1.1.0 heartbeat parameters respectively),
-> kept as-is for traceability; **for the parameters currently in effect and the latest round of results, see Sections 10 and 11** (Section 10 holds the final parameters,
-> Section 11 covers the streaming write-back fix after the 2026-10-31 review). Proxy retries have moved from "by count" to
-> "a 180-second time window + one attempt every 20 seconds"; the "503 after 3 retries" wording in the old batches is historical only.
+> **Reading order**: Sections 1 through 14 are historical batches kept as-is for traceability
+> (fixed-count retries, the v1.1.0 heartbeat parameters, the v0.4.0 build line, and the 2026-10-31 fixes).
+> **Section 15 (V0.2.7) is the current result.** The current defaults are a 300-second retry window,
+> one attempt every 20 seconds, a 30-second silence timeout and 80-second heartbeats; the
+> "180-second window" and "503 after 3 retries" wording in old batches is historical only.
 
 ## 1. Hook (retry_hook.py)
 
@@ -134,7 +135,7 @@ The tests used accelerated parameters (SILENCE=2s, HEARTBEAT_START=5s, MAX_ATTEM
 
 ## 10. v0.4.0 final parameters
 
-Release parameters: retry window 180 seconds, interval 20 seconds; single-attempt silence timeout 30 seconds; heartbeat starts after 80 seconds of silence, then one every 80 seconds with no cap.
+v0.4.0 release parameters: retry window 180 seconds, interval 20 seconds; single-attempt silence timeout 30 seconds; heartbeat starts after 80 seconds of silence, then one every 80 seconds with no cap. (Superseded: the default retry window is 300 seconds since V0.2.6.)
 
 | # | Scenario | Expected | Result |
 |---|---|---|---|
@@ -156,7 +157,7 @@ New self-test `tools/selftest_stream.py`; all six scenarios PASS (fake upstream 
 | 6 | Slow client: the client does not read for 1.5 seconds while the upstream pushes 2000 events × 2KB (about 4MB) | Backpressure works, everything is received and the stream ends normally, no lost chunk and no false silence report | ✅ 2000/2000 events, terminating chunk received, log `ok` |
 
 Also re-run: all four scenarios of `selftest_proxy_429.py` PASS; all four assertions of the heartbeat recipe in Section 4 of `docs/06-ai-maintenance-guide` pass;
-the non-streaming control sends no heartbeat and returns 503 when the window expires; `doctor.py` reports 11 PASS / 1 WARN (another rule for a provider that connects directly) / 0 FAIL.
+the non-streaming control sends no heartbeat and returns 503 when the window expires; at that time `doctor.py` reported 11 PASS / 1 WARN (another rule for a provider that connects directly) / 0 FAIL.
 
 ## 12. v0.4.0 hardening (added during final acceptance)
 | # | Scenario | Expected | Observed |

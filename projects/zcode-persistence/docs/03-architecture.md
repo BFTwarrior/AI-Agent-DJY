@@ -106,12 +106,12 @@ write response headers (strip hop-by-hop) → read1 chunk by chunk, flush to the
    │   `client gone` and never retried)
    ├─ read error/silence after text was written, no complete tool call
    │   ──► RST the client (V0.2.7; FIN alone is not retryable for the client)
-   ├─ stream breaks after content was written ──► can only end; cannot retry (would duplicate content)
+   ├─ stream breaks after content and a complete tool call / finish reason ──► can only end; cannot retry (would duplicate content)
    ├─ fixed-length response delivers too few bytes ──► log truncated, no terminator
    └─ normal end ──► log ok
 ```
 
-**The v0.4.0 retry decision**: every failed attempt is resent — connection errors, any
+**The retry decision (since v0.4.0; 300-second window since V0.2.6)**: every failed attempt is resent — connection errors, any
 non-2xx from upstream, and silence timeouts. It is not count-based but time-window-based:
 keep retrying for 5 minutes, once every 20 seconds (`Retry-After` is honored, capped at 60
 seconds), and only stop when the window expires; `MAX_ATTEMPTS=200` is merely a fuse against

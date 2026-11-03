@@ -49,7 +49,7 @@ Two main components plus one optional side path (off by default):
 28. **Tool-call completeness must use the client's own standard** (V0.2.7). Every buffered call needs a non-empty `name`; the concatenated `arguments` must parse with `json.loads(..., parse_constant=reject)` (the client's `JSON.parse` rejects `NaN`/`Infinity`). Keep the buffer as an **arrival-ordered list**, never group by `index` and `sorted()` it: reordering multi-index fragments makes the client concatenate invalid JSON (or even a wrong shell command); scenario 27 pins this. `flush_tools()` must write **zero bytes** when validation fails.
 29. **Content written + later truncation or upstream SSE error: reset the client** (V0.2.7). Two triggers: tool arguments are not valid JSON; the upstream sends `{"error":...}` (e.g. `upstream_error`) after content. Do not re-request internally (duplicates content) and do not forward an SSE business error (the client wraps it in `ProviderBusinessError` with `retryable=false`). RST with `SO_LINGER=0`, close `wfile`/`rfile`, then the socket, **and set `handler.close_connection=True`** — otherwise `handle()` keeps calling `readline` on the closed `rfile`, leaking a 100%-CPU thread per reset (scenario 29: 0.000 s CPU in a 0.6 s window). Never RST after a complete tool call or an emitted `finish_reason` (tool re-execution); pass through or drop only the malformed fragment.
 
-## Current final parameters (v0.4.0)
+## Current final parameters
 
 `RETRY_WINDOW=300` (seconds, the time window), `RETRY_INTERVAL=20` (seconds, fixed interval; `MAX_ATTEMPTS` is only a runaway fuse, default 200), `SILENCE_TIMEOUT=30`, `HEARTBEAT_START=80`, `HEARTBEAT_INTERVAL=80` (no cap on count), `PROXY_RETRY_WINDOW` / `PROXY_RETRY_INTERVAL` override the window and the interval, `RETRY_AFTER_CAP=60`, port 8787.
 
@@ -58,8 +58,8 @@ Changing these defaults amounts to changing the product spec; you **must** updat
 ## What you must do after making changes
 
 1. Run the accelerated test in section 4 of `docs/06-ai-maintenance-guide.md` (all four assertions must pass).
-2. Run `python -I tools/selftest_hook.py`, `tools/selftest_proxy_429.py`, `tools/selftest_stream.py`, `tools/selftest_watch.py`
-   (11 hook cases + 5 retry scenarios + 32 streaming scenarios + 12 error-reporting assertions + 13 migration checks must all pass). If you changed `pipe_response` you must run the streaming suite;
+2. Run `python -I tools/selftest_hook.py`, `tools/selftest_proxy_429.py`, `tools/selftest_stream.py`, `tools/selftest_watch.py`, `tools/selftest_route.py`
+   (11 hook cases + 5 retry scenarios + 32 streaming scenarios + 12 error-reporting assertions + 13 migration checks must all pass; run `tools/selftest_ensure.py` after changing `ensure_proxy.py`). If you changed `pipe_response` you must run the streaming suite;
    if you changed `error_watch.py` you must run the third suite.
 3. Bump `VERSION`, `tools/install.py`, `src/retry_proxy.py` (`PROXY_VERSION`) and `src/error_watch.py` (`clientInfo.version`); all four must agree.
 4. Record "what changed + why" in `CHANGELOG.md`.
@@ -76,7 +76,7 @@ the project `README.md` records the current build line.
 
 1. Read the "What it is / Limitations" sections of `README.md`.
 2. Read section 2 (code map) and section 3 (invariants) of this file (`docs/06-ai-maintenance-guide.md`).
-3. Run a health check once: `python <install directory>/doctor.py`, which should show 11 passed, 0 failed.
+3. Run a health check once: `python <install directory>/doctor.py`; it must show 0 failed (16 items on the reference machine; the count depends on how many providers are configured).
 4. Run a self-test once: `python tools/selftest_proxy_429.py`; all 5 scenarios should PASS.
 
 **Three things you must know before changing code**

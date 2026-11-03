@@ -36,7 +36,8 @@ The local rule is "install skills and MCP servers under
 which shows the runtime uses copies while the AI directory is the install/archive layer.
 This repository follows the same structure:
 
-- `AI\AI-Agent-DJY\skills\<name>`: install layer, used to restore on a new machine.
+- `AI\AI-Agent-DJY\skills\<name>`: install layer, created on first sync; used to restore on a
+  new machine. It is not part of this repository.
 - `~\.zcode\skills\<name>`: runtime copy; ZCode reads only this.
 - The existing `AI\addyosmani-agent-skills` **is not deleted**; it remains the upstream
   snapshot and rollback point.

@@ -1,4 +1,4 @@
-# Architecture Diagram (V0.2.5 patch release)
+# Architecture Diagram (V0.2.7 patch release)
 
 > Build line 0.4.0. Parameters and semantics follow the code in this project's `src/`;
 > this document sketches the relationships without repeating every detail.
@@ -9,7 +9,9 @@
 ZCode client
   model request ──► retry_proxy.py (127.0.0.1:8787) ──► upstream relay
                      ├─ /ap/... → upstream-a.example.com/v1
-                     └─ /cm/... → upstream-b.example.com/v1
+                     ├─ /cm/... → upstream-b.example.com/v1
+                     ├─ /cg/... → 127.0.0.1:27891/v1
+                     └─ /p/<b64>/... → any origin decoded from the token
                         (resends automatically before any byte is returned)
 
   Bash tool failure ──► PostToolUse (primary)
@@ -38,7 +40,7 @@ ZCode client
 request ──► read full body (chunked-aware) ──► UA fallback ──► detect streaming
    │
    ▼
-main loop (window started .. started+180s, one attempt every RETRY_INTERVAL=20s)
+main loop (window started .. started+300s, one attempt every RETRY_INTERVAL=20s)
    ├─ each attempt: connect 10s → send body 90s → wait for first byte 30s
    ├─ failure: connection error / any non-2xx / 30s with no bytes
    ├─ after failure: wait max(20s, Retry-After ≤ 60s); stop if the next attempt falls outside the window
@@ -50,15 +52,21 @@ main loop (window started .. started+180s, one attempt every RETRY_INTERVAL=20s)
    │    ├─ no text/tool yet and the stream ends without finish_reason, or sends {"error":...},
    │    │    or dies mid-tool-arguments → discard and re-request into the same client
    │    │    response (V0.2.3/V0.2.4/V0.2.5; tool deltas are buffered until finish)
-   │    ├─ stream breaks mid-way → stop; do not add a chunked terminator (the client must see truncation)
+   │    ├─ content + incomplete tool args or an SSE error, no complete call/finish
+   │    │    → validate zero bytes, then RST the client (V0.2.7)
+   │    ├─ stream breaks after a complete tool call / finish → stop; no terminator
+   │    │    (the client must see truncation)
    │    └─ normal end → log ok
-   └─ window expires with failures → streaming: SSE error event; non-streaming: 503 + OpenAI-shaped error body
+   └─ window expires with failures → no content: streaming SSE error / non-streaming 503;
+                                        content already written: RST the client
 ```
 
-**Key constraint**: once bytes have started flowing back to the client you cannot retry (the
-content would be duplicated), so resending happens only "before the first byte". The
-heartbeat exists so that the client's 95-second first-byte timeout does not misfire on a
-long wait.
+**Key constraint**: once bytes have started flowing back to the client the proxy cannot retry
+internally (the content would be duplicated), so resending happens only "before the first
+byte". Since V0.2.7, an incomplete stream after content resets the client connection so the
+client can discard the partial output and retry with its anchor; a complete tool call or an
+emitted `finish_reason` is never reset. The heartbeat exists so that the client's 95-second
+first-byte timeout does not misfire on a long wait.
 
 ## Hook decision order
 

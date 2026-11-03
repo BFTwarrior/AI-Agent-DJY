@@ -45,12 +45,15 @@ Confirm `config.json`, `.env`, logs, sqlite and zip files are ignored and not fo
 Standard tests for `projects/zcode-persistence` (run from the project directory):
 
 ```bash
+python -I tools/selftest_hook.py
 python -I tools/selftest_proxy_429.py
 python -I tools/selftest_stream.py
 python -I tools/selftest_watch.py
+python -I tools/selftest_route.py
+python -I tools/selftest_ensure.py
 ```
 
-All three must pass; details are in the project's `docs/04-test-record.md`.
+All six must pass; details are in the project's `docs/04-test-record.md`.
 
 ## After committing
 
@@ -66,7 +69,7 @@ git status
 
 ## Release checklist
 
-- [ ] `VERSION` and `CHANGELOG.md` updated
+- [ ] All version fields (project `VERSION` and its copies) and `CHANGELOG.md` updated
 - [ ] Project tests pass
 - [ ] Release archive built and sha256 recorded
 - [ ] Tags created: repository `vX.Y.Z`, project `proj-<name>-vX.Y[.Z]`
