@@ -137,7 +137,7 @@ Since v0.4.0 there is no filtering by error type any more — as soon as a Bash 
 | Situation | Detection basis | Suggested wording |
 |---|---|---|
 | Timeout | `timedOut=true` (even if the output is empty) | Retry the same command as-is |
-| Upstream produced nothing | The error text hits `UPSTREAM_PATTERNS` (upstream_deadline / turn execution failed / the Chinese phrase meaning "no output" / overloaded / provider_code / capacity) | `sleep 180` first, wait 3 minutes, then retry (set that command's timeout to 200000 ms or more) |
+| Upstream produced nothing | The error text hits `UPSTREAM_PATTERNS` (upstream_deadline / upstream_error / turn execution failed / the Chinese phrase meaning "no output" / overloaded / provider_code / capacity) | `sleep 180` first, wait 3 minutes, then retry (set that command's timeout to 200000 ms or more) |
 | Every other failure | Non-zero exit code / status=failed / cancelled | Retry the same command as-is |
 | Success | Exit code 0 and status completed/success/ok | Silent |
 
