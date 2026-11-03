@@ -76,7 +76,7 @@ the project `README.md` records the current build line.
 
 1. Read the "What it is / Limitations" sections of `README.md`.
 2. Read section 2 (code map) and section 3 (invariants) of `docs/06-ai-maintenance-guide.md`.
-3. Run a health check once: `python <install directory>/doctor.py`; it must show 0 failed (16 items on the reference machine; the count depends on how many providers are configured).
+3. Run a health check once: `python <install directory>/doctor.py`; it must show 0 failed (the item count depends on how many providers are configured).
 4. Run a self-test once: `python tools/selftest_proxy_429.py`; all 5 scenarios should PASS.
 
 **Three things you must know before changing code**

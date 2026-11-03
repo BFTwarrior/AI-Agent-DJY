@@ -110,7 +110,7 @@ def run_quiet(fn):
 
 
 def main():
-    "按顺序跑 11 条断言并汇总；全部通过退出码 0。"
+    "按顺序跑 12 条断言并汇总；全部通过退出码 0。"
     ok = True
     tmp = tempfile.mkdtemp(prefix="watchtest-")
     ew.LOG = os.path.join(tmp, "watch.log")      # 别污染发布包里的日志

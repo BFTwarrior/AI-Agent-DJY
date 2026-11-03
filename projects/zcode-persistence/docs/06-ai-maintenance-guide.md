@@ -234,19 +234,22 @@ Log locations: `%TEMP%\Zcode-Persistence\hook.log` (hook), `C:\Program Files (x8
 4. Bump the version in all four places: `VERSION`, `VERSION` in `tools/install.py`, `PROXY_VERSION` in `src/retry_proxy.py`, and `clientInfo.version` in `src/error_watch.py`.
 5. Update `CHANGELOG.md` (state clearly what changed and why).
 6. Sync the affected parameter tables in `README.md` / `docs/02-maintenance.md`.
-7. Package: use the script below (put the script named `make_zip.py` next to the package directory and run it there; remember to change the version number).
+7. Package: save the script below as `make_zip.py` and run `python make_zip.py <package-dir> <output.zip>` from anywhere. The output must be outside the package directory; the script skips itself, `__pycache__`, `*.pyc` and `*.log`. Remember to change the version number.
 
 ```python
-import os, zipfile
-root = os.path.dirname(os.path.abspath(__file__))
-with zipfile.ZipFile("Zcode-Persistence-vX.Y.zip", "w", zipfile.ZIP_DEFLATED) as z:
+import os, sys, zipfile
+
+root = os.path.abspath(sys.argv[1])
+out = os.path.abspath(sys.argv[2])
+with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
     for dp, dns, fns in os.walk(root):
         dns[:] = [d for d in dns if d != "__pycache__"]
         for fn in fns:
-            if fn.endswith((".pyc", ".log")):
+            src = os.path.join(dp, fn)
+            if src == out or fn == "make_zip.py" or fn.endswith((".pyc", ".log")):
                 continue
-            z.write(os.path.join(dp, fn), os.path.join("Zcode-Persistence-vX.Y",
-                    os.path.relpath(os.path.join(dp, fn), root)))
+            z.write(src, os.path.join("Zcode-Persistence-vX.Y",
+                    os.path.relpath(src, root)))
 ```
 
 8. Hand it to an independent sub-agent for review (released only when the overall score is ≥4.5/5 and the code score is ≥4.0/5); if below standard, fix it and start over.
@@ -263,7 +266,7 @@ the project `README.md` records the current build line.
 
 1. Read the "What it is / Limitations" sections of `README.md`.
 2. Read this file (`docs/06-ai-maintenance-guide.md`), section 2 code map and section 3 invariants.
-3. Run a health check once: `python <install directory>/doctor.py`; it must show 0 failed (16 items on the reference machine; the count depends on how many providers are configured).
+3. Run a health check once: `python <install directory>/doctor.py`; it must show 0 failed (the item count depends on how many providers are configured).
 4. Run the self-tests: `tools/selftest_hook.py` (11 checks), `tools/selftest_proxy_429.py` (5 scenarios), `tools/selftest_stream.py` (32 scenarios), `tools/selftest_route.py` (13 checks),
    `tools/selftest_watch.py` (12 assertions), `tools/selftest_ensure.py` (serialization); all should PASS.
 

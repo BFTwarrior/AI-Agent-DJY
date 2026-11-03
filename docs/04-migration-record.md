@@ -73,7 +73,7 @@ recorded in the project `CHANGELOG` and Releases.
 
 | Content | Destination |
 |---|---|
-| Release current at migration time `*.zip` | GitHub Releases (`proj-zcode-persistence-v0.2.1`) |
+| Release current at migration time `*.zip` | GitHub Releases (`proj-zcode-persistence-v0.2`) |
 | Historical release zips (11 files) | History import archive → Release (`...-v0.1-history`) |
 | Historical docs (2 versions) and diagram (1 version) | Same history import archive |
 | `proxy.log`, `restart.log`, `install-state.json`, `__pycache__` | Local runtime data |
