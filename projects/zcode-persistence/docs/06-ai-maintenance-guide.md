@@ -76,7 +76,7 @@ pipe_response()                 ← response headers already sent; no more retri
 ### `src/error_watch.py` (about 620 lines)
 
 Error reporting: polls `session.last_outcome` in `~/.zcode/cli/db/db.sqlite`; when the value is `error`
-(the UI red dot) it emails the cause to `your-email@example.com`. It is not auto-started by default; only SessionStart starts it when `ZCODE_PERSISTENCE_WATCH=1`.
+(the UI red dot) it emails the cause to `ZCODE_PERSISTENCE_MAIL_TO` (sender: `ZCODE_PERSISTENCE_MAIL_FROM`). It is not auto-started by default; only SessionStart starts it when `ZCODE_PERSISTENCE_WATCH=1`.
 
 - State machine (the easiest place to introduce a bug): `seen` advances to that session's `time_updated` only after a **successful send**;
   cooldown / rate limiting / send failure / `--no-send` all **do not advance** it, and the error stays in pending for the next round.

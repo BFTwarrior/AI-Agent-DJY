@@ -71,10 +71,11 @@ internal structure see [03-Architecture](docs/03-architecture.md).
 
 ## Safety note
 
-`src/error_watch.py` and some of the documentation contain a **real recipient email
-address** (used for error reporting). This repository must stay private; to publish or
-share it, first switch the address to environment-variable injection and scrub the
-addresses out of the documentation.
+`src/error_watch.py` ships with **placeholder** addresses. Before enabling error
+reporting, set `ZCODE_PERSISTENCE_MAIL_TO` (recipient) and
+`ZCODE_PERSISTENCE_MAIL_FROM` (sender). When the recipient is a QQ address, the sender
+must be an Outlook address; QQ discards forged senders. This repository contains no real
+email addresses.
 
 ## Distribution
 

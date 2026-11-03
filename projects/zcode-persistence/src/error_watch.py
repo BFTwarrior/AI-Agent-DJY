@@ -61,10 +61,12 @@ LOG = os.path.join(HERE, "error_watch.log")
 #   logged       {节流 key: 上次写日志时刻}，防 5 秒轮询刷屏
 #   baseline     首轮基线是否已建立（查询失败时不置位）
 
-MAIL_TO = "your-email@example.com"
-# 发件人必须固定成 outlook 地址：用账号本名（QQ 地址）发，QQ 侧会当伪造直接丢弃
-# （2026-10-31 实测：From=your-email@example.com 的信只留在"已发送"，收件箱没有）
-MAIL_FROM = "your-sender@example.com"
+# 公开仓库不写真实地址：优先读环境变量，未设置时保留 example 占位符。
+# 收件人：ZCODE_PERSISTENCE_MAIL_TO；发件人：ZCODE_PERSISTENCE_MAIL_FROM。
+# 发件人必须是 outlook 地址（至少对 QQ 收件人）：用账号本名（QQ 地址）发，
+# QQ 侧会当伪造直接丢弃（2026-10-31 实测），只留在“已发送”。
+MAIL_TO = os.environ.get("ZCODE_PERSISTENCE_MAIL_TO", "your-email@example.com")
+MAIL_FROM = os.environ.get("ZCODE_PERSISTENCE_MAIL_FROM", "your-sender@example.com")
 POLL = 5                 # 轮询间隔（秒）
 FRESH = 180              # 首次启动时，只把这么新的历史红点当"刚发生"
 MAX_PER_HOUR = 8         # 每小时最多几封

@@ -27,13 +27,13 @@ It adds three things to ZCode: **automatically suggest a retry when a tool fails
 ### The optional third piece: error reporting (off by default)
 
 `src/error_watch.py` watches `session.last_outcome` in the ZCode session database; when it sees `error`
-(red dot in the left session list / notification area) it emails "why this failure happened" to `your-email@example.com`:
+(red dot in the left session list / notification area) it emails "why this failure happened" to the address in `ZCODE_PERSISTENCE_MAIL_TO`:
 
 - Only `error` counts. `completed` (normal finish) and `interrupted` (user stopped / paused) are never reported.
 - The reason comes from the `gave up` records in `proxy.log` that **line up with the error moment** (15 minutes either side);
   if none line up it says so plainly ("not caused by the proxy exhausting retries") instead of inventing a cause.
-- Mail goes out through the outlook MCP (stdio JSON-RPC of `ms-365-mcp-server`); the sender is always
-  `your-sender@example.com` (using the account's own name `your-email@example.com` as From gets discarded on the QQ side).
+- Mail goes out through the outlook MCP (stdio JSON-RPC of `ms-365-mcp-server`); the sender is
+  `ZCODE_PERSISTENCE_MAIL_FROM` (use an Outlook address when the recipient is QQ; QQ discards forged senders).
 - Anti-spam: at most one report per session per 10 minutes; at most 8 mails per hour; a failed send does not advance state and is retried 1 minute later.
 - **Not started by default**: only launched by SessionStart when the environment variable `ZCODE_PERSISTENCE_WATCH=1` is set.
   Run it manually with `python error_watch.py` (`--once` only prints, `--test-mail` sends a self-test mail).
@@ -253,8 +253,8 @@ It checks each item in turn: whether the scripts are all present, whether the in
 6. **Error reporting does not run by default.** `error_watch.py` is installed into the install directory, but SessionStart only starts it when `ZCODE_PERSISTENCE_WATCH=1` is set;
    it decides on the red dot by polling `session.last_outcome` in `~/.zcode/cli/db/db.sqlite`, so a schema change in ZCode will break it —
    when broken it writes `db: failed to query the session DB` to `error_watch.log` instead of silently pretending to be alive.
-7. **The mail sender cannot be changed.** The outlook MCP account is `your-email@example.com`, but `From` must be written explicitly as
-   `your-sender@example.com`; when it is written as the account's own name the mail only stays in "Sent" and the QQ side never receives it (verified on 2026-10-31).
+7. **The mail sender must be an Outlook address when the recipient is QQ.** Set `ZCODE_PERSISTENCE_MAIL_FROM`
+   explicitly; if the account's own QQ address is used as `From`, the mail only stays in "Sent" and QQ never receives it (verified on 2026-10-31).
 8. **This project is not an official component**; the ultimate fallback on failure is always `uninstall.py` + the config backups.
 9. **The following two things have not been tested in practice, only asserted on this side**: the real ZCode client's
    "automatic continuation" for 503 / SSE error bodies (it can only be observed the next time retries are genuinely exhausted), and the recovery behaviour of the MCP send-failure path.

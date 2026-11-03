@@ -7,7 +7,7 @@ You are maintaining a ZCode "failure retry" toolkit. Read `README.md` first to l
 Two main components plus one optional side path (off by default):
 - `src/retry_hook.py`: ZCode's `PostToolUse` hook (`PostToolUseFailure` as fallback). It **only suggests** that the model retry the tool call; it never performs any retry itself.
 - `src/retry_proxy.py`: a local HTTP proxy (127.0.0.1:8787) that **really does** resend model requests.
-- `src/error_watch.py`: error reporting (optional, off by default). It polls `session.last_outcome` in the session store and, on `error` (the red dot in the UI), emails the reason to `your-email@example.com`; `completed`/`interrupted` are not reported.
+- `src/error_watch.py`: error reporting (optional, off by default). It polls `session.last_outcome` in the session store and, on `error` (the red dot in the UI), emails the reason to `ZCODE_PERSISTENCE_MAIL_TO` (sender: `ZCODE_PERSISTENCE_MAIL_FROM`); `completed`/`interrupted` are not reported.
 
 ## Invariants that must never be broken
 
