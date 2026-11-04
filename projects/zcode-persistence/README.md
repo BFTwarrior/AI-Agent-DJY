@@ -11,9 +11,10 @@ resends when a model request fails**, plus a default-off **email report of sessi
 
 The proxy now also reads the wait hint from the first 64 KB of a non-2xx error body
 (`"retry_after":N` or `Retry-After: N`), takes the longer of header/body, and keeps the
-60-second cap. The probe accumulates chunks until it finds a hint, reads 64 KB, or spends
-1 second, so a split body is handled without stalling the retry. The body is never logged.
-`selftest_proxy_429.py` now covers 11 scenarios, including split bodies and the 64 KB bound.
+60-second cap. The probe caps the socket timeout at 1 second and parses once at
+EOF / 64 KB / budget, so a number split across chunks is not truncated. The body is never
+logged. `selftest_proxy_429.py` now covers 12 scenarios, including split numbers and the
+64 KB bound.
 
 ### V0.2.7: recover after content has been written
 
@@ -87,6 +88,7 @@ email addresses.
 
 ## Distribution
 
-The distribution package lives in the repository Releases: `proj-zcode-persistence-v0.2.7`.
+The latest published distribution package lives in the repository Releases:
+`proj-zcode-persistence-v0.2.7`. The `0.2.8` build is on `main` and is not yet published;
 The archive contains build artifacts; this directory is authoritative for the source, and
 if the two disagree, this directory plus the tag wins.

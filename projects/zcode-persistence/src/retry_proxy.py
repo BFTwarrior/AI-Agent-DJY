@@ -174,12 +174,15 @@ ERROR_BODY_PROBE = 64 * 1024
 ERROR_BODY_BUDGET = 1.0
 
 
-def retry_after_from_body(body):
+def retry_after_from_body(body, complete=True):
     """从错误正文补读服务端给的等待秒数。
 
     Cloudflare/中转的 502/503 常把等待时间写在正文里
     （`"retry_after":60` 或 `Retry-After: 5`），响应头反而没有；调用方与
     响应头取较长者。只匹配数字，不解析、不记录正文；上限同 RETRY_AFTER_CAP。
+
+    `complete=False` 表示正文还没读完（到了 64KB 上限或预算）：如果匹配正好
+    结束在缓冲区末尾，数字可能被切断，宁可返回 0 也不采用半截值。
     """
     if not body:
         return 0.0
@@ -189,36 +192,44 @@ def retry_after_from_body(body):
         match = re.search(rb'retry[_-]?after["\']?\s*[:=]\s*' + number, body, re.I)
     if match is None:
         return 0.0
+    if not complete and match.end() == len(body):
+        return 0.0
     try:
         return min(float(match.group(1)), RETRY_AFTER_CAP)
     except ValueError:
         return 0.0
 
 
-def probe_retry_after(resp):
-    """分段读取错误正文，直到找到等待提示、读满 64KB 或超出预算。
+def probe_retry_after(resp, conn):
+    """分段读取错误正文，直到 EOF、读满 64KB 或超出预算。
 
-    `read1` 只做一次底层读，正文分段时提示可能落在第二段；所以循环累积。
-    读取量有上限、时间有预算；正文只在内存里做正则，不写日志。
+    探测前把 socket 超时临时压到预算（探测完就关连接，无需恢复），这样
+    上游发一段后停住时，read1 不会一直阻塞到 SILENCE_TIMEOUT。正文只在
+    内存里做一次正则，不写日志。
     """
+    sock = body_socket(resp, conn)
+    if sock is not None:
+        try:
+            sock.settimeout(min(ERROR_BODY_BUDGET, SILENCE_TIMEOUT))
+        except Exception:
+            pass
     chunks = []
     total = 0
+    eof = False
     deadline = time.monotonic() + ERROR_BODY_BUDGET
     while total < ERROR_BODY_PROBE:
         try:
-            part = resp.read1(min(ERROR_BODY_PROBE - total, 65536))
+            part = resp.read1(ERROR_BODY_PROBE - total)
         except Exception:
             break
         if not part:
+            eof = True
             break
         chunks.append(part)
         total += len(part)
-        hint = retry_after_from_body(b"".join(chunks))
-        if hint > 0:
-            return hint
         if time.monotonic() >= deadline:
             break
-    return 0.0
+    return retry_after_from_body(b"".join(chunks), complete=eof)
 
 
 DEFAULT_UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -400,7 +411,7 @@ def fetch_once(host, port, scheme, method, path, headers, body):
         retry_after = parse_retry_after(resp.getheader("Retry-After"))
         try:
             # 有界探测：分段读到 64KB 或命中提示为止；正文不写日志（只记状态行）。
-            retry_after = max(retry_after, probe_retry_after(resp))
+            retry_after = max(retry_after, probe_retry_after(resp, conn))
         except Exception:
             pass
         try:

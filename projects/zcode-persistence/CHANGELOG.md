@@ -8,11 +8,12 @@
   `"retry_after":N` or `Retry-After: N` when the response header is absent; the wait is
   `max(header, body)` and is still capped by `RETRY_AFTER_CAP` (60 s). Covers gateways
   (Cloudflare in particular) that put the hint only in the body. The body is never logged.
-  The probe accumulates `read1` chunks until it finds a hint, reads 64 KB, or spends
-  1 second, so a split body is handled without letting a slow error page stall the retry.
-- **Tests**: `tools/selftest_proxy_429.py` grew from 5 to 11 scenarios (body JSON hint,
-  cap, text form, split body, 64 KB bound, empty body); one case asserts the body marker
-  never appears in `proxy.log`.
+  The probe caps the socket timeout at 1 second and parses once at EOF / 64 KB / budget,
+  so a number split across chunks is not truncated and a stalled tail cannot hold the
+  retry for the full 30-second silence timeout.
+- **Tests**: `tools/selftest_proxy_429.py` grew from 5 to 12 scenarios (body JSON hint,
+  cap, text form, split number, 64 KB bound, empty body, stall budget); one case asserts
+  the body marker never appears in `proxy.log`.
 - Version fields bumped to 0.2.8 (`VERSION`, `tools/install.py`, `PROXY_VERSION`,
   `error_watch.clientInfo`).
 

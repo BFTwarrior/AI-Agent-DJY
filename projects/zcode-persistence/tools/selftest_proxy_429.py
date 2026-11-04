@@ -5,7 +5,7 @@
   假上游（端口 = 代理端口 + 1） —— 可编排"先返 429 若干次，再返 200"
   代理副本（临时端口）          —— 用临时目录里的 retry_proxy.py 副本，映射到假上游
 
-验证八件事：
+验证十二件事：
   1. 上游 429 两次后代理会重发，最终拿到 200 并正常回写给客户端
   2. 一直 429 时，时间窗内持续重试，窗口到点返回 503 + OpenAI 形状的错误体
   3. 任何非 2xx 都重试（400 也重试，不只是 429）
@@ -14,9 +14,10 @@
   6. 502 正文里的 `"retry_after":0.9` 会被读出来参与退避，且正文不落日志
   7. 正文里的等待秒数同样受 RETRY_AFTER_CAP 封顶
   8. 正文里的 `Retry-After: 1` 文本形式也能读出来
-  9. 正文分两段、提示在第二段时也能读到（单次 read1 会漏）
+  9. 正文分两段、切点落在数字中间时也能解析出完整值（不能读成半截）
  10. 正文超过 64KB 时只探测前 64KB，界外提示不生效（backoff 仍为 0.2s）
  11. 空正文不会误匹配，backoff 仍为 0.2s
+ 12. 正文发一段后停顿超过预算：探测在 1 秒左右结束，不阻塞到 socket 超时
 
 用法：python tools/selftest_proxy_429.py            （默认读同包 src/retry_proxy.py）
       python tools/selftest_proxy_429.py --src X    （指定要测的脚本）
@@ -70,8 +71,12 @@ class FakeUpstream(object):
                         cut, delay = outer.error_split
                         self.wfile.write(body[:cut])
                         self.wfile.flush()
-                        time.sleep(delay)
-                        self.wfile.write(body[cut:])
+                        try:
+                            time.sleep(delay)
+                            self.wfile.write(body[cut:])
+                        except Exception:
+                            # 代理可能已因探测预算关闭连接。
+                            pass
                     else:
                         self.wfile.write(body)
                     return
@@ -204,7 +209,7 @@ def run_case(name, plan, src, env_extra, proxy_port=None,
 
 
 def main():
-    "依次跑 11 个场景并汇总；全部通过退出码 0。"
+    "依次跑 12 个场景并汇总；全部通过退出码 0。"
     ap = argparse.ArgumentParser()
     ap.add_argument("--src", default=os.path.join(
         os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -292,13 +297,15 @@ def main():
     print("   判定:", "PASS" if expect else "FAIL")
     ok = ok and expect
 
-    # 场景 9：正文分两段、提示在第二段——单次 read1 只会拿到第一段，
-    # 必须循环累积才能读到。
-    r = run_case("正文分段 retry_after", [502, 200], args.src, {},
-                 error_body=b'{"error":{"message":"split","retry_after":1}}',
-                 error_split=(20, 0.4))
+    # 场景 9：正文分两段、切点落在数字中间（`15` 被切成 `1` + `5`）——
+    # 必须等正文读完再解析，不能把半截的 1 当成完整值。
+    body = b'{"retry_after":15}'
+    cut = body.index(b"15") + 1
+    r = run_case("正文在数字中间分段", [502, 200], args.src,
+                 {"PROXY_RETRY_AFTER_CAP": "1.5"},
+                 error_body=body, error_split=(cut, 0.3))
     expect = (r["status"] == 200 and r["hits"] == 2
-              and "backoff 1s" in r["log"])
+              and "backoff 1.5s" in r["log"])
     print("   判定:", "PASS" if expect else "FAIL")
     ok = ok and expect
 
@@ -315,6 +322,18 @@ def main():
     r = run_case("空错误正文", [503, 200], args.src, {}, error_body=b"")
     expect = (r["status"] == 200 and r["hits"] == 2
               and "backoff 0.2s" in r["log"])
+    print("   判定:", "PASS" if expect else "FAIL")
+    ok = ok and expect
+
+    # 场景 12：正文发一段后停顿 3 秒——探测预算 1 秒必须生效，
+    # 不能阻塞到 SILENCE_TIMEOUT（这里用日志里的 attempt 耗时判断）。
+    body = b'{"error":"xxxxxxxxxx","retry_after":1}'
+    r = run_case("正文停顿超过预算", [503, 200], args.src, {},
+                 error_body=body, error_split=(15, 3.0))
+    m = re.search(r"attempt 1 fail \(status: HTTP 503\) (\d+\.\d)s", r["log"])
+    elapsed_ok = m is not None and float(m.group(1)) < 2.0
+    expect = (r["status"] == 200 and r["hits"] == 2
+              and elapsed_ok and "backoff 0.2s" in r["log"])
     print("   判定:", "PASS" if expect else "FAIL")
     ok = ok and expect
 

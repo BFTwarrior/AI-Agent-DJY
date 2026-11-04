@@ -4,8 +4,8 @@
 
 It adds three things to ZCode: **automatically suggest a retry when a tool fails**, **automatically resend when a model request fails**, and (off by default) **email the reason when a session errors**.
 
-- Version: V0.2.7 patch release (build line 0.4.0)
-- Build date: 2026-11-03 (V0.2.7: JSON validation for buffered tool calls + RST recovery after content for incomplete tool args and upstream SSE errors; V0.2.6: generic `/p` routing + automatic provider migration + retry after a reasoning-only read error + 300 s default window; V0.2.5: buffer tool-call deltas; V0.2.4: absorb upstream SSE `error`; V0.2.3: internal retry for early-finished streams)
+- Version: V0.2.8 on main (latest published release V0.2.7; build line 0.4.0)
+- Build date: 2026-11-04 (V0.2.8: read `retry_after` from the error body, split-body and 1 s probe budget; V0.2.7: JSON validation for buffered tool calls + RST recovery after content for incomplete tool args and upstream SSE errors; V0.2.6: generic `/p` routing + automatic provider migration + retry after a reasoning-only read error + 300 s default window; V0.2.5: buffer tool-call deltas; V0.2.4: absorb upstream SSE `error`; V0.2.3: internal retry for early-finished streams)
 - Applies to: ZCode Desktop (Windows), Python 3.9+
 - Dependencies: Python standard library only; in proxy mode, TLS verification prefers certifi when it is installed
 
@@ -101,7 +101,7 @@ projects/zcode-persistence/
 │  ├─ uninstall.py          Uninstall (exact restore)
 │  ├─ doctor.py             Health check
 │  ├─ selftest_hook.py      Self-test: 11 hook checks (10 decision cases + third-attempt wording; exit 1 with no output is not a failure)
-│  ├─ selftest_proxy_429.py Self-test: eleven retry-semantics scenarios (including 400 not retryable, body-supplied retry_after, bounded and split-body probes)
+│  ├─ selftest_proxy_429.py Self-test: twelve retry-semantics scenarios (including 400 not retryable, body-supplied retry_after, split numbers, bounded and stalled probes)
 │  ├─ selftest_stream.py    Self-test: 32 streaming scenarios (including RST recovery, multi-index order, CPU, NaN)
 │  ├─ selftest_watch.py     Self-test: 12 error-reporting assertions (cooldown/rate limit/send failure/cause attribution/--once does not persist)
 │  ├─ selftest_route.py     Self-test: 13 /p routing and migration checks

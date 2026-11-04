@@ -327,10 +327,11 @@ the client's `sqa()` matches. Independent review: overall 4.7/5, code 4.4/5.
 Some gateways (Cloudflare in particular) put the wait hint in the 502/503 body instead
 of the `Retry-After` header. The proxy now probes the first 64 KB of every non-2xx body
 for `"retry_after":N` or `Retry-After: N`, takes the larger of header/body, and keeps the
-60-second cap. The probe accumulates `read1` chunks until it finds a hint, reads 64 KB,
-or spends 1 second; the body is never logged.
+60-second cap. The probe caps the socket timeout at 1 second and parses once at
+EOF / 64 KB / budget, so a number split across chunks is not truncated; the body is never
+logged.
 
-`selftest_proxy_429.py`: 11 scenarios pass (5 existing + body JSON hint / cap / text form /
-split body / 64 KB bound / empty body). The body-hint case also asserts the marker string
-is absent from `proxy.log`. Full regression: hook 11, stream 32, watch 12, route 13,
-ensure serialization.
+`selftest_proxy_429.py`: 12 scenarios pass (5 existing + body JSON hint / cap / text form /
+split number / 64 KB bound / empty body / stall budget). The body-hint case also asserts
+the marker string is absent from `proxy.log`. Full regression: hook 11, stream 32,
+watch 12, route 13, ensure serialization.
