@@ -101,6 +101,6 @@ email addresses.
 ## Distribution
 
 The distribution package lives in the repository Releases:
-`proj-zcode-persistence-v0.2.8`.
+`proj-zcode-persistence-v0.2.9`.
 The archive contains build artifacts; this directory is authoritative for the source, and
 if the two disagree, this directory plus the tag wins.
