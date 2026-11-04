@@ -89,6 +89,6 @@ email addresses.
 ## Distribution
 
 The latest published distribution package lives in the repository Releases:
-`proj-zcode-persistence-v0.2.7`. The `0.2.8` build is on `main` and is not yet published;
+`proj-zcode-persistence-v0.2.7`. The `0.2.8` build is on `main` and is not yet published.
 The archive contains build artifacts; this directory is authoritative for the source, and
 if the two disagree, this directory plus the tag wins.

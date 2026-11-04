@@ -410,7 +410,7 @@ def fetch_once(host, port, scheme, method, path, headers, body):
     if retryable_status(resp.status):
         retry_after = parse_retry_after(resp.getheader("Retry-After"))
         try:
-            # 有界探测：分段读到 64KB 或命中提示为止；正文不写日志（只记状态行）。
+            # 有界探测：分段读到 EOF/64KB/预算后统一解析；正文不写日志（只记状态行）。
             retry_after = max(retry_after, probe_retry_after(resp, conn))
         except Exception:
             pass
