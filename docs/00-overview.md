@@ -59,8 +59,8 @@ Shared principles:
    └─ <local history>\         Local history originals, kept
 ```
 
-**The repository root is `AI-Agent-DJY\repo`.** On this machine `<workspace>` is
-`<workspace>`, so the repository is `<workspace>\归档\AI-Agent-DJY\repo`. Do not
+**The repository root is `AI-Agent-DJY\repo`.** `<workspace>` denotes the local parent
+folder; the repository is `<workspace>\归档\AI-Agent-DJY\repo`. Do not
 initialize git in the `AI-Agent-DJY` parent folder, or planning documents and local history
 would be committed along with the repository.
 
@@ -77,11 +77,11 @@ repo projects/<name>/ ──tag/Release──►  GitHub Releases (archives)
 
 Details: [03-Deployment and Sync](03-deployment-and-sync.md).
 
-## Current contents (2026-11-03)
+## Current contents (2026-11-04)
 
 - 3 skills: `code-review-and-quality`, `code-simplification`, `constraint-driven-development`
 - 2 MCP entries: `github`, `ms365` (config templates only, no secrets)
-- 1 project: `zcode-persistence` V0.2.7 (source + docs + diagrams; 32 streaming scenarios)
+- 1 project: `zcode-persistence` V0.2.8 (source + docs + diagrams; 12 retry scenarios + 32 streaming scenarios)
 - `shared/`: scaffold only; no cross-project scripts or prompts have been added yet
 
 ## Non-goals

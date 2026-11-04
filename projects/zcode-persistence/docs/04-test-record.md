@@ -211,10 +211,10 @@ from 22:57 to 22:59 the watcher sent 8 mails in a row for the same session (dedu
 | Item | Result |
 |---|---|
 | How it was started | `restart_proxy_idle.py --force`, run in the foreground by this session's Bash (this session had no in-flight model requests at the time; what got cut were 5-7 upstream connections of another session) |
-| Starting point | PID <pid>, `/__zp_health` returned the lowercase `zcode-persistence` and no `root` (old code from before the rename) |
+| Starting point | PID `<pid>`, `/__zp_health` returned the lowercase `zcode-persistence` and no `root` (old code from before the rename) |
 | Reason | Another session's team kept 5-7 upstream `ESTABLISHED` connections open and `proxy.log` was silent for <1s, so the idle window never came |
-| Result | <time> `kill: PID <pid> → success`; the first spawn brought up PID <pid> |
-| Re-check | Only 1 LISTENING on 8787; `/__zp_health` = `{"name":"Zcode-Persistence","root":"C:\\Program Files (x86)\\AI\\Zcode-Persistence"}` |
+| Result | <time> `kill: PID <pid> → success`; the first spawn brought up PID `<new-pid>` |
+| Re-check | Only 1 LISTENING on 8787; `/__zp_health` = `{"name":"Zcode-Persistence","root":"<install-dir>"}` |
 | Requests afterwards | From <time> `proxy.log` shows consecutive `ok ... status=200`; the proxy serves normally |
 
 **Branch verification with injected stubs** (no real process killed; `netstat_rows`/`kill`/`spawn`/`health_info` replaced one at a time):
@@ -299,7 +299,7 @@ Two production failures share one recovery path:
 
 - `tool_args_invalid`: text had been written, then the upstream ended mid-arguments;
   V0.2.5 flushed the incomplete buffer.
-- `upstream_error` (`request=<request-id>-…`, `<model>`): the gateway sent
+- `upstream_error` (`request=<request-id>`, `<model>`): the gateway sent
   `{"error":{"message":"Upstream request failed","type":"upstream_error"}}` after
   67 characters; V0.2.4 forwarded it, and the client wrapped it in
   `ProviderBusinessError` (`retryable=false`).
@@ -334,4 +334,4 @@ logged.
 `selftest_proxy_429.py`: 12 scenarios pass (5 existing + body JSON hint / cap / text form /
 split number / 64 KB bound / empty body / stall budget). The body-hint case also asserts
 the marker string is absent from `proxy.log`. Full regression: hook 11, stream 32,
-watch 12, route 13, ensure serialization.
+watch 12, route 13, ensure serialization. Independent review: overall 4.8/5, code 4.8/5.

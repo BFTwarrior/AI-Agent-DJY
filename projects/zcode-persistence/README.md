@@ -4,6 +4,7 @@ A ZCode failure-retry toolkit: **suggests a retry when a tool fails**, **automat
 resends when a model request fails**, plus a default-off **email report of session errors**.
 
 - Version: V0.2.8
+- Build line: 0.4.0
 - Applies to: ZCode Desktop (Windows), Python 3.9+
 - Dependencies: Python standard library only; proxy mode prefers certifi (if installed)
 

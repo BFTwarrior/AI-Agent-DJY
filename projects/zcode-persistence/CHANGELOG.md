@@ -252,7 +252,7 @@ client's auto-continuation.
 - `ensure_proxy.py` now takes a Windows named mutex
   (`Local\ZcodePersistence-EnsureProxy`) around "check the port + spawn", so two
   SessionStart hooks cannot both spawn a proxy. This actually happened after the
-  2026-11-01 reboot: PIDs <pid> and <pid> started in the same second.
+  2026-11-01 reboot: PIDs `<pid-a>` and `<pid-b>` started in the same second.
 - `doctor.py` counts LISTENING processes on 8787 and reports FAIL when there is more than
   one, instead of only checking that "something is listening".
 
@@ -346,8 +346,8 @@ Going file by file on the principle of "leave what works alone, fix only what is
   so the idle window never arrived. `--force` skips only "wait for an idle window" (three checks: in-flight connections, log silence, `MIN_ALIVE`),
   while none of the other checks are dropped — verifying via `kill:` that the old process really is gone, that only one listener remains on 8787, and that `root` points at the install directory;
   the price is that in-flight requests are cut once. Before swapping, the target PID, in-flight connection count and silent seconds are written to `restart.log`.
-- **First hot update landed**: old PID <pid> (code from before the rename; `/__zp_health` returned the lowercase name and no `root`)
-  → new PID <pid>; the health probe returns `{"name":"Zcode-Persistence", "root":"C:\\Program Files (x86)\\AI\\Zcode-Persistence"}`,
+- **First hot update landed**: old PID `<old-pid>` (code from before the rename; `/__zp_health` returned the lowercase name and no `root`)
+  → new PID `<new-pid>`; the health probe returns `{"name":"Zcode-Persistence", "root":"<install-dir>"}`,
   8787 has a single listener, and requests are handled immediately afterwards (`ok ... status=200`). **Option A's retryable 503 error body has been in effect since then.**
 - **Fixes after independent review (same day)**: when `netstat` cannot be read it is no longer treated as "no listener" and falsely reported as success (now `abort` + exit code 1);
   when the kill fails but the port is already free, the port decides and spawning continues instead of falsely reporting "still occupied"; leftover cleanup now verifies each process individually and
