@@ -5,7 +5,8 @@ The old expectations of v0.3.x (filtering out by error type, no retry on `permis
 
 > **Reading order**: Sections 1 through 16 are historical batches kept as-is for traceability
 > (fixed-count retries, the v1.1.0 heartbeat parameters, the v0.4.0 build line, the 2026-10-31 fixes,
-> and the V0.2.1–V0.2.6 changes). **Section 17 (V0.2.7) is the current result.** The current defaults
+> and the V0.2.1–V0.2.6 changes). **Section 17 (V0.2.7) is the current release result;
+> section 18 is the newest (unreleased) proxy change.** The current defaults
 > are a 300-second retry window, one attempt every 20 seconds, a 30-second silence timeout and
 > 80-second heartbeats; the "180-second window" and "503 after 3 retries" wording in old batches is historical only.
 
@@ -320,3 +321,14 @@ Two production failures share one recovery path:
 route 13, ensure serialization) also pass. A Node/undici probe against the real proxy
 receives `TypeError: terminated` with cause `read ECONNRESET` after 61 content bytes;
 the client's `sqa()` matches. Independent review: overall 4.7/5, code 4.4/5.
+
+## 18. Unreleased — retry_after from the error body
+
+Some gateways (Cloudflare in particular) put the wait hint in the 502/503 body instead
+of the `Retry-After` header. The proxy now probes the first 64 KB of every non-2xx body
+for `"retry_after":N` or `Retry-After: N`, takes the larger of header/body, and keeps the
+60-second cap. The body is never logged.
+
+`selftest_proxy_429.py`: 8 scenarios pass (5 existing + body JSON hint / cap / text form);
+the body-hint case also asserts the marker string is absent from `proxy.log`.
+Full regression: hook 11, stream 32, watch 12, route 13, ensure serialization.

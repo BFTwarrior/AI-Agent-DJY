@@ -176,7 +176,7 @@ So a provider's baseUrl becomes `http://127.0.0.1:8787/p/<b64>` for any relay, o
 **Retry count**
 
 Not by count but by time window: **keep retrying for 5 minutes, once every 20 seconds** (about 15 attempts inside the window), identical for streaming and non-streaming.
-Wait **20 seconds** between two attempts; if the upstream returns a longer `Retry-After`, honour that instead (capped at 60 seconds). When the window expires no new attempt is started;
+Wait **20 seconds** between two attempts; if the upstream returns a longer `Retry-After` (response header or error body), honour that instead (capped at 60 seconds). When the header is absent, the proxy probes the first 64 KB of the non-2xx body for `"retry_after":N` or `Retry-After: N`; the body itself is never logged. When the window expires no new attempt is started;
 the attempt already in flight is allowed to run to completion (connect 10 s + send 90 s + wait for headers 30 s maximum), so the total duration may be slightly longer than the window.
 In practice failures are mostly **HTTP 429 (concurrency saturated)**; waiting a few seconds before resending almost always gets through.
 

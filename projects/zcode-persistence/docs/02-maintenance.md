@@ -96,7 +96,7 @@ All of the proxy's timing can be overridden with environment variables; changes 
 | `PROXY_HEARTBEAT_INTERVAL` | `80` | While upstream is silent, send one extra heartbeat every N seconds, unlimited count |
 | `PROXY_CONNECT_TIMEOUT` | `10` | Connect timeout (seconds) |
 | `PROXY_SEND_TIMEOUT` | `90` | Timeout for sending the request body (seconds) |
-| `PROXY_RETRY_AFTER_CAP` | `60` | Upper bound (seconds) on how far the upstream `Retry-After` is honored |
+| `PROXY_RETRY_AFTER_CAP` | `60` | Upper bound (seconds) on how far the upstream `Retry-After` (header or error body) is honored |
 | `PROXY_PORT` | `8787` | Listening port |
 
 Example: move heartbeats forward to 60 seconds and repeat them every 60 seconds, shrink the retry window to 60 seconds, and try every 10 seconds:

@@ -2,6 +2,15 @@
 
 > 2026-11-01: migrated to the AI-Agent-DJY repository; documentation was translated to English and directories standardized to `docs/` and `diagrams/`. Historical entries keep paths as originally written.
 
+## Unreleased
+
+- **Proxy**: on a non-2xx response, also probe the first 64 KB of the error body for
+  `"retry_after":N` or `Retry-After: N` when the response header is absent; the wait is
+  `max(header, body)` and is still capped by `RETRY_AFTER_CAP` (60 s). Covers gateways
+  (Cloudflare in particular) that put the hint only in the body. The body is never logged.
+- **Tests**: `tools/selftest_proxy_429.py` grew from 5 to 8 scenarios (body JSON hint,
+  cap, text form); one case asserts the body marker never appears in `proxy.log`.
+
 ## V0.2.7 — 2026-11-03
 
 Recover after content has been written. Buffered tool calls are validated as JSON

@@ -43,7 +43,7 @@ request ──► read full body (chunked-aware) ──► UA fallback ──►
 main loop (window started .. started+300s, one attempt every RETRY_INTERVAL=20s)
    ├─ each attempt: connect 10s → send body 90s → wait for first byte 30s
    ├─ failure: connection error / any non-2xx / 30s with no bytes
-   ├─ after failure: wait max(20s, Retry-After ≤ 60s); stop if the next attempt falls outside the window
+   ├─ after failure: wait max(20s, Retry-After from header or body ≤ 60s); stop if the next attempt falls outside the window
    ├─ window expires with no attempt in flight → finish (MAX_ATTEMPTS=200 is only a runaway fuse)
    └─ heartbeat: 80s without upstream input → write the SSE comment `: keepalive`,
                  then one every 80s, no cap (independent clock, not tied to attempt boundaries)

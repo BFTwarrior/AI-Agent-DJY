@@ -5,12 +5,15 @@
   假上游（端口 = 代理端口 + 1） —— 可编排"先返 429 若干次，再返 200"
   代理副本（临时端口）          —— 用临时目录里的 retry_proxy.py 副本，映射到假上游
 
-验证五件事：
+验证八件事：
   1. 上游 429 两次后代理会重发，最终拿到 200 并正常回写给客户端
   2. 一直 429 时，时间窗内持续重试，窗口到点返回 503 + OpenAI 形状的错误体
   3. 任何非 2xx 都重试（400 也重试，不只是 429）
   4. 一直失败时不会提前放弃，也不会挂死
   5. 客户端自己写错（未知前缀）时 400 必须不可重试
+  6. 502 正文里的 `"retry_after":0.9` 会被读出来参与退避，且正文不落日志
+  7. 正文里的等待秒数同样受 RETRY_AFTER_CAP 封顶
+  8. 正文里的 `Retry-After: 1` 文本形式也能读出来
 
 用法：python tools/selftest_proxy_429.py            （默认读同包 src/retry_proxy.py）
       python tools/selftest_proxy_429.py --src X    （指定要测的脚本）
@@ -34,8 +37,9 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 class FakeUpstream(object):
     """按 plan 依次返回状态码；plan 用完后一直返最后一个。"""
 
-    def __init__(self, plan, port):
+    def __init__(self, plan, port, error_body=None):
         self.plan = list(plan)
+        self.error_body = error_body
         self.hits = 0
         outer = self
 
@@ -48,8 +52,12 @@ class FakeUpstream(object):
                 status = outer.plan[min(outer.hits, len(outer.plan) - 1)]
                 outer.hits += 1
                 if status != 200:
-                    body = ('{"error":{"message":"upstream %d","type":"x"}}'
-                            % status).encode()
+                    body = outer.error_body
+                    if body is None:
+                        body = ('{"error":{"message":"upstream %d","type":"x"}}'
+                                % status).encode()
+                    elif isinstance(body, str):
+                        body = body.encode("utf-8")
                     self.send_response(status)
                     self.send_header("Content-Type", "application/json")
                     self.send_header("Content-Length", str(len(body)))
@@ -140,7 +148,7 @@ def free_pair():
 
 
 def run_case(name, plan, src, env_extra, proxy_port=None,
-             path="/ap/v1/chat/completions"):
+             path="/ap/v1/chat/completions", error_body=None):
     "跑一个用例：起假上游 → 起代理副本 → 发请求 → 收集日志。"
     workdir = tempfile.mkdtemp(prefix="proxytest-")
     proxy_port = proxy_port or free_pair()
@@ -155,7 +163,7 @@ def run_case(name, plan, src, env_extra, proxy_port=None,
     results = {}
     try:
         proxy = make_proxy_copy(src, workdir, upstream_port)
-        with FakeUpstream(plan, upstream_port) as up:
+        with FakeUpstream(plan, upstream_port, error_body=error_body) as up:
             out = open(logfile, "w", encoding="utf-8")
             proc = subprocess.Popen([sys.executable, proxy], env=env,
                                     stdout=out, stderr=subprocess.STDOUT,
@@ -184,7 +192,7 @@ def run_case(name, plan, src, env_extra, proxy_port=None,
 
 
 def main():
-    "依次跑 5 个场景并汇总；全部通过退出码 0。"
+    "依次跑 8 个场景并汇总；全部通过退出码 0。"
     ap = argparse.ArgumentParser()
     ap.add_argument("--src", default=os.path.join(
         os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -241,6 +249,36 @@ def main():
     print("   错误体:", r["data"][:120])
     print("   判定:", "PASS" if bad_ok else "FAIL")
     ok = ok and bad_ok
+
+    # 场景 6：502 正文里带 retry_after（响应头没有）——要读出来参与退避，
+    # 且正文绝不能落进日志（代理只记状态行）。
+    marker = "BODY-HINT-MARKER"
+    body = ('{"error":{"message":"%s","retry_after":0.9},"type":"x"}'
+            % marker).encode()
+    r = run_case("502 正文 retry_after", [502, 200], args.src, {},
+                 error_body=body)
+    expect = (r["status"] == 200 and r["hits"] == 2
+              and "backoff 0.9s" in r["log"]
+              and marker not in r["log"])
+    print("   判定:", "PASS" if expect else "FAIL")
+    ok = ok and expect
+
+    # 场景 7：正文里的等待秒数也受 RETRY_AFTER_CAP 封顶（9999 → 0.7）
+    r = run_case("正文 retry_after 封顶", [503, 200], args.src,
+                 {"PROXY_RETRY_AFTER_CAP": "0.7"},
+                 error_body=b'{"error":{"retry_after":9999}}')
+    expect = (r["status"] == 200 and r["hits"] == 2
+              and "backoff 0.7s" in r["log"])
+    print("   判定:", "PASS" if expect else "FAIL")
+    ok = ok and expect
+
+    # 场景 8：正文里的文本形式 `Retry-After: 1` 也能读
+    r = run_case("正文 Retry-After 文本", [429, 200], args.src, {},
+                 error_body=b"upstream busy\nRetry-After: 1\n")
+    expect = (r["status"] == 200 and r["hits"] == 2
+              and "backoff 1s" in r["log"])
+    print("   判定:", "PASS" if expect else "FAIL")
+    ok = ok and expect
 
     print("\n总体:", "全部通过" if ok else "有失败项")
     return 0 if ok else 1

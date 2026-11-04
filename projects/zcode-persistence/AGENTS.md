@@ -22,7 +22,7 @@ Two main components plus one optional side path (off by default):
 8. TLS must use certifi's CA bundle (the Windows built-in root store lacks SSL.com, so validation fails).
 9. The UA fallback must not be removed: the relay's Cloudflare blocks `Python-urllib` (returns 1010).
 10. The hook's stdout JSON **may only use `additionalContext`**. `systemMessage` is visible to the user only and invisible to the model — that is exactly where v0.3.0 came unstuck: the hook dutifully wrote `advise` to the log, yet the model still did not retry. The client parses with zod (non-strict), so unknown keys get stripped — but stripped means written for nothing, so still emit this one key only.
-11. Backoff must not be "retry immediately". 85% of the failures actually observed are upstream **HTTP 429 (concurrency saturated)**, so you must wait for `RETRY_INTERVAL` (20 seconds); if the upstream hands you a longer `Retry-After`, obey it (capped by `RETRY_AFTER_CAP`=60 seconds). The total retry budget is measured by `RETRY_WINDOW` (300 seconds), not by attempt count.
+11. Backoff must not be "retry immediately". 85% of the failures actually observed are upstream **HTTP 429 (concurrency saturated)**, so you must wait for `RETRY_INTERVAL` (20 seconds); if the upstream hands you a longer `Retry-After` (response header or error body), obey it (capped by `RETRY_AFTER_CAP`=60 seconds). The total retry budget is measured by `RETRY_WINDOW` (300 seconds), not by attempt count.
 12. **Do not add "filter by error type" back in**. The user's spec is "any error at all gets three retries": the hook suggests a retry on any failure, the proxy resends on any non-2xx. The FATAL filter from v0.3.x has been deleted; adding it back amounts to violating the requirement.
 13. The heartbeat is "send **only after 80 seconds with no upstream input at all**, then one every 80 seconds, **with no cap on the number of times**". Do not change it to a fixed count, and do not change it to also fire when data is arriving. Before the response headers it is sent by the main loop's independent clock; after the response headers it is sent by `pipe_response`'s reader thread plus the main thread consuming the queue (send one when silence reaches `HEARTBEAT_INTERVAL`, and only call it truncated when silence reaches `RETRY_WINDOW`).
 14. During the backoff wait the thread must `sleep`, not spin (v0.3.1 once pinned a single core at 97% during a 50-second backoff).
@@ -77,7 +77,7 @@ the project `README.md` records the current build line.
 1. Read the "What it is / Limitations" sections of `README.md`.
 2. Read section 2 (code map) and section 3 (invariants) of `docs/06-ai-maintenance-guide.md`.
 3. Run a health check once: `python <install directory>/doctor.py`; it must show 0 failed (the item count depends on how many providers are configured).
-4. Run a self-test once: `python tools/selftest_proxy_429.py`; all 5 scenarios should PASS.
+4. Run a self-test once: `python tools/selftest_proxy_429.py`; all 8 scenarios should PASS.
 
 **Three things you must know before changing code**
 

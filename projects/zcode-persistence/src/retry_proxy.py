@@ -18,7 +18,7 @@ ZCode 只看到最终结果，看不到中间失败。
 
 重试次数：
   不按次数，按时间窗：默认持续重试 300 秒，每 20 秒一次（窗口内约 15 次尝试）；
-  上游给了更长的 Retry-After 就尊重它（上限 60 秒）。窗口/间隔由
+  上游给了更长的 Retry-After（响应头或错误正文）就尊重它（上限 60 秒）。窗口/间隔由
   PROXY_RETRY_WINDOW / PROXY_RETRY_INTERVAL 覆盖；MAX_ATTEMPTS（默认 200）
   只是防跑飞的保险丝，正常路径碰不到。流式与非流式一致。
   实测上游失败以 HTTP 429（并发打满）为主，等几秒再发基本都能过。
@@ -165,6 +165,30 @@ def invalid_body(message):
 
 
 RETRY_AFTER_CAP = max(0.0, env_float("PROXY_RETRY_AFTER_CAP", 60.0))
+
+# 非 2xx 时只探测正文开头这么多字节，找网关写在正文里的等待提示。
+# 错误页可能很大（Cloudflare HTML），整读会拖住重试；正文绝不写日志。
+ERROR_BODY_PROBE = 64 * 1024
+
+
+def retry_after_from_body(body):
+    """从错误正文补读服务端给的等待秒数。
+
+    响应头 Retry-After 优先；Cloudflare/中转的 502/503 也常把等待时间写在
+    正文里（`"retry_after":60` 或 `Retry-After: 5`），头里反而没有。
+    只匹配数字，不解析、不记录正文；上限同 RETRY_AFTER_CAP。
+    """
+    if not body:
+        return 0.0
+    match = re.search(rb'"retry_after"\s*:\s*(\d+(?:\.\d+)?)', body, re.I)
+    if match is None:
+        match = re.search(rb'retry-after\s*[:=]\s*(\d+)', body, re.I)
+    if match is None:
+        return 0.0
+    try:
+        return min(float(match.group(1)), RETRY_AFTER_CAP)
+    except ValueError:
+        return 0.0
 
 DEFAULT_UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
               "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
@@ -344,7 +368,10 @@ def fetch_once(host, port, scheme, method, path, headers, body):
     if retryable_status(resp.status):
         retry_after = parse_retry_after(resp.getheader("Retry-After"))
         try:
-            resp.read()
+            # 有界探测：只读开头 64KB 找正文里的等待提示；不整读大错误页，
+            # 也不把正文写进日志（只记状态行）。
+            probe = resp.read1(ERROR_BODY_PROBE)
+            retry_after = max(retry_after, retry_after_from_body(probe))
         except Exception:
             pass
         try:
