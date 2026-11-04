@@ -103,6 +103,7 @@ Error reporting: polls `session.last_outcome` in `~/.zcode/cli/db/db.sqlite`; wh
 - `selftest_stream.py`: 32 streaming scenarios (including missing-finish-reason, upstream-error, partial-tool-call, RST-after-content, multi-index ordering, CPU after reset, `NaN` and legacy `function_call` cases).
 - `selftest_watch.py`: 12 assertions for error reporting (new red dot / dedupe / historical baseline / completed and stopped are not reported / rate limit / multiple sessions merged / wording when there are no relevant records / failure but not given up · new format / same · old format / cooldown and expiry / send failure retry / `--once` writes nothing to disk).
 - `selftest_route.py`: 13 `/p` routing and provider-migration checks.
+- `selftest_upstreams.py`: 8 upstream-config checks (placeholder defaults, override/add/invalid entries, installer host lookup, explicit prefix wins, unknown/unsupported host returns `None`).
 - `selftest_ensure.py`: cross-process serialization of the proxy-start lock.
 - `restart_proxy_idle.py`: restart only in an idle window; `--force` skips the wait but not the safety checks.
 

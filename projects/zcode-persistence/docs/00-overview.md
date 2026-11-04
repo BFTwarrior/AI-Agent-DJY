@@ -105,6 +105,7 @@ projects/zcode-persistence/
 │  ├─ selftest_stream.py    Self-test: 32 streaming scenarios (including RST recovery, multi-index order, CPU, NaN)
 │  ├─ selftest_watch.py     Self-test: 12 error-reporting assertions (cooldown/rate limit/send failure/cause attribution/--once does not persist)
 │  ├─ selftest_route.py     Self-test: 13 /p routing and migration checks
+│  ├─ selftest_upstreams.py Self-test: 8 upstream-config and installer host-lookup checks
 │  ├─ selftest_ensure.py    Self-test: cross-process serialization of the proxy lock
 │  └─ restart_proxy_idle.py Restart the process: only in an idle window (--force switches immediately); never start a new one until the old one is gone
 ├─ docs/

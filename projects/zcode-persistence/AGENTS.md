@@ -59,7 +59,7 @@ Changing these defaults amounts to changing the product spec; you **must** updat
 
 1. Run the accelerated test in section 4 of `docs/06-ai-maintenance-guide.md` (all four assertions must pass).
 2. Run `python -I tools/selftest_hook.py`, `tools/selftest_proxy_429.py`, `tools/selftest_stream.py`, `tools/selftest_watch.py`, `tools/selftest_route.py`, `tools/selftest_upstreams.py`
-   (11 hook checks (10 cases + third-attempt wording) + 12 retry scenarios + 32 streaming scenarios + 12 error-reporting assertions + 13 migration checks + 4 upstream-config checks must all pass; run `tools/selftest_ensure.py` after changing `ensure_proxy.py`). If you changed `pipe_response` you must run the streaming suite;
+   (11 hook checks (10 cases + third-attempt wording) + 12 retry scenarios + 32 streaming scenarios + 12 error-reporting assertions + 13 migration checks + 8 upstream-config checks must all pass; run `tools/selftest_ensure.py` after changing `ensure_proxy.py`). If you changed `pipe_response` you must run the streaming suite;
    if you changed `error_watch.py` you must run the fourth suite.
 3. Bump `VERSION`, `tools/install.py`, `src/retry_proxy.py` (`PROXY_VERSION`) and `src/error_watch.py` (`clientInfo.version`); all four must agree.
 4. Record "what changed + why" in `CHANGELOG.md`.

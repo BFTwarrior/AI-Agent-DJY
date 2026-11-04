@@ -50,10 +50,11 @@ python -I tools/selftest_proxy_429.py
 python -I tools/selftest_stream.py
 python -I tools/selftest_watch.py
 python -I tools/selftest_route.py
+python -I tools/selftest_upstreams.py
 python -I tools/selftest_ensure.py
 ```
 
-All six must pass; details are in the project's `docs/04-test-record.md`.
+All seven must pass; details are in the project's `docs/04-test-record.md`.
 
 ## After committing
 
