@@ -268,7 +268,7 @@ the project `README.md` records the current build line.
 2. Read this file (`docs/06-ai-maintenance-guide.md`), section 2 code map and section 3 invariants.
 3. Run a health check once: `python <install directory>/doctor.py`; it must show 0 failed (the item count depends on how many providers are configured).
 4. Run the self-tests: `tools/selftest_hook.py` (11 checks), `tools/selftest_proxy_429.py` (12 scenarios), `tools/selftest_stream.py` (32 scenarios), `tools/selftest_route.py` (13 checks),
-   `tools/selftest_watch.py` (12 assertions), `tools/selftest_upstreams.py` (4 checks), `tools/selftest_ensure.py` (serialization); all should PASS.
+   `tools/selftest_watch.py` (12 assertions), `tools/selftest_upstreams.py` (8 checks), `tools/selftest_ensure.py` (serialization); all should PASS.
 
 **Three things you must know before changing code**
 

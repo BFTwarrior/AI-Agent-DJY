@@ -68,7 +68,7 @@ python tools/install.py --with-proxy --provider-id new-provider
 python tools/doctor.py
 ```
 
-**Prefix selection rule**: when `--proxy-prefix` is omitted, the prefix is derived from the original `baseUrl` — if it contains `upstream-b.example.com` the prefix is `/cm`, if it contains `upstream-a.example.com` it is `/ap`; if neither matches the installer **errors out and makes no changes at all**. It never silently defaults to some upstream, which would send channel A's requests to channel B. **Do not guess a prefix for an unknown address** — use `route_providers.py` (`/p`) instead.
+**Prefix selection rule**: when `--proxy-prefix` is omitted, the prefix is derived from the original `baseUrl` by looking up its host in the local `src/upstreams.json`; if the host is not there the installer **errors out and makes no changes at all**. It never silently defaults to some upstream, which would send channel A's requests to channel B. **Do not guess a prefix for an unknown address** — use `route_providers.py` (`/p`) instead.
 
 After opening a new ZCode session, `doctor.py` should show the provider check and the proxy-port check as PASS.
 
@@ -163,11 +163,11 @@ The path prefix selects the upstream:
 | `/ap/...` | upstream A from the local `upstreams.json` (placeholder `upstream-a.example.com` by default) |
 | `/cm/...` | upstream B from the local `upstreams.json` (placeholder `upstream-b.example.com` by default) |
 | `/cg/...` | `http://127.0.0.1:27891/v1/...` (local Cherry gateway) |
+| `/p/<b64>/...` | any origin decoded from the base64url token (recommended, V0.2.6) |
 
 Real relay hosts live in `upstreams.json` next to `retry_proxy.py`; the tracked
 `upstreams.example.json` shows the format. The file is git-ignored and is not included in
 the public release asset.
-| `/p/<b64>/...` | any origin decoded from the base64url token (recommended, V0.2.6) |
 
 So a provider's baseUrl becomes `http://127.0.0.1:8787/p/<b64>` for any relay, or a fixed `/ap/v1` for the AP channel.
 

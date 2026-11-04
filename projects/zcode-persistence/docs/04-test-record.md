@@ -100,10 +100,10 @@ Executed in an isolated HOME sandbox; the real configuration was never touched.
 
 | # | Scenario | Expected | Result |
 |---|---|---|---|
-| 1 | First install with --with-proxy (original address upstream-a.example.com) | 1 hook entry each, baseUrl switched to /ap/v1, state records originalBaseUrl | ✅ |
+| 1 | First install with --with-proxy (original address matches upstream A in `upstreams.json`) | 1 hook entry each, baseUrl switched to /ap/v1, state records originalBaseUrl | ✅ |
 | 2 | Re-running the same install command | Hooks are not duplicated, the provider is unchanged, originalBaseUrl is not overwritten | ✅ |
 | 3 | Wrong providerId | Exits with an error, the configuration is byte-for-byte unchanged | ✅ |
-| 4 | Original address upstream-b.example.com | Automatically selects /cm/v1 | ✅ |
+| 4 | Original address matches upstream B in `upstreams.json` | Automatically selects /cm/v1 | ✅ |
 | 5 | Original address unrecognized and no prefix given | Exits with an error and makes no change | ✅ |
 | 6 | Original address unrecognized + --proxy-prefix ap | Switches normally | ✅ |
 | 7 | uninstall --dry-run | Does not write to disk | ✅ |
@@ -344,6 +344,7 @@ The public tree must not contain real relay hosts. `UPSTREAMS` now holds placeho
 validates host/port/scheme, and can add new prefixes (`/xx`). The file is git-ignored and
 excluded from the release asset; `upstreams.example.json` documents the format.
 
-`selftest_upstreams.py`: 4 checks pass (placeholder default, override `/ap`, add `/xx`,
-invalid entries ignored). Full regression: hook 11, 429 12, stream 32, watch 12, route 13,
+`selftest_upstreams.py`: 8 checks pass (placeholder default, override `/ap`, add `/xx`,
+invalid entries ignored, installer host lookup, explicit prefix wins, unknown host returns
+None, unsupported prefix returns None). Full regression: hook 11, 429 12, stream 32, watch 12, route 13,
 ensure serialization. No default retry parameter changed.

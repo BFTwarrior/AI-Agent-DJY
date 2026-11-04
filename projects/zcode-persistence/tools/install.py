@@ -165,20 +165,45 @@ def find_hooks(events, script, only_event=None):
     return found
 
 
+def load_upstream_hosts():
+    """把 src/upstreams.json 里的 host 映射成前缀名；没有文件就返回空表。
+
+    公开仓库只带 upstreams.example.json；本机真实 host 在 git-ignored 的
+    upstreams.json 里。自动识别只认这份本地表，不在代码里硬编码任何域名。
+    """
+    path = os.path.join(SRC, "upstreams.json")
+    try:
+        with open(path, encoding="utf-8") as fh:
+            data = json.load(fh)
+    except Exception:
+        return {}
+    mapping = {}
+    if not isinstance(data, dict):
+        return mapping
+    for prefix, spec in data.items():
+        if (not isinstance(prefix, str) or not prefix.startswith("/")
+                or not isinstance(spec, list) or len(spec) < 2):
+            continue
+        host = spec[0]
+        name = prefix.lstrip("/")
+        if (isinstance(host, str) and host.strip()
+                and name in PREFIXES):
+            mapping[host.strip().lower()] = name
+    return mapping
+
+
 def pick_prefix(original_base_url, explicit):
     """决定切到哪个上游前缀。
 
-    显式参数优先；否则按原始地址识别；判断不出来返回 None，
+    显式参数优先；否则按本地 upstreams.json 的 host 识别；判断不出来返回 None，
     由调用方报错，绝不静默默认成某个上游（那会把 A 通道的请求发到 B 通道）。
     """
     if explicit:
         return explicit
-    url = (original_base_url or "").lower()
-    if "upstream-b.example.com" in url:
-        return "cm"
-    if "upstream-a.example.com" in url:
-        return "ap"
-    return None
+    host = (urllib.parse.urlsplit(original_base_url or "").hostname or "").lower()
+    if not host:
+        return None
+    return load_upstream_hosts().get(host)
 
 
 def main():
@@ -188,7 +213,7 @@ def main():
     ap.add_argument("--with-proxy", action="store_true", help="把 provider 切到本地重试代理")
     ap.add_argument("--provider-id", default="new-provider", help="要切换到代理的 provider id")
     ap.add_argument("--proxy-prefix", default=None, choices=sorted(PREFIXES),
-                    help="上游前缀；省略时按原始地址自动识别（upstream-b.example.com->cm, upstream-a.example.com->ap）")
+                    help="上游前缀；省略时按本地 upstreams.json 的 host 自动识别，识别不出会报错")
     ap.add_argument("--original-base-url", default=None,
                     help="手工指定该 provider 的原始地址（修复缺失的回滚记录时用）")
     args = ap.parse_args()
