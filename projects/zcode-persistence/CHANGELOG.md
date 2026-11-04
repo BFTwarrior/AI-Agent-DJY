@@ -2,6 +2,16 @@
 
 > 2026-11-01: migrated to the AI-Agent-DJY repository; documentation was translated to English and directories standardized to `docs/` and `diagrams/`. Historical entries keep paths as originally written.
 
+## V0.2.9 — 2026-11-04
+
+- **Public hygiene**: real relay hosts are no longer in the repository or the release
+  asset. `UPSTREAMS` contains placeholder hosts; the proxy loads the real hosts from
+  `upstreams.json` next to `retry_proxy.py` (git-ignored, never packaged). The tracked
+  `upstreams.example.json` documents the format. `/p/<base64>` routing is unchanged.
+- Docs: the current tree has no machine paths, PID or request-ID samples; the release
+  asset is rebuilt from the scrubbed tree.
+- Version fields bumped to 0.2.9.
+
 ## V0.2.8 — 2026-11-04
 
 - **Proxy**: on a non-2xx response, also probe the first 64 KB of the error body for

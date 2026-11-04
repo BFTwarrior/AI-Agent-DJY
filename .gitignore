@@ -42,3 +42,6 @@ build/
 Thumbs.db
 .DS_Store
 desktop.ini
+
+# Local upstream table (real relay hosts; never publish)
+upstreams.json

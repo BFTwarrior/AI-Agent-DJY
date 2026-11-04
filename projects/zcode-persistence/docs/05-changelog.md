@@ -2,6 +2,14 @@
 
 > 2026-11-01: migrated to the AI-Agent-DJY repository; documentation was translated to English and directories standardized to `docs/` and `diagrams/`. Historical entries keep paths as originally written.
 
+## V0.2.9 — 2026-11-04
+
+- **公开面清理**：真实中转域名从仓库与发行资产中移除。`UPSTREAMS` 只保留占位地址；
+  代理启动时从同目录 `upstreams.json` 读取真实上游（该文件被 git 忽略、不进入公开资产）。
+  仓库内保留 `upstreams.example.json` 说明格式；`/p/<base64>` 路由不变。
+- 文档：当前树不含本机路径、PID 或 request ID 样本；发行资产从清理后的树重建。
+- 版本号升至 0.2.9。
+
 ## V0.2.8 — 2026-11-04
 
 - **Proxy**: on a non-2xx response, also probe the first 64 KB of the error body for

@@ -3,10 +3,17 @@
 A ZCode failure-retry toolkit: **suggests a retry when a tool fails**, **automatically
 resends when a model request fails**, plus a default-off **email report of session errors**.
 
-- Version: V0.2.8
+- Version: V0.2.9
 - Build line: 0.4.0
 - Applies to: ZCode Desktop (Windows), Python 3.9+
 - Dependencies: Python standard library only; proxy mode prefers certifi (if installed)
+
+### V0.2.9: relay hosts moved out of the public tree
+
+`UPSTREAMS` now contains placeholder hosts only. The proxy loads real relay hosts from
+`upstreams.json` next to `retry_proxy.py`; the file is git-ignored and never included in
+the public release asset. `src/upstreams.example.json` documents the format. `/p/<base64>`
+routing is unchanged.
 
 ### V0.2.8: retry_after from the error body
 
@@ -78,6 +85,10 @@ python src/route_providers.py
 For prefix selection, parameters, uninstallation and rollback see
 [01-Install and rollback](docs/01-install-and-rollback.md); for design trade-offs and
 internal structure see [03-Architecture](docs/03-architecture.md).
+
+The proxy ships with **placeholder** upstream hosts. Put real relay hosts in
+`src/upstreams.json` (format: `src/upstreams.example.json`); the file is git-ignored and
+is never included in the public release asset. `/p/<base64>` routing does not need it.
 
 ## Safety note
 

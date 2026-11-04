@@ -1,4 +1,4 @@
-# Architecture Diagram (V0.2.8)
+# Architecture Diagram (V0.2.9)
 
 > Build line 0.4.0. Parameters and semantics follow the code in this project's `src/`;
 > this document sketches the relationships without repeating every detail.
@@ -8,8 +8,8 @@
 ```text
 ZCode client
   model request ──► retry_proxy.py (127.0.0.1:8787) ──► upstream relay
-                     ├─ /ap/... → upstream-a.example.com/v1
-                     ├─ /cm/... → upstream-b.example.com/v1
+                     ├─ /ap/... → <upstream-a>/v1
+                     ├─ /cm/... → <upstream-b>/v1
                      ├─ /cg/... → 127.0.0.1:27891/v1
                      └─ /p/<b64>/... → any origin decoded from the token
                         (resends automatically before any byte is returned)

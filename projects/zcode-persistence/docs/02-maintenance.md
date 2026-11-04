@@ -66,18 +66,24 @@ automatically on the next session start.
 
 If you really need a fixed prefix (for example when the baseUrl cannot be edited):
 
-1. Edit `UPSTREAMS` in `src/retry_proxy.py`:
+1. Create or edit `upstreams.json` next to `retry_proxy.py` (source: `src/upstreams.json`,
+   git-ignored; template: `src/upstreams.example.json`):
 
-   ```python
-   UPSTREAMS = {
-       "/ap": ("upstream-a.example.com", 443),
-       "/cm": ("upstream-b.example.com", 443),
-       "/cg": ("127.0.0.1", 27891, "http"),
-       "/xx": ("new-domain.example", 443),  # added
+   ```json
+   {
+     "/ap": ["relay-a.example.net", 443],
+     "/cm": ["relay-b.example.net", 443],
+     "/cg": ["127.0.0.1", 27891, "http"],
+     "/xx": ["new-domain.example", 443]
    }
    ```
 
-2. Add the corresponding entry to the `PREFIXES` dict in `tools/install.py` (the key is the prefix name, the value is the full baseUrl); the prefix name automatically becomes a valid value for `--proxy-prefix`.
+   The proxy reads this file at startup; a missing file falls back to the placeholder
+   hosts in `UPSTREAMS`. No source edit is needed.
+
+2. For a brand-new prefix, add the corresponding entry to the `PREFIXES` dict in
+   `tools/install.py` (the key is the prefix name, the value is the full baseUrl); the
+   prefix name automatically becomes a valid value for `--proxy-prefix`.
 3. Restart the proxy (see below).
 
 ---

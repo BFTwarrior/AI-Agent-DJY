@@ -1,0 +1,5 @@
+{
+  "/ap": ["relay-a.example.net", 443],
+  "/cm": ["relay-b.example.net", 443],
+  "/cg": ["127.0.0.1", 27891, "http"]
+}

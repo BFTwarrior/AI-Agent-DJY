@@ -69,7 +69,7 @@ running process, and the timing defaults may be identical between versions. Run
 version with the installed `VERSION` and warns on a mismatch.
 
 **Do not guess a prefix for an unknown address**: `--proxy-prefix ap` would send
-that provider's requests to `upstream-a.example.com`. Use `route_providers.py` instead.
+that provider's requests to the upstream configured for `/ap`. Use `route_providers.py` instead.
 The prefix is derived from the original address only for known AP/UPSTREAM-B hosts;
 if it cannot be determined the installer errors out and exits, it does not guess.
 

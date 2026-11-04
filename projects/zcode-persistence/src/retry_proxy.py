@@ -30,8 +30,8 @@ ZCode 只看到最终结果，看不到中间失败。
   90→80 秒是为了和客户端 95 秒首字节超时之间多留 15 秒余量。
 
 路径前缀选上游：
-  /ap/...  -> https://upstream-a.example.com/v1/...
-  /cm/...  -> https://upstream-b.example.com/v1/...
+  /ap/...  -> 由本地 upstreams.json 配置的上游 A
+  /cm/...  -> 由本地 upstreams.json 配置的上游 B
   /cg/...  -> http://127.0.0.1:27891/v1/...（本机 Cherry AI 连接中心）
 
 不记录任何请求/响应内容，只记状态行。
@@ -87,7 +87,7 @@ def env_int(name, default, lo=1, hi=1000000):
 LISTEN_HOST = "127.0.0.1"
 LISTEN_PORT = env_int("PROXY_PORT", 8787, 1, 65535)
 # 只用于 /__zp_health 的能力标记，让 ensure_proxy 能分辨"跑的是不是支持 /p 的新代码"。
-PROXY_VERSION = "0.2.8"
+PROXY_VERSION = "0.2.9"
 
 # 重试策略：按"时间窗"而不是次数。默认持续重试 5 分钟，每 20 秒一次（窗口内约 15 次）。
 # MAX_ATTEMPTS 只保留为防跑飞的保险丝，正常永远碰不到。
@@ -237,11 +237,48 @@ DEFAULT_UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
 
 # 值可以是 (host, port) 或 (host, port, scheme)；scheme 默认 https。
 # 允许 http 是为了本地测试和自建反代。
+# 公开仓库/发行包只带占位地址；真实上游放在脚本同目录的 upstreams.json，
+# 该文件被 .gitignore 忽略、也不会进入公开资产。
 UPSTREAMS = {
     "/ap": ("upstream-a.example.com", 443),
     "/cm": ("upstream-b.example.com", 443),
     "/cg": ("127.0.0.1", 27891, "http"),
 }
+
+
+def apply_local_upstreams():
+    """用脚本同目录的 upstreams.json 覆盖占位上游。
+
+    文件格式（键与 `/ap`、`/cm`、`/cg` 对应）：
+        {"/ap": ["relay-a.example.net", 443],
+         "/cm": ["relay-b.example.net", 443, "https"]}
+    文件不存在或条目格式不对时静默保留占位值，不影响 /p 通用路由。
+    """
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "upstreams.json")
+    try:
+        with open(path, encoding="utf-8") as fh:
+            data = json.load(fh)
+    except Exception:
+        return
+    if not isinstance(data, dict):
+        return
+    for key, spec in data.items():
+        if (not isinstance(key, str) or not key.startswith("/")
+                or not 2 <= len(key) <= 8
+                or not isinstance(spec, list) or not 2 <= len(spec) <= 3):
+            continue
+        host, port = spec[0], spec[1]
+        if not isinstance(host, str) or not host.strip():
+            continue
+        if not isinstance(port, int) or not 1 <= port <= 65535:
+            continue
+        scheme = spec[2] if len(spec) == 3 else "https"
+        if scheme not in ("http", "https"):
+            continue
+        UPSTREAMS[key] = (host.strip(), port, scheme)
+
+
+apply_local_upstreams()
 
 HOP_BY_HOP = {
     "connection", "keep-alive", "proxy-authenticate", "proxy-authorization",

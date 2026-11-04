@@ -5,8 +5,8 @@ The old expectations of v0.3.x (filtering out by error type, no retry on `permis
 
 > **Reading order**: Sections 1 through 16 are historical batches kept as-is for traceability
 > (fixed-count retries, the v1.1.0 heartbeat parameters, the v0.4.0 build line, the 2026-10-31 fixes,
-> and the V0.2.1–V0.2.6 changes). **Section 18 (V0.2.8) is the current result; section 17
-> records V0.2.7.** The current defaults
+> and the V0.2.1–V0.2.6 changes). **Section 19 (V0.2.9) is the current result; sections 17–18
+> record V0.2.7–V0.2.8.** The current defaults
 > are a 300-second retry window, one attempt every 20 seconds, a 30-second silence timeout and
 > 80-second heartbeats; the "180-second window" and "503 after 3 retries" wording in old batches is historical only.
 
@@ -334,4 +334,16 @@ logged.
 `selftest_proxy_429.py`: 12 scenarios pass (5 existing + body JSON hint / cap / text form /
 split number / 64 KB bound / empty body / stall budget). The body-hint case also asserts
 the marker string is absent from `proxy.log`. Full regression: hook 11, stream 32,
-watch 12, route 13, ensure serialization. Independent review: overall 4.8/5, code 4.8/5.
+watch 12, route 13, ensure serialization. Independent review (2026-11-04, independent
+subagent review): overall 4.8/5, code 4.8/5.
+
+## 19. V0.2.9 — relay hosts moved to local upstreams.json
+
+The public tree must not contain real relay hosts. `UPSTREAMS` now holds placeholders;
+`apply_local_upstreams()` reads `upstreams.json` next to `retry_proxy.py` at import time,
+validates host/port/scheme, and can add new prefixes (`/xx`). The file is git-ignored and
+excluded from the release asset; `upstreams.example.json` documents the format.
+
+`selftest_upstreams.py`: 4 checks pass (placeholder default, override `/ap`, add `/xx`,
+invalid entries ignored). Full regression: hook 11, 429 12, stream 32, watch 12, route 13,
+ensure serialization. No default retry parameter changed.

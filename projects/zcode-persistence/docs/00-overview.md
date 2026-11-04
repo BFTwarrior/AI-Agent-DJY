@@ -4,8 +4,8 @@
 
 It adds three things to ZCode: **automatically suggest a retry when a tool fails**, **automatically resend when a model request fails**, and (off by default) **email the reason when a session errors**.
 
-- Version: V0.2.8 (build line 0.4.0)
-- Build date: 2026-11-04 (V0.2.8: read `retry_after` from the error body, split-body handling and a ~1 s probe budget (2 s worst case); V0.2.7: JSON validation for buffered tool calls + RST recovery after content for incomplete tool args and upstream SSE errors; V0.2.6: generic `/p` routing + automatic provider migration + retry after a reasoning-only read error + 300 s default window; V0.2.5: buffer tool-call deltas; V0.2.4: absorb upstream SSE `error`; V0.2.3: internal retry for early-finished streams)
+- Version: V0.2.9 (build line 0.4.0)
+- Build date: 2026-11-04 (V0.2.9: real relay hosts moved to git-ignored `upstreams.json`; placeholder defaults; V0.2.8: read `retry_after` from the error body, split-body handling and a ~1 s probe budget (2 s worst case); V0.2.7: JSON validation for buffered tool calls + RST recovery after content for incomplete tool args and upstream SSE errors; V0.2.6: generic `/p` routing + automatic provider migration + retry after a reasoning-only read error + 300 s default window; V0.2.5: buffer tool-call deltas; V0.2.4: absorb upstream SSE `error`; V0.2.3: internal retry for early-finished streams)
 - Applies to: ZCode Desktop (Windows), Python 3.9+
 - Dependencies: Python standard library only; in proxy mode, TLS verification prefers certifi when it is installed
 
@@ -160,9 +160,13 @@ The path prefix selects the upstream:
 
 | Prefix | Target |
 |---|---|
-| `/ap/...` | `https://upstream-a.example.com/v1/...` |
-| `/cm/...` | `https://upstream-b.example.com/v1/...` |
+| `/ap/...` | upstream A from the local `upstreams.json` (placeholder `upstream-a.example.com` by default) |
+| `/cm/...` | upstream B from the local `upstreams.json` (placeholder `upstream-b.example.com` by default) |
 | `/cg/...` | `http://127.0.0.1:27891/v1/...` (local Cherry gateway) |
+
+Real relay hosts live in `upstreams.json` next to `retry_proxy.py`; the tracked
+`upstreams.example.json` shows the format. The file is git-ignored and is not included in
+the public release asset.
 | `/p/<b64>/...` | any origin decoded from the base64url token (recommended, V0.2.6) |
 
 So a provider's baseUrl becomes `http://127.0.0.1:8787/p/<b64>` for any relay, or a fixed `/ap/v1` for the AP channel.

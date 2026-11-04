@@ -9,7 +9,7 @@ The audience for this document is an AI or engineer with **absolutely no context
 | Question | Answer |
 |---|---|
 | What is this | A two-piece "automatic retry on failure" kit for ZCode plus one optional bypass: hook + local proxy + error reporting (off by default) |
-| Version | See `VERSION` (`0.2.8`; the build line is `0.4.0`, and the project `README.md` records the current build line) |
+| Version | See `VERSION` (`0.2.9`; the build line is `0.4.0`, and the project `README.md` records the current build line) |
 | Where is the code | Five Python files in `src/` (hook / proxy / auto-start / route migration / error reporting), no third-party dependencies (certifi optional) |
 | Where it is installed | `C:\Program Files (x86)\AI\Zcode-Persistence\` |
 | Which system config is modified | `~/.zcode/cli/config.json` (hook), `~/.zcode/v2/provider_config.json` (the provider's baseUrl) |
@@ -248,7 +248,7 @@ with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
             src = os.path.join(dp, fn)
             if src == out or fn == "make_zip.py" or fn.endswith((".pyc", ".log")):
                 continue
-            z.write(src, os.path.join("Zcode-Persistence-vX.Y",
+            z.write(src, os.path.join("Zcode-Persistence-VX.Y-正式版",
                     os.path.relpath(src, root)))
 ```
 
@@ -258,7 +258,7 @@ with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
 
 ## Continuing development starts here (for the next AI / engineer)
 
-**First get the version numbers straight**: what you ship externally is the formal release number (`0.2.8`); `0.4.0` is the build-line iteration number,
+**First get the version numbers straight**: what you ship externally is the formal release number (`0.2.9`); `0.4.0` is the build-line iteration number,
 and the two are not the same thing. `VERSION`, `tools/install.py`, `PROXY_VERSION` and `clientInfo.version` all carry the formal release number;
 the project `README.md` records the current build line.
 
@@ -268,7 +268,7 @@ the project `README.md` records the current build line.
 2. Read this file (`docs/06-ai-maintenance-guide.md`), section 2 code map and section 3 invariants.
 3. Run a health check once: `python <install directory>/doctor.py`; it must show 0 failed (the item count depends on how many providers are configured).
 4. Run the self-tests: `tools/selftest_hook.py` (11 checks), `tools/selftest_proxy_429.py` (12 scenarios), `tools/selftest_stream.py` (32 scenarios), `tools/selftest_route.py` (13 checks),
-   `tools/selftest_watch.py` (12 assertions), `tools/selftest_ensure.py` (serialization); all should PASS.
+   `tools/selftest_watch.py` (12 assertions), `tools/selftest_upstreams.py` (4 checks), `tools/selftest_ensure.py` (serialization); all should PASS.
 
 **Three things you must know before changing code**
 

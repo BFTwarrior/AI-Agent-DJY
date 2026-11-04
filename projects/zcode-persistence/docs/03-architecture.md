@@ -7,7 +7,7 @@ ZCode Desktop
   model request ──┐
                   │  (mode B: baseUrl = 127.0.0.1:8787/p/<b64> or a fixed /ap,/cm,/cg)
                   ▼
-            retry_proxy :8787 ──► upstream-a.example.com/v1
+            retry_proxy :8787 ──► <upstream-a>/v1
                   │                (resend on failure)
                   ▼
             upstream relay

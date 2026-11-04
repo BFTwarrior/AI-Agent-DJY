@@ -24,7 +24,7 @@ import sys
 import time
 import urllib.parse
 
-VERSION = "0.2.8"
+VERSION = "0.2.9"
 DEFAULT_PREFIX = r"C:\Program Files (x86)\AI\Zcode-Persistence"
 PROXY_HOST = "127.0.0.1:8787"
 PROXY_PORT = int(PROXY_HOST.rsplit(":", 1)[1])
@@ -271,6 +271,10 @@ def main():
     if os.path.exists(readme_src):
         shutil.copy2(readme_src, os.path.join(prefix, "README.md"))
         placed.append("README.md")
+    upstreams_src = os.path.join(SRC, "upstreams.json")
+    if os.path.exists(upstreams_src):
+        shutil.copy2(upstreams_src, os.path.join(prefix, "upstreams.json"))
+        placed.append("upstreams.json")
     # VERSION 也要落盘：doctor 用它和 /__zp_health 的运行版本对比，
     # 抓“装了新版但旧代理进程还在跑”。
     version_src = os.path.join(os.path.dirname(SRC), "VERSION")
