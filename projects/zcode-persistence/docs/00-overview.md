@@ -101,7 +101,7 @@ projects/zcode-persistence/
 │  ├─ uninstall.py          Uninstall (exact restore)
 │  ├─ doctor.py             Health check
 │  ├─ selftest_hook.py      Self-test: 11 hook checks (10 decision cases + third-attempt wording; exit 1 with no output is not a failure)
-│  ├─ selftest_proxy_429.py Self-test: five retry-semantics scenarios (including 400 not retryable)
+│  ├─ selftest_proxy_429.py Self-test: eleven retry-semantics scenarios (including 400 not retryable, body-supplied retry_after, bounded and split-body probes)
 │  ├─ selftest_stream.py    Self-test: 32 streaming scenarios (including RST recovery, multi-index order, CPU, NaN)
 │  ├─ selftest_watch.py     Self-test: 12 error-reporting assertions (cooldown/rate limit/send failure/cause attribution/--once does not persist)
 │  ├─ selftest_route.py     Self-test: 13 /p routing and migration checks

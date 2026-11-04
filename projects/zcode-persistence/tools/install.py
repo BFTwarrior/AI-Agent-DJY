@@ -24,7 +24,7 @@ import sys
 import time
 import urllib.parse
 
-VERSION = "0.2.7"
+VERSION = "0.2.8"
 DEFAULT_PREFIX = r"C:\Program Files (x86)\AI\Zcode-Persistence"
 PROXY_HOST = "127.0.0.1:8787"
 PROXY_PORT = int(PROXY_HOST.rsplit(":", 1)[1])

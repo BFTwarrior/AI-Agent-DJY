@@ -87,7 +87,7 @@ def env_int(name, default, lo=1, hi=1000000):
 LISTEN_HOST = "127.0.0.1"
 LISTEN_PORT = env_int("PROXY_PORT", 8787, 1, 65535)
 # 只用于 /__zp_health 的能力标记，让 ensure_proxy 能分辨"跑的是不是支持 /p 的新代码"。
-PROXY_VERSION = "0.2.7"
+PROXY_VERSION = "0.2.8"
 
 # 重试策略：按"时间窗"而不是次数。默认持续重试 5 分钟，每 20 秒一次（窗口内约 15 次）。
 # MAX_ATTEMPTS 只保留为防跑飞的保险丝，正常永远碰不到。
@@ -170,25 +170,56 @@ RETRY_AFTER_CAP = max(0.0, env_float("PROXY_RETRY_AFTER_CAP", 60.0))
 # 错误页可能很大（Cloudflare HTML），整读会拖住重试；正文绝不写日志。
 ERROR_BODY_PROBE = 64 * 1024
 
+# 探测正文的总墙钟预算：正文分段到达时最多等这么久，避免慢错误页拖住重试。
+ERROR_BODY_BUDGET = 1.0
+
 
 def retry_after_from_body(body):
     """从错误正文补读服务端给的等待秒数。
 
-    响应头 Retry-After 优先；Cloudflare/中转的 502/503 也常把等待时间写在
-    正文里（`"retry_after":60` 或 `Retry-After: 5`），头里反而没有。
-    只匹配数字，不解析、不记录正文；上限同 RETRY_AFTER_CAP。
+    Cloudflare/中转的 502/503 常把等待时间写在正文里
+    （`"retry_after":60` 或 `Retry-After: 5`），响应头反而没有；调用方与
+    响应头取较长者。只匹配数字，不解析、不记录正文；上限同 RETRY_AFTER_CAP。
     """
     if not body:
         return 0.0
-    match = re.search(rb'"retry_after"\s*:\s*(\d+(?:\.\d+)?)', body, re.I)
+    number = rb'(\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)'
+    match = re.search(rb'"retry[_-]?after"\s*:\s*' + number, body, re.I)
     if match is None:
-        match = re.search(rb'retry-after\s*[:=]\s*(\d+)', body, re.I)
+        match = re.search(rb'retry[_-]?after["\']?\s*[:=]\s*' + number, body, re.I)
     if match is None:
         return 0.0
     try:
         return min(float(match.group(1)), RETRY_AFTER_CAP)
     except ValueError:
         return 0.0
+
+
+def probe_retry_after(resp):
+    """分段读取错误正文，直到找到等待提示、读满 64KB 或超出预算。
+
+    `read1` 只做一次底层读，正文分段时提示可能落在第二段；所以循环累积。
+    读取量有上限、时间有预算；正文只在内存里做正则，不写日志。
+    """
+    chunks = []
+    total = 0
+    deadline = time.monotonic() + ERROR_BODY_BUDGET
+    while total < ERROR_BODY_PROBE:
+        try:
+            part = resp.read1(min(ERROR_BODY_PROBE - total, 65536))
+        except Exception:
+            break
+        if not part:
+            break
+        chunks.append(part)
+        total += len(part)
+        hint = retry_after_from_body(b"".join(chunks))
+        if hint > 0:
+            return hint
+        if time.monotonic() >= deadline:
+            break
+    return 0.0
+
 
 DEFAULT_UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
               "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
@@ -368,10 +399,8 @@ def fetch_once(host, port, scheme, method, path, headers, body):
     if retryable_status(resp.status):
         retry_after = parse_retry_after(resp.getheader("Retry-After"))
         try:
-            # 有界探测：只读开头 64KB 找正文里的等待提示；不整读大错误页，
-            # 也不把正文写进日志（只记状态行）。
-            probe = resp.read1(ERROR_BODY_PROBE)
-            retry_after = max(retry_after, retry_after_from_body(probe))
+            # 有界探测：分段读到 64KB 或命中提示为止；正文不写日志（只记状态行）。
+            retry_after = max(retry_after, probe_retry_after(resp))
         except Exception:
             pass
         try:

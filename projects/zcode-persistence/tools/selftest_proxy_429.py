@@ -14,6 +14,9 @@
   6. 502 正文里的 `"retry_after":0.9` 会被读出来参与退避，且正文不落日志
   7. 正文里的等待秒数同样受 RETRY_AFTER_CAP 封顶
   8. 正文里的 `Retry-After: 1` 文本形式也能读出来
+  9. 正文分两段、提示在第二段时也能读到（单次 read1 会漏）
+ 10. 正文超过 64KB 时只探测前 64KB，界外提示不生效（backoff 仍为 0.2s）
+ 11. 空正文不会误匹配，backoff 仍为 0.2s
 
 用法：python tools/selftest_proxy_429.py            （默认读同包 src/retry_proxy.py）
       python tools/selftest_proxy_429.py --src X    （指定要测的脚本）
@@ -37,9 +40,10 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 class FakeUpstream(object):
     """按 plan 依次返回状态码；plan 用完后一直返最后一个。"""
 
-    def __init__(self, plan, port, error_body=None):
+    def __init__(self, plan, port, error_body=None, error_split=None):
         self.plan = list(plan)
         self.error_body = error_body
+        self.error_split = error_split
         self.hits = 0
         outer = self
 
@@ -62,7 +66,14 @@ class FakeUpstream(object):
                     self.send_header("Content-Type", "application/json")
                     self.send_header("Content-Length", str(len(body)))
                     self.end_headers()
-                    self.wfile.write(body)
+                    if outer.error_split is not None:
+                        cut, delay = outer.error_split
+                        self.wfile.write(body[:cut])
+                        self.wfile.flush()
+                        time.sleep(delay)
+                        self.wfile.write(body[cut:])
+                    else:
+                        self.wfile.write(body)
                     return
                 body = json.dumps({"id": "cmpl-1", "choices": [
                     {"message": {"role": "assistant", "content": "ok"}}]}).encode()
@@ -148,7 +159,7 @@ def free_pair():
 
 
 def run_case(name, plan, src, env_extra, proxy_port=None,
-             path="/ap/v1/chat/completions", error_body=None):
+             path="/ap/v1/chat/completions", error_body=None, error_split=None):
     "跑一个用例：起假上游 → 起代理副本 → 发请求 → 收集日志。"
     workdir = tempfile.mkdtemp(prefix="proxytest-")
     proxy_port = proxy_port or free_pair()
@@ -163,7 +174,8 @@ def run_case(name, plan, src, env_extra, proxy_port=None,
     results = {}
     try:
         proxy = make_proxy_copy(src, workdir, upstream_port)
-        with FakeUpstream(plan, upstream_port, error_body=error_body) as up:
+        with FakeUpstream(plan, upstream_port, error_body=error_body,
+                          error_split=error_split) as up:
             out = open(logfile, "w", encoding="utf-8")
             proc = subprocess.Popen([sys.executable, proxy], env=env,
                                     stdout=out, stderr=subprocess.STDOUT,
@@ -192,7 +204,7 @@ def run_case(name, plan, src, env_extra, proxy_port=None,
 
 
 def main():
-    "依次跑 8 个场景并汇总；全部通过退出码 0。"
+    "依次跑 11 个场景并汇总；全部通过退出码 0。"
     ap = argparse.ArgumentParser()
     ap.add_argument("--src", default=os.path.join(
         os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -277,6 +289,32 @@ def main():
                  error_body=b"upstream busy\nRetry-After: 1\n")
     expect = (r["status"] == 200 and r["hits"] == 2
               and "backoff 1s" in r["log"])
+    print("   判定:", "PASS" if expect else "FAIL")
+    ok = ok and expect
+
+    # 场景 9：正文分两段、提示在第二段——单次 read1 只会拿到第一段，
+    # 必须循环累积才能读到。
+    r = run_case("正文分段 retry_after", [502, 200], args.src, {},
+                 error_body=b'{"error":{"message":"split","retry_after":1}}',
+                 error_split=(20, 0.4))
+    expect = (r["status"] == 200 and r["hits"] == 2
+              and "backoff 1s" in r["log"])
+    print("   判定:", "PASS" if expect else "FAIL")
+    ok = ok and expect
+
+    # 场景 10：正文超过 64KB，提示在探测窗口之外——不能被读到，
+    # 退避回到默认 0.2s，证明读取有界。
+    big = b"x" * (64 * 1024 + 1000) + b'"retry_after":5'
+    r = run_case("正文超过 64KB", [502, 200], args.src, {}, error_body=big)
+    expect = (r["status"] == 200 and r["hits"] == 2
+              and "backoff 0.2s" in r["log"])
+    print("   判定:", "PASS" if expect else "FAIL")
+    ok = ok and expect
+
+    # 场景 11：空正文不误匹配，退避仍为默认 0.2s
+    r = run_case("空错误正文", [503, 200], args.src, {}, error_body=b"")
+    expect = (r["status"] == 200 and r["hits"] == 2
+              and "backoff 0.2s" in r["log"])
     print("   判定:", "PASS" if expect else "FAIL")
     ok = ok and expect
 

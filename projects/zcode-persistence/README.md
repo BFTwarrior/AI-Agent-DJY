@@ -3,9 +3,17 @@
 A ZCode failure-retry toolkit: **suggests a retry when a tool fails**, **automatically
 resends when a model request fails**, plus a default-off **email report of session errors**.
 
-- Version: V0.2.7 patch release (build line 0.4.0)
+- Version: V0.2.8 (main; latest published release V0.2.7)
 - Applies to: ZCode Desktop (Windows), Python 3.9+
 - Dependencies: Python standard library only; proxy mode prefers certifi (if installed)
+
+### V0.2.8: retry_after from the error body
+
+The proxy now also reads the wait hint from the first 64 KB of a non-2xx error body
+(`"retry_after":N` or `Retry-After: N`), takes the longer of header/body, and keeps the
+60-second cap. The probe accumulates chunks until it finds a hint, reads 64 KB, or spends
+1 second, so a split body is handled without stalling the retry. The body is never logged.
+`selftest_proxy_429.py` now covers 11 scenarios, including split bodies and the 64 KB bound.
 
 ### V0.2.7: recover after content has been written
 

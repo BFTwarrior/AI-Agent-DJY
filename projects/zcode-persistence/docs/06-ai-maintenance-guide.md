@@ -99,7 +99,7 @@ Error reporting: polls `session.last_outcome` in `~/.zcode/cli/db/db.sqlite`; wh
 - `uninstall.py`: delete hooks by exact basename; the provider is restored only when "current value == the recorded proxyBaseUrl"; `/p` migrations are restored from `provider_config.json.proxy-origins.json`, including before `--purge`; `--purge` verifies the process command line before killing, and only accepts prefix records whose directory really contains this tool's files.
 - `doctor.py`: script, interpreter, `hooks.enabled`, the three hooks (the two tool hooks validate matcher=Bash, all three validate the script path), provider, port, proxy version (running vs installed), proxy runtime parameters, error-watch status, log tail. The log tail reads only the last 64KB; finding the "start line" walks back from the end of the file in 64KB blocks, up to 8MB.
 - `selftest_hook.py`: 11 hook checks (10 decision cases + third-attempt wording; including exit 1 with no output, timeouts and cancelled calls).
-- `selftest_proxy_429.py`: five retry-semantics scenarios (429 recovers / persistent 429 / 400 recovers / persistent 400 / unknown prefix 400 must be `retryable:false`).
+- `selftest_proxy_429.py`: eleven retry-semantics scenarios (429 recovers / persistent 429 / 400 recovers / persistent 400 / unknown prefix 400 must be `retryable:false` / body-supplied `retry_after` / cap / text form / split body / 64 KB bound / empty body).
 - `selftest_stream.py`: 32 streaming scenarios (including missing-finish-reason, upstream-error, partial-tool-call, RST-after-content, multi-index ordering, CPU after reset, `NaN` and legacy `function_call` cases).
 - `selftest_watch.py`: 12 assertions for error reporting (new red dot / dedupe / historical baseline / completed and stopped are not reported / rate limit / multiple sessions merged / wording when there are no relevant records / failure but not given up · new format / same · old format / cooldown and expiry / send failure retry / `--once` writes nothing to disk).
 - `selftest_route.py`: 13 `/p` routing and provider-migration checks.
@@ -267,7 +267,7 @@ the project `README.md` records the current build line.
 1. Read the "What it is / Limitations" sections of `README.md`.
 2. Read this file (`docs/06-ai-maintenance-guide.md`), section 2 code map and section 3 invariants.
 3. Run a health check once: `python <install directory>/doctor.py`; it must show 0 failed (the item count depends on how many providers are configured).
-4. Run the self-tests: `tools/selftest_hook.py` (11 checks), `tools/selftest_proxy_429.py` (8 scenarios), `tools/selftest_stream.py` (32 scenarios), `tools/selftest_route.py` (13 checks),
+4. Run the self-tests: `tools/selftest_hook.py` (11 checks), `tools/selftest_proxy_429.py` (11 scenarios), `tools/selftest_stream.py` (32 scenarios), `tools/selftest_route.py` (13 checks),
    `tools/selftest_watch.py` (12 assertions), `tools/selftest_ensure.py` (serialization); all should PASS.
 
 **Three things you must know before changing code**

@@ -113,8 +113,8 @@ write response headers (strip hop-by-hop) → read1 chunk by chunk, flush to the
 
 **The retry decision (since v0.4.0; 300-second window since V0.2.6)**: every failed attempt is resent — connection errors, any
 non-2xx from upstream, and silence timeouts. It is not count-based but time-window-based:
-keep retrying for 5 minutes, once every 20 seconds (`Retry-After` is honored, capped at 60
-seconds), and only stop when the window expires; `MAX_ATTEMPTS=200` is merely a fuse against
+keep retrying for 5 minutes, once every 20 seconds (`Retry-After` from the response header
+or the error body is honored, capped at 60 seconds), and only stop when the window expires; `MAX_ATTEMPTS=200` is merely a fuse against
 runaway retries. During backoff the thread does a `time.sleep` until the next attempt
 instead of spinning. Heartbeats are independent of attempt boundaries: after 80 consecutive
 seconds without upstream input one `: keepalive` is sent, and then one every 80 seconds,
