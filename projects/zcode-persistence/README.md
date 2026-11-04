@@ -3,7 +3,7 @@
 A ZCode failure-retry toolkit: **suggests a retry when a tool fails**, **automatically
 resends when a model request fails**, plus a default-off **email report of session errors**.
 
-- Version: V0.2.8 (main; latest published release V0.2.7)
+- Version: V0.2.8
 - Applies to: ZCode Desktop (Windows), Python 3.9+
 - Dependencies: Python standard library only; proxy mode prefers certifi (if installed)
 
@@ -88,7 +88,7 @@ email addresses.
 
 ## Distribution
 
-The latest published distribution package lives in the repository Releases:
-`proj-zcode-persistence-v0.2.7`. The `0.2.8` build is on `main` and is not yet published.
+The distribution package lives in the repository Releases:
+`proj-zcode-persistence-v0.2.8`.
 The archive contains build artifacts; this directory is authoritative for the source, and
 if the two disagree, this directory plus the tag wins.
