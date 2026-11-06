@@ -18,8 +18,13 @@ When the window is exhausted *after* the 200 + heartbeats were already sent, the
 now writes one zero-width `content` delta and resets the client connection. The client
 resumes a stream only when it has discarded text **and** sees `ECONNRESET`; with
 heartbeats alone the discarded byte count is 0, so a bare RST never triggered a retry.
+A settle delay (`PROXY_ANCHOR_SETTLE_MS`, default 300 ms) sits between the write and the
+reset: `SO_LINGER=0` drops unread peer data, and an immediate reset lost the anchor in
+11 of 43 measured runs.
+
 A per-session one-shot token (`PROXY_RETRY_ONCE_TTL`, default 900 s) limits this to one
-retry per session, so the client's 10 retries cannot multiply with the proxy window.
+retry per session, so the client's 10 retries cannot multiply with the proxy window. The
+token is released if the anchor write fails.
 
 ### V0.2.9: relay hosts moved out of the public tree
 

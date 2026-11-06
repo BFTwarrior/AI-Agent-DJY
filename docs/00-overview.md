@@ -77,7 +77,7 @@ repo projects/<name>/ ──tag/Release──►  GitHub Releases (archives)
 
 Details: [03-Deployment and Sync](03-deployment-and-sync.md).
 
-## Current contents (2026-11-04)
+## Current contents (2026-11-07)
 
 - 3 skills: `code-review-and-quality`, `code-simplification`, `constraint-driven-development`
 - 2 MCP entries: `github`, `ms365` (config templates only, no secrets)

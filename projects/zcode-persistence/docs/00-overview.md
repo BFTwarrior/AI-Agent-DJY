@@ -154,7 +154,7 @@ Since v0.4.0 there is no filtering by error type any more — as soon as a Bash 
 
 ```
 ZCode ──► 127.0.0.1:8787 ──► real relay ──► upstream
-Resend on any error: up to 5 minutes, one attempt every 20 seconds; give up only when the window expires
+Resend on any error: up to 10 minutes, one attempt every 20 seconds; give up only when the window expires
 ```
 
 The path prefix selects the upstream:
@@ -180,7 +180,7 @@ So a provider's baseUrl becomes `http://127.0.0.1:8787/p/<b64>` for any relay, o
 
 **Retry count**
 
-Not by count but by time window: **keep retrying for 5 minutes, once every 20 seconds** (about 15 attempts inside the window), identical for streaming and non-streaming.
+Not by count but by time window: **keep retrying for 10 minutes, once every 20 seconds** (about 30 attempts inside the window), identical for streaming and non-streaming.
 Wait **20 seconds** between two attempts; if the upstream returns a longer `Retry-After` (response header or error body), honour that instead (capped at 60 seconds). When the header is absent, the proxy probes the first 64 KB of the non-2xx body for `"retry_after":N` or `Retry-After: N`; the body itself is never logged. When the window expires no new attempt is started;
 the attempt already in flight is allowed to run to completion (connect 10 s + send 90 s + wait for headers 60 s maximum), so the total duration may be slightly longer than the window.
 In practice failures are mostly **HTTP 429 (concurrency saturated)**; waiting a few seconds before resending almost always gets through.
@@ -203,8 +203,7 @@ After the change the client uses its own stream-recovery retry (at most 10 times
 the equivalent of automatically sending a "continue". **This only applies to 503 (the proxy exhausted its retries)**; for 400 (the client itself wrote a wrong prefix / request body)
 the proxy returns `invalid_request` + `retryable:false`, so that deterministic errors are not resent 10 times.
 
-If a streaming response has already started (heartbeat mode, or an early retry that already sent the 200 headers), giving up can only stuff the same error body into an SSE `data:` event,
-with a chunked terminating block appended at the end — scenario 7 in `tools/selftest_stream.py` watches exactly this part.
+If a streaming response has already started (heartbeat mode, or an early retry that already sent the 200 headers), the status line can no longer change. Since V0.2.10 the first exhaustion of a session writes one zero-width `content` delta, waits `PROXY_ANCHOR_SETTLE_MS` (default 300 ms), then resets the client connection so ZCode really resends once; the client resumes only when it has discarded text **and** sees `ECONNRESET`. Later exhaustions in the same session (`PROXY_RETRY_ONCE_TTL`, default 900 s) fall back to stuffing the same error body into an SSE `data:` event with a chunked terminating block — scenario 7 and scenario 33 in `tools/selftest_stream.py` watch these two paths.
 
 **Heartbeat keep-alive**
 

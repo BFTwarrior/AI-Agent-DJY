@@ -186,7 +186,8 @@ def claim_retry_once(key):
     caller within the TTL gets it.
 
     When the proxy gives up in heartbeat mode, an SSE business error is never
-    retried by the client (retryable is always false). The only working entry is
+    retried by the client: its resume path needs discarded text AND a retryable
+    error, and an SSE business error ends the turn instead. The only working entry is
     RST plus already-discarded content. One RST buys up to 10 client resends, each
     of which re-enters the proxy's 10-minute window, so this gate is mandatory:
     without it an upstream that stays down rolls into dozens of requests. The key
@@ -591,10 +592,11 @@ def pipe_response(handler, resp, conn, path, started, sse_started=False, heartbe
     saw_choices = False
     finish_out = False
     early = False
-    # V0.2.7：正文已经写出、后面却残缺/上游报错时，内部重发会重复正文，不能
-    # 再走 early。改为 RST 客户端连接：客户端把传输层 ECONNRESET 当作可重试
-    # 错误，丢弃这段残缺输出并用 previous-message-anchor 续写（Sqo=10 次预算）。
-    # 不能发 SSE 业务错误——客户端会包成 ProviderBusinessError，retryable 恒为 false。
+    # V0.2.7: once content is out, an internal resend would duplicate it, so this
+    # cannot go through the early path. The client resumes only when it has
+    # discarded text AND the error is retryable: a transport-level ECONNRESET
+    # qualifies, an SSE business error (ProviderBusinessError) does not. The client
+    # drops the partial output and resends with previous-message-anchor (budget 10).
     client_reset = False
     # 客户端写失败（关窗/取消）不能当成上游失败去重发；emit() 置位。
     client_gone = False
@@ -723,12 +725,14 @@ def pipe_response(handler, resp, conn, path, started, sse_started=False, heartbe
     def reset_for_recovery(why):
         """正文已写出、工具调用残缺：RST 客户端连接，让客户端自己续写。
 
-        V0.2.7：内部重发会把用户已经看到的正文再写一遍，不能再走 early。
-        发 SSE 业务错误也没用：客户端把它包成 ProviderBusinessError，
-        retryable 恒为 false（2026-11-02 实测）。客户端唯一认的恢复入口是
-        **传输层错误**：它看到 ECONNRESET 且有 partial 输出时，会丢弃这段
-        输出、用 previous-message-anchor 重新请求（最多 10 次）。
-        所以这里不给终止块，直接 SO_LINGER=0 关客户端 socket 制造 RST。
+        V0.2.7: an internal resend would replay content the user has already seen,
+        so the early path is closed here. An SSE business error does not help either:
+        the client wraps it as ProviderBusinessError and ends the turn. The client
+        resumes only when it has discarded text AND the error is retryable, and the
+        only such entry is a transport error — it sees ECONNRESET with partial output,
+        drops that output and resends with previous-message-anchor (budget 10).
+        So write no terminating block and close the client socket with
+        SO_LINGER=0 to produce a RST.
         """
         nonlocal client_reset
         client_reset = True
@@ -1146,9 +1150,10 @@ class Handler(BaseHTTPRequestHandler):
     def _reset_client(self, why):
         """Close the client connection with SO_LINGER=0 to emit a RST.
 
-        Since V0.2.7 a RST is the only entry that can make ZCode resend: a stream
-        that ends with an SSE business error is reported as ProviderBusinessError
-        and the turn ends. This helper only emits the RST; the caller decides
+        Since V0.2.7 a RST is the only entry that can make ZCode resend: the client
+        resumes a stream only when it has discarded text AND the error is retryable,
+        and a stream that ends with an SSE business error is reported as
+        ProviderBusinessError, ending the turn. This helper only emits the RST; the caller decides
         whether it is warranted — incomplete content goes through
         reset_for_recovery, an exhausted window in heartbeat mode goes through
         _seed_retry_anchor.
@@ -1441,9 +1446,10 @@ class Handler(BaseHTTPRequestHandler):
                   % (waited, attempt, ",".join(reasons[-5:])))
         if sse_mode:
             # 200 + heartbeats are already on the wire: a mid-stream SSE error is
-            # wrapped as ProviderBusinessError (retryable always false) and kills
-            # the turn. The only entry that makes the client retry is "discarded
-            # text + ECONNRESET", so seed a zero-width delta and then RST.
+            # wrapped as ProviderBusinessError and ends the turn; the client's
+            # resume path needs discarded text AND a retryable error. The only entry
+            # is "discarded text + ECONNRESET", so seed a zero-width delta, settle,
+            # then RST.
             # One attempt per session, otherwise this becomes a 10×N storm.
             key = self._session_key()
             if claim_retry_once(key):

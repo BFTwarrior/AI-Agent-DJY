@@ -81,15 +81,15 @@ read the full body (supports Content-Length and chunked)
    │
    ▼
 attempt 1:
-  connect(10s) → send(90s) → wait for first byte(30s)
+  connect(10s) → send(90s) → wait for first byte(60s)
    ├─ connection failure / any non-2xx ──► retry
-   ├─ no response headers within 30s ────► retry
+   ├─ no response headers within 60s ────► retry
    └─ headers received ──────────────────► start write-back
    │
    ▼
 write response headers (strip hop-by-hop) → read1 chunk by chunk, flush to the client
    │  (streaming: the reader thread only does blocking reads; the main thread checks the
-   │   queue every 0.5s; after 80s of silence add `: keepalive`; at 300s mark truncation)
+   │   queue every 0.5s; after 80s of silence add `: keepalive`; at 600s mark truncation)
    │
    ├─ SSE ends ([DONE] / clean EOF) with no finish_reason, or an unknown reason,
    │   and no text/tool call yet ──► return "early"; _handle re-requests upstream and

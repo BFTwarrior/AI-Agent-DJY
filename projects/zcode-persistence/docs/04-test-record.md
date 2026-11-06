@@ -352,14 +352,16 @@ ensure serialization. No default retry parameter changed.
 ## 20. V0.2.10 — longer window + one real client retry
 
 Field evidence (2026-11-06): a request carrying ~420k input tokens spent 355 s in five
-silent attempts and gave up after 355 s; the same upstream answered normally again
+silent attempts and gave up; the same upstream answered normally again
 157 s later. A 5-minute window cannot outlast that kind of stall, and a 30-second silence
 cutoff discards slow-but-healthy large requests.
 
 - `PROXY_RETRY_WINDOW` 300 → 600 s; `PROXY_SILENCE_TIMEOUT` 30 → 60 s.
 - After the window is exhausted **and** the 200 + heartbeats were already sent, the
-  proxy writes one zero-width `content` delta (`chatcmpl-zp-anchor`) and then resets
-  the client connection with `SO_LINGER=0`. ZCode only resumes a stream when it has
+  proxy writes one zero-width `content` delta (`chatcmpl-zp-anchor`), waits
+  `PROXY_ANCHOR_SETTLE_MS` (default 300 ms), then resets the client connection with
+  `SO_LINGER=0`. The settle delay is required: an immediate reset lost the anchor in
+  11 of 43 measured runs because `SO_LINGER=0` drops unread peer data. ZCode only resumes a stream when it has
   discarded text **and** sees `ECONNRESET`; with heartbeats alone the discarded byte
   count is 0, so a bare RST never triggered a retry.
 - `PROXY_RETRY_ONCE_TTL` (default 900 s): the first exhaustion of a session gets the
