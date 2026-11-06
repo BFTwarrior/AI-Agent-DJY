@@ -264,7 +264,7 @@ It checks each item in turn: whether the scripts are all present, whether the in
    explicitly; if the account's own QQ address is used as `From`, the mail only stays in "Sent" and QQ never receives it (verified on 2026-10-31).
 8. **This project is not an official component**; the ultimate fallback on failure is always `uninstall.py` + the config backups.
 9. **The following things have not been verified end-to-end in a real ZCode turn**: the client's automatic continuation for 503 / SSE error bodies, and the V0.2.7 RST path when retries are genuinely exhausted. The RST → `ECONNRESET` recognition is verified with a Node/undici probe, but the full client continuation has not been observed in ZCode. The recovery behaviour of the MCP send-failure path is also unverified.
-   The actual process swap performed by `restart_proxy_idle.py` has been verified on 2026-11-01 02:58 (old process terminated, single listener, correct `root`).
+   The actual process swap performed by `restart_proxy_idle.py` has been verified on a live machine (old process terminated, single listener, correct `root`).
 
 ---
 

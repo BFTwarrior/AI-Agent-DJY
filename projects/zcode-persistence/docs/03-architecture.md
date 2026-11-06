@@ -134,7 +134,7 @@ the client is reset instead (V0.2.7). If a complete tool call or a `finish_reaso
 already been written, the event is passed through — a retry would run tools twice.
 
 **Recovering after content (V0.2.7)**: an internal re-request would duplicate the text,
-and an SSE business error becomes `ProviderBusinessError` (`retryable` always false). The
+and an SSE business error becomes `ProviderBusinessError`, which is not retryable. The
 client's `Eqo()` only recovers when discarded reasoning/text bytes > 0 and `sqa(error)` is
 true; `sqa()` walks the `cause` chain and accepts `ECONNRESET`. The proxy therefore
 validates every buffered tool call as JSON (`NaN`/`Infinity` rejected) and, if content was

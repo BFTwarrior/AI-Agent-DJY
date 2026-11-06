@@ -200,8 +200,8 @@ All three self-test suites ran on local loopback with temporary databases and te
 | 16 | Same as above | The send fails | `seen` does not advance, and the retry after the backoff succeeds | ✅ |
 | 17 | Same as above | `--once` (going through the full `main()`) | Prints only; no mail sent, no state file written | ✅ |
 
-Real-machine record (not a self-test): at 22:51 on 2026-10-31 a self-test mail was sent with the corrected `From`;
-from 22:57 to 22:59 the watcher sent 8 mails in a row for the same session (deduplication compared timestamps only), so the watcher was disabled that same day and changed to
+Real-machine record (not a self-test): on 2026-10-31 a self-test mail was sent with the corrected `From`;
+later that evening the watcher sent 8 mails in a row for the same session (deduplication compared timestamps only), so the watcher was disabled that same day and changed to
 "advance seen only after a successful send + 600-second per-session cooldown + at most 8 mails per hour + not started by default (`ZCODE_PERSISTENCE_WATCH=1`)".
 
 ## 14. Process swap with `--force` (2026-11-01)

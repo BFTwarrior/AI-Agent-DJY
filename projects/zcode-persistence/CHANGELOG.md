@@ -88,7 +88,8 @@ no `tool-call` is emitted, and the turn dies.
 
 **Cause**: the gateway returned an in-stream SSE error after content. V0.2.4 forwarded
 it to avoid duplication; the client wrapped it in `ProviderBusinessError`
-(`retryable` always false) and ended the turn without a retry.
+(`retryable` is not set, so the client does not resume) and ended the turn
+without a retry.
 
 **Fix**: the error branch now splits by what was actually written:
 - no content and no complete tool call: swallow the event and re-request internally;
