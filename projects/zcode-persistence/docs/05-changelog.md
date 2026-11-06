@@ -209,7 +209,7 @@ two such streams were re-requested internally, and the client completed both wit
 
 ### Hook no longer treats "no match" as a failure
 
-**Problem**: a Bash call ending with `exitCode=1` and completely empty stdout/stderr — `grep -q` with no match, `diff --quiet` with differences, a false `test` — was treated as a failure. The client also marks such calls `status="failed"`, so the hook advised a retry three times. The third message told the model to stop and explain, and it did: the "test" session started at 21:22:58, received the 3/3 advice at 21:24:09, and finished at 21:24:14 (1m16s), matching the screenshot's "worked 1m17s / stopped".
+**Problem**: a Bash call ending with `exitCode=1` and completely empty stdout/stderr — `grep -q` with no match, `diff --quiet` with differences, a false `test` — was treated as a failure. The client also marks such calls `status="failed"`, so the hook advised a retry three times. The third message told the model to stop and explain, and it did: the "test" session received the 3/3 advice and finished about 76 s later, matching the screenshot's "worked 1m17s / stopped".
 
 **Fix**:
 - `failure_of()` now treats `exitCode == 1`, not timed out, not cancelled, and empty stdout/stderr as **not a failure**. Any other exit code, any output, a timeout, or cancellation still counts as a failure.
