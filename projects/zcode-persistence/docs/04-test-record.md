@@ -366,7 +366,8 @@ cutoff discards slow-but-healthy large requests.
   count is 0, so a bare RST never triggered a retry.
 - `PROXY_RETRY_ONCE_TTL` (default 900 s): the first exhaustion of a session gets the
   anchor + RST, later ones fall back to the ordinary retryable SSE error. Without this
-  the client's 10 retries would multiply with the proxy window.
+  gate on this branch the client's 10 retries would multiply with the proxy window;
+  `reset_for_recovery` keeps resetting whenever incomplete content requires it.
 - `reset_for_recovery` now delegates socket teardown to a shared `Handler._reset_client`;
   the V0.2.7 RST paths are unchanged.
 
