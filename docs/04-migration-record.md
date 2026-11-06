@@ -43,9 +43,9 @@ not copied into the repository.
 | `diagrams/` | 1 | `architecture.md` |
 | Root | 4 | `README.md`, `CHANGELOG.md`, `VERSION`, `AGENTS.md` |
 
-This table is the V0.2.1 import snapshot. The current tree has 28 files: `src/` 5 (adds
-`route_providers.py`), `tools/` 10 (adds `selftest_route.py` and `selftest_ensure.py`),
-`docs/` 8 (English), `diagrams/` 1, root 4.
+This table is the V0.2.1 import snapshot. The current tree has 30 files: `src/` 6 (adds
+`route_providers.py` and `upstreams.example.json`), `tools/` 11 (adds `selftest_route.py`,
+`selftest_ensure.py` and `selftest_upstreams.py`), `docs/` 8 (English), `diagrams/` 1, root 4.
 
 The table is the V0.2.1 snapshot (25 files). The byte counts below describe the initial V0.2
 import (24 files) from the pre-public local snapshot; the public history may differ after the

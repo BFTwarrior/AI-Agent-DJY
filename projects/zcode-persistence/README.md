@@ -8,6 +8,8 @@ resends when a model request fails**, plus a default-off **email report of sessi
 - Applies to: ZCode Desktop (Windows), Python 3.9+
 - Dependencies: Python standard library only; proxy mode prefers certifi (if installed)
 
+## Version history
+
 ### V0.2.10: longer retry window + one real client retry
 
 `PROXY_RETRY_WINDOW` is 600 s (was 300) and `PROXY_SILENCE_TIMEOUT` is 60 s (was 30):
