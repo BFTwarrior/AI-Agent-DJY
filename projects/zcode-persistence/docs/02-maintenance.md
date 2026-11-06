@@ -101,6 +101,7 @@ All of the proxy's timing can be overridden with environment variables; changes 
 | `PROXY_HEARTBEAT_START` | `80` | How many consecutive seconds without upstream input before heartbeats start |
 | `PROXY_HEARTBEAT_INTERVAL` | `80` | While upstream is silent, send one extra heartbeat every N seconds, unlimited count |
 | `PROXY_RETRY_ONCE_TTL` | `900` | Per-session one-shot window for the anchor + RST client retry; `0` disables it |
+| `PROXY_ANCHOR_SETTLE_MS` | `300` | Delay between writing the retry anchor and resetting the client; `SO_LINGER=0` drops unread peer data, so an immediate reset loses the anchor |
 | `PROXY_CONNECT_TIMEOUT` | `10` | Connect timeout (seconds) |
 | `PROXY_SEND_TIMEOUT` | `90` | Timeout for sending the request body (seconds) |
 | `PROXY_RETRY_AFTER_CAP` | `60` | Upper bound (seconds) on how far the upstream `Retry-After` (header or error body) is honored |

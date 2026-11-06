@@ -2,6 +2,30 @@
 
 > 2026-11-01: migrated to the AI-Agent-DJY repository; documentation was translated to English and directories standardized to `docs/` and `diagrams/`. Historical entries keep paths as originally written.
 
+## V0.2.10 — 2026-11-06
+
+- **Retry budget**: `PROXY_RETRY_WINDOW` 300 → 600 s and `PROXY_SILENCE_TIMEOUT`
+  30 → 60 s. Field evidence: a ~420k-token request spent 355 s in five silent attempts
+  and gave up; the same upstream answered again 157 s later. A 5-minute window cannot
+  outlast that stall, and a 30-second cutoff discards slow but healthy large requests.
+- **One client retry after a heartbeat-mode give-up**: when the window is exhausted
+  after the 200 + heartbeats were sent, the proxy writes one zero-width `content`
+  delta and then resets the client connection (`SO_LINGER=0`). ZCode only resumes a
+  stream when it has discarded text **and** sees `ECONNRESET`, so a bare RST with no
+  content never triggered a retry.
+- `PROXY_ANCHOR_SETTLE_MS` (default 300 ms) sits between the anchor write and the
+  reset: `SO_LINGER=0` makes the kernel drop unread peer data, and an immediate reset
+  lost the anchor in 11 of 43 measured runs.
+- **One-shot token per session**: `PROXY_RETRY_ONCE_TTL` (default 900 s). The first
+  exhaustion of a session gets the anchor + RST; later ones fall back to the ordinary
+  retryable SSE error. Without it the client's 10 retries would multiply with the
+  proxy window. The token is released if the anchor write fails.
+- `reset_for_recovery` now delegates socket teardown to a shared `Handler._reset_client`;
+  the V0.2.7 RST paths are unchanged.
+- `selftest_stream.py`: 32 → 34 scenarios. The anchor case runs ten rounds and also
+  parses the anchor as a content delta, so the gate is deterministic.
+- Version fields bumped to 0.2.10.
+
 ## V0.2.9 — 2026-11-04
 
 - **公开面清理**：真实中转域名从仓库与发行资产中移除。`UPSTREAMS` 只保留占位地址；
@@ -121,7 +145,7 @@ failed on the error event before the proxy's early retry could help.
 - `selftest_stream.py` adds case 16 (reasoning + error → internal retry succeeds)
   and case 17 (text + error → passed through, no retry); 17 scenarios pass.
 - The other four suites pass.
-- Production sample: the 18:55:53 `stream_truncated` request had only 188 reasoning
+- Production sample: one `stream_truncated` request had only 188 reasoning
   deltas (751 chars), `text=0`, `tool=0`, so it was safe to retry.
 
 ## V0.2.3 — 2026-11-02
@@ -140,7 +164,7 @@ The client log (`model.sdk.stream.completed`) shows `finishReason=other`,
 
 **Root cause**: the client's `Bto()` maps a missing/null/unknown `finish_reason` to
 `other`, then completes the turn (`turn.completed`). The previous release only intercepted
-the literal `"other"`, which never matched in production: the 23:48:03 stream was logged
+the literal `"other"`, which never matched in production: that stream was logged
 by the proxy as `ok bytes=1009`, with no `early finish other` line.
 
 **Dead end (discarded)**: sending a mid-stream SSE error to the client. Two production
@@ -177,8 +201,7 @@ and transparent continuations for both the missing-reason and literal-`other` fo
 `selftest_proxy_429.py` and `selftest_watch.py` still pass. The new
 `selftest_ensure.py` proves two processes serialize on the mutex (2.45 s). Local install
 runs a single proxy. Live traffic also confirmed it twice: the `early finish` events at
-00:59:57 and 01:01:17 were re-requested internally, and the client completed at 01:00:29
-and 01:01:28 with `attempt=1` (`finishReason=tool-calls`), with no `turn.failed`.
+two such streams were re-requested internally, and the client completed both with `attempt=1` (`finishReason=tool-calls`), with no `turn.failed`.
 
 ## V0.2.1 — 2026-11-01
 

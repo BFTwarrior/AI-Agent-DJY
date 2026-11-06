@@ -5,9 +5,9 @@ The old expectations of v0.3.x (filtering out by error type, no retry on `permis
 
 > **Reading order**: Sections 1 through 16 are historical batches kept as-is for traceability
 > (fixed-count retries, the v1.1.0 heartbeat parameters, the v0.4.0 build line, the 2026-10-31 fixes,
-> and the V0.2.1–V0.2.6 changes). **Section 19 (V0.2.9) is the current result; sections 17–18
-> record V0.2.7–V0.2.8.** The current defaults
-> are a 300-second retry window, one attempt every 20 seconds, a 30-second silence timeout and
+> and the V0.2.1–V0.2.6 changes). **Section 20 (V0.2.10) is the current result; sections 17–19
+> record V0.2.7–V0.2.9.** The current defaults
+> are a 600-second retry window, one attempt every 20 seconds, a 60-second silence timeout and
 > 80-second heartbeats; the "180-second window" and "503 after 3 retries" wording in old batches is historical only.
 
 ## 1. Hook (retry_hook.py)
@@ -136,7 +136,7 @@ The tests used accelerated parameters (SILENCE=2s, HEARTBEAT_START=5s, MAX_ATTEM
 
 ## 10. v0.4.0 final parameters
 
-v0.4.0 release parameters: retry window 180 seconds, interval 20 seconds; single-attempt silence timeout 30 seconds; heartbeat starts after 80 seconds of silence, then one every 80 seconds with no cap. (Superseded: the default retry window is 300 seconds since V0.2.6.)
+v0.4.0 release parameters: retry window 180 seconds, interval 20 seconds; single-attempt silence timeout 30 seconds; heartbeat starts after 80 seconds of silence, then one every 80 seconds with no cap. (Superseded: the default retry window is 300 seconds from V0.2.6 and 600 seconds since V0.2.10.)
 
 | # | Scenario | Expected | Result |
 |---|---|---|---|
@@ -317,7 +317,7 @@ Two production failures share one recovery path:
 | 31 | legacy `function_call` (no index) | validated under `-1` and passed through | ✅ |
 | 32 | empty `arguments` | treated as incomplete; RST | ✅ |
 
-`selftest_stream.py`: 34 scenarios pass. The other suites (hook 11, 429 5, watch 12,
+`selftest_stream.py`: 32 scenarios pass. The other suites (hook 11, 429 5, watch 12,
 route 13, ensure serialization) also pass. A Node/undici probe against the real proxy
 receives `TypeError: terminated` with cause `read ECONNRESET` after 61 content bytes;
 the client's `sqa()` matches. Independent review: overall 4.7/5, code 4.4/5.
@@ -333,7 +333,7 @@ logged.
 
 `selftest_proxy_429.py`: 12 scenarios pass (5 existing + body JSON hint / cap / text form /
 split number / 64 KB bound / empty body / stall budget). The body-hint case also asserts
-the marker string is absent from `proxy.log`. Full regression: hook 11, stream 34,
+the marker string is absent from `proxy.log`. Full regression: hook 11, stream 32,
 watch 12, route 13, ensure serialization. Independent review (2026-11-04, independent
 subagent review): overall 4.8/5, code 4.8/5.
 
@@ -346,14 +346,14 @@ excluded from the release asset; `upstreams.example.json` documents the format.
 
 `selftest_upstreams.py`: 8 checks pass (placeholder default, override `/ap`, add `/xx`,
 invalid entries ignored, installer host lookup, explicit prefix wins, unknown host returns
-None, unsupported prefix returns None). Full regression: hook 11, 429 12, stream 34, watch 12, route 13,
+None, unsupported prefix returns None). Full regression: hook 11, 429 12, stream 32, watch 12, route 13,
 ensure serialization. No default retry parameter changed.
 
 ## 20. V0.2.10 — longer window + one real client retry
 
 Field evidence (2026-11-06): a request carrying ~420k input tokens spent 355 s in five
-silent attempts and gave up at 08:46:24; the same upstream answered normally again at
-08:49:24. A 5-minute window cannot outlast that kind of stall, and a 30-second silence
+silent attempts and gave up after 355 s; the same upstream answered normally again
+157 s later. A 5-minute window cannot outlast that kind of stall, and a 30-second silence
 cutoff discards slow-but-healthy large requests.
 
 - `PROXY_RETRY_WINDOW` 300 → 600 s; `PROXY_SILENCE_TIMEOUT` 30 → 60 s.

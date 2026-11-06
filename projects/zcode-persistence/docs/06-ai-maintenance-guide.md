@@ -9,7 +9,7 @@ The audience for this document is an AI or engineer with **absolutely no context
 | Question | Answer |
 |---|---|
 | What is this | A two-piece "automatic retry on failure" kit for ZCode plus one optional bypass: hook + local proxy + error reporting (off by default) |
-| Version | See `VERSION` (`0.2.9`; the build line is `0.4.0`, and the project `README.md` records the current build line) |
+| Version | See `VERSION` (`0.2.10`; the build line is `0.4.0`, and the project `README.md` records the current build line) |
 | Where is the code | Five Python files in `src/` (hook / proxy / auto-start / route migration / error reporting), no third-party dependencies (certifi optional) |
 | Where it is installed | `C:\Program Files (x86)\AI\Zcode-Persistence\` |
 | Which system config is modified | `~/.zcode/cli/config.json` (hook), `~/.zcode/v2/provider_config.json` (the provider's baseUrl) |
@@ -259,7 +259,7 @@ with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
 
 ## Continuing development starts here (for the next AI / engineer)
 
-**First get the version numbers straight**: what you ship externally is the formal release number (`0.2.9`); `0.4.0` is the build-line iteration number,
+**First get the version numbers straight**: what you ship externally is the formal release number (`0.2.10`); `0.4.0` is the build-line iteration number,
 and the two are not the same thing. `VERSION`, `tools/install.py`, `PROXY_VERSION` and `clientInfo.version` all carry the formal release number;
 the project `README.md` records the current build line.
 
@@ -332,12 +332,12 @@ These are all real problems that were hit and fixed. **Do not reintroduce them.*
 8. **The time window is not a hard upper bound**. `RETRY_WINDOW` only decides "whether to still launch new attempts"; an attempt already in flight is allowed to finish (connect 10 seconds + send 90 seconds + wait for headers 60 seconds maximum), so the worst-case duration may exceed the window.
 9. **`proxy.log` does not rotate**. It keeps growing during long runs; `doctor` reads only the tail (walking back at most 8MB for the start line), and when cleanup is needed you can simply delete it (the proxy recreates it).
 10. **Response-body heartbeats apply only to SSE**. `can_hb` requires the client to want streaming and the response to be `text/event-stream` (or heartbeat mode to have already sent a 200);
-    for other Content-Types, inserting a comment line would corrupt the body, so that case is still truncated per `SILENCE_TIMEOUT=30` seconds.
+    for other Content-Types, inserting a comment line would corrupt the body, so that case is still truncated per `SILENCE_TIMEOUT=60` seconds.
 11. **Reader thread and queue**. `pipe_response` uses `Queue(maxsize=64)` (about 512KB) to connect the reader thread and the main thread;
     when the queue is full the reader thread blocks (backpressure) and no data is lost. After the main thread finishes it sets `stop`, and the reader thread exits at its next `put`;
     if it is stuck in a blocking read, all it can do is wait for the socket timeout (`RETRY_WINDOW+30` seconds) — the unavoidable price of being unable to interrupt `read1` from outside on Windows.
     Also: when the client "neither reads nor disconnects" (half-open), the main thread blocks in `wfile.write` until the peer recovers or TCP errors; having no client write timeout is a pre-existing boundary.
-    Degradation: when `body_socket()` cannot get a socket, the read timeout remains `SILENCE_TIMEOUT=30` and response-body heartbeats are basically ineffective.
+    Degradation: when `body_socket()` cannot get a socket, the read timeout remains `SILENCE_TIMEOUT=60` and response-body heartbeats are basically ineffective.
 12. **A missing or unknown `finish_reason` is a failure, not a normal end** (V0.2.3).
     The client's `Bto()` maps `undefined`/null/unknown values to `other`, then completes
     the turn. If the stream produced no `delta.content` and no tool call, `process_sse()`

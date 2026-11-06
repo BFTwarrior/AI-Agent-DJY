@@ -51,7 +51,7 @@ Two main components plus one optional side path (off by default):
 
 ## Current final parameters
 
-`RETRY_WINDOW=600` (seconds, the time window), `RETRY_INTERVAL=20` (seconds, fixed interval; `MAX_ATTEMPTS` is only a runaway fuse, default 200), `SILENCE_TIMEOUT=60`, `HEARTBEAT_START=80`, `HEARTBEAT_INTERVAL=80` (no cap on count), `PROXY_RETRY_WINDOW` / `PROXY_RETRY_INTERVAL` override the window and the interval, `PROXY_RETRY_ONCE_TTL=900` (one anchor+RST client retry per session), `RETRY_AFTER_CAP=60`, port 8787.
+`RETRY_WINDOW=600` (seconds, the time window), `RETRY_INTERVAL=20` (seconds, fixed interval; `MAX_ATTEMPTS` is only a runaway fuse, default 200), `SILENCE_TIMEOUT=60`, `HEARTBEAT_START=80`, `HEARTBEAT_INTERVAL=80` (no cap on count), `PROXY_RETRY_WINDOW` / `PROXY_RETRY_INTERVAL` override the window and the interval, `PROXY_RETRY_ONCE_TTL=900` (one anchor+RST client retry per session), `ANCHOR_SETTLE_MS=300` (wait after the anchor write before the reset, otherwise the kernel drops it), `RETRY_AFTER_CAP=60`, port 8787.
 
 Changing these defaults amounts to changing the product spec; you **must** update `README.md`, `docs/02-maintenance.md`, `docs/04-test-record.md` and `CHANGELOG.md` in step.
 

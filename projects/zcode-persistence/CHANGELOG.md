@@ -6,7 +6,7 @@
 
 - **Retry budget**: `PROXY_RETRY_WINDOW` 300 → 600 s and `PROXY_SILENCE_TIMEOUT`
   30 → 60 s. Field evidence: a 42 万-token request spent 355 s in five silent attempts
-  and gave up at 08:46; the same upstream answered again at 08:49. A 5-minute window
+  and gave up after 355 s; the same upstream answered again 157 s later. A 5-minute window
   cannot outlast that kind of stall, and a 30-second silence cutoff discards slow but
   healthy large requests.
 - **One client retry after a heartbeat-mode give-up**: when the window is exhausted
@@ -239,7 +239,7 @@ failed on the error event before the proxy's early retry could help.
 - `selftest_stream.py` adds case 16 (reasoning + error → internal retry succeeds)
   and case 17 (text + error → passed through, no retry); 17 scenarios pass.
 - The other four suites pass.
-- Production sample: the 18:55:53 `stream_truncated` request had only 188 reasoning
+- Production sample: one `stream_truncated` request had only 188 reasoning
   deltas (751 chars), `text=0`, `tool=0`, so it was safe to retry.
 
 ## V0.2.3 — 2026-11-02
@@ -258,7 +258,7 @@ The client log (`model.sdk.stream.completed`) shows `finishReason=other`,
 
 **Root cause**: the client's `Bto()` maps a missing/null/unknown `finish_reason` to
 `other`, then completes the turn (`turn.completed`). The previous release only intercepted
-the literal `"other"`, which never matched in production: the 23:48:03 stream was logged
+the literal `"other"`, which never matched in production: that stream was logged
 by the proxy as `ok bytes=1009`, with no `early finish other` line.
 
 **Dead end (discarded)**: sending a mid-stream SSE error to the client. Two production
@@ -295,8 +295,7 @@ and transparent continuations for both the missing-reason and literal-`other` fo
 `selftest_proxy_429.py` and `selftest_watch.py` still pass. The new
 `selftest_ensure.py` proves two processes serialize on the mutex (2.45 s). Local install
 runs a single proxy. Live traffic also confirmed it twice: the `early finish` events at
-00:59:57 and 01:01:17 were re-requested internally, and the client completed at 01:00:29
-and 01:01:28 with `attempt=1` (`finishReason=tool-calls`), with no `turn.failed`.
+two such streams were re-requested internally, and the client completed both with `attempt=1` (`finishReason=tool-calls`), with no `turn.failed`.
 
 ## V0.2.1 — 2026-11-01
 

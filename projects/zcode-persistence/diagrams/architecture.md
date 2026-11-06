@@ -1,4 +1,4 @@
-# Architecture Diagram (V0.2.9)
+# Architecture Diagram (V0.2.10)
 
 > Build line 0.4.0. Parameters and semantics follow the code in this project's `src/`;
 > this document sketches the relationships without repeating every detail.
@@ -40,9 +40,9 @@ ZCode client
 request ──► read full body (chunked-aware) ──► UA fallback ──► detect streaming
    │
    ▼
-main loop (window started .. started+300s, one attempt every RETRY_INTERVAL=20s)
-   ├─ each attempt: connect 10s → send body 90s → wait for first byte 30s
-   ├─ failure: connection error / any non-2xx / 30s with no bytes
+main loop (window started .. started+600s, one attempt every RETRY_INTERVAL=20s)
+   ├─ each attempt: connect 10s → send body 90s → wait for first byte 60s
+   ├─ failure: connection error / any non-2xx / 60s with no bytes
    ├─ after failure: wait max(20s, Retry-After from header or body ≤ 60s); stop if the next attempt falls outside the window
    ├─ window expires with no attempt in flight → finish (MAX_ATTEMPTS=200 is only a runaway fuse)
    └─ heartbeat: 80s without upstream input → write the SSE comment `: keepalive`,

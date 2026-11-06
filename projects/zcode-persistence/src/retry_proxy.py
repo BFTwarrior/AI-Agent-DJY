@@ -195,7 +195,7 @@ def claim_retry_once(key):
     """
     if RETRY_ONCE_TTL <= 0 or not key:
         return False
-    now = time.time()
+    now = time.monotonic()
     with _retry_once_lock:
         # Drop expired entries here: there is at most one per active session, so a
         # timer would be overkill.
@@ -207,6 +207,18 @@ def claim_retry_once(key):
         return True
 
 
+def release_retry_once(key):
+    """Give the token back when the anchor could not be delivered.
+
+    Otherwise a failed write (client already gone) would burn the session's only
+    retry for nothing.
+    """
+    if not key:
+        return
+    with _retry_once_lock:
+        _retry_once.pop(key, None)
+
+
 RETRY_AFTER_CAP = max(0.0, env_float("PROXY_RETRY_AFTER_CAP", 60.0))
 
 # One-shot token that allows "let the client retry once for real" after giving up
@@ -214,6 +226,13 @@ RETRY_AFTER_CAP = max(0.0, env_float("PROXY_RETRY_AFTER_CAP", 60.0))
 # 10 minutes, so without a gate an upstream that stays down snowballs into dozens
 # of requests. Rate-limited per session: one trigger per TTL.
 RETRY_ONCE_TTL = env_int("PROXY_RETRY_ONCE_TTL", 900, 0, 86400)
+
+# Delay between writing the retry anchor and resetting the connection.
+# SO_LINGER=0 makes the kernel drop unread peer data, so an immediate reset loses
+# the anchor a fair fraction of the time (11 of 43 runs, measured 2026-11-06).
+# 300 ms is far longer than a loopback/localhost round trip and far shorter than
+# anything the user notices.
+ANCHOR_SETTLE_MS = env_int("PROXY_ANCHOR_SETTLE_MS", 300, 0, 5000)
 _retry_once_lock = threading.Lock()
 _retry_once = {}
 
@@ -1127,11 +1146,12 @@ class Handler(BaseHTTPRequestHandler):
     def _reset_client(self, why):
         """Close the client connection with SO_LINGER=0 to emit a RST.
 
-        Since V0.2.7 a RST is the only entry that makes ZCode resend: SSE business
-        errors are always wrapped as ProviderBusinessError (retryable is false).
-        This helper only emits the RST; the caller decides whether it is warranted
-        — incomplete content goes through reset_for_recovery, an exhausted window
-        in heartbeat mode goes through _seed_retry_anchor.
+        Since V0.2.7 a RST is the only entry that can make ZCode resend: a stream
+        that ends with an SSE business error is reported as ProviderBusinessError
+        and the turn ends. This helper only emits the RST; the caller decides
+        whether it is warranted — incomplete content goes through
+        reset_for_recovery, an exhausted window in heartbeat mode goes through
+        _seed_retry_anchor.
         """
         self._zp_client_reset = True
         # BaseHTTPRequestHandler.handle() loops on `while not close_connection`.
@@ -1139,7 +1159,7 @@ class Handler(BaseHTTPRequestHandler):
         # readline on a closed rfile, leaking one 100% CPU spinning thread per RST
         # (measured 2026-11-03).
         self.close_connection = True
-        log("client reset (%s)" % why)
+        log("client reset (%s) %s" % (why, self.path))
         try:
             sock = self.connection
             try:
@@ -1148,7 +1168,7 @@ class Handler(BaseHTTPRequestHandler):
             except Exception as exc:
                 # Close anyway if the option cannot be set: a FIN is better than a
                 # connection left hanging.
-                log("client reset setsockopt failed: %r" % (exc,))
+                log("client reset setsockopt failed: %r %s" % (exc, self.path))
             # Closing the socket object alone is not enough: wfile/rfile still hold
             # the same fd, and CPython only closes it when the refcount drops, so the
             # client receives neither RST nor FIN.
@@ -1172,7 +1192,7 @@ class Handler(BaseHTTPRequestHandler):
         return ""
 
     def _seed_retry_anchor(self, reason):
-        """Write a tiny content delta, then RST, so the client really retries once.
+        """Write a tiny content delta, give it time to arrive, then RST.
 
         Why this step is needed: the client's recovery path requires
         `discardedReasoningBytes + discardedTextBytes > 0` AND a retryable error.
@@ -1182,8 +1202,20 @@ class Handler(BaseHTTPRequestHandler):
         A zero-width space does not change what the user reads, but it is enough for
         the client to consider content started, so it discards this output and
         resends with previous-message-anchor.
+
+        Ordering matters: `SO_LINGER=0` makes the kernel discard anything the peer
+        has not read yet. Measured on 2026-11-06: write-then-reset-immediately lost
+        the anchor in 11 of 43 runs (the client saw only headers and keepalives, so
+        it never retried). Hence ANCHOR_SETTLE_MS between the write and the reset.
+        Returns True when the anchor was written.
         """
         try:
+            sock = self.connection
+            try:
+                # Do not let Nagle hold the few bytes back until the reset arrives.
+                sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+            except Exception:
+                pass
             self._sse_write("data: " + json.dumps({
                 "id": "chatcmpl-zp-anchor",
                 "object": "chat.completion.chunk",
@@ -1195,7 +1227,11 @@ class Handler(BaseHTTPRequestHandler):
             }, ensure_ascii=False) + "\n\n")
         except Exception as exc:
             log("retry anchor write failed: %r" % (exc,))
+            return False
+        if ANCHOR_SETTLE_MS > 0:
+            time.sleep(ANCHOR_SETTLE_MS / 1000.0)
         self._reset_client(reason)
+        return True
 
     # ---------- 主流程 ----------
     def _handle(self, method):
@@ -1413,7 +1449,10 @@ class Handler(BaseHTTPRequestHandler):
             if claim_retry_once(key):
                 log("retry anchor + reset for one client retry (session=%s) %s"
                     % (key[:12] or "-", path))
-                self._seed_retry_anchor("window exhausted; one client retry")
+                if not self._seed_retry_anchor("window exhausted; one client retry"):
+                    # The anchor never made it out, so the client will not resume:
+                    # give the token back instead of burning the session's only try.
+                    release_retry_once(key)
             else:
                 log("no client retry token left (session=%s), plain error %s"
                     % (key[:12] or "-", path))

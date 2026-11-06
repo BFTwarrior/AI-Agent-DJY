@@ -111,9 +111,9 @@ write response headers (strip hop-by-hop) → read1 chunk by chunk, flush to the
    └─ normal end ──► log ok
 ```
 
-**The retry decision (since v0.4.0; 300-second window since V0.2.6)**: every failed attempt is resent — connection errors, any
+**The retry decision (since v0.4.0; 600-second window since V0.2.10)**: every failed attempt is resent — connection errors, any
 non-2xx from upstream, and silence timeouts. It is not count-based but time-window-based:
-keep retrying for 5 minutes, once every 20 seconds (`Retry-After` from the response header
+keep retrying for 10 minutes, once every 20 seconds (`Retry-After` from the response header
 or the error body is honored, capped at 60 seconds), and only stop when the window expires; `MAX_ATTEMPTS=200` is merely a fuse against
 runaway retries. During backoff the thread does a `time.sleep` until the next attempt
 instead of spinning. Heartbeats are independent of attempt boundaries: after 80 consecutive
@@ -145,10 +145,10 @@ client would hang; not setting `close_connection` makes `handle()` spin on the c
 `rfile` at 100% CPU. The client sees `ECONNRESET`, discards the partial output and retries
 with `previous-message-anchor` (max 10).
 
-**Where the 30-second silence timeout comes from**: the ZCode client declares failure if it
+**Where the 60-second silence timeout comes from**: the ZCode client declares failure if it
 has not received the first byte within 95 seconds. So the proxy first hangs an SSE heartbeat
 comment line on the stream once 80 seconds are up, extending the client's patience.
-Silence **before the response headers** is judged a failure with `SILENCE_TIMEOUT=30` and
+Silence **before the response headers** is judged a failure with `SILENCE_TIMEOUT=60` and
 retried; **after the response headers** retrying is no longer possible, and silence is
 handled instead by "reader thread + main thread consuming the queue": one heartbeat every
 80 seconds keeps the wait alive, and the stream is judged truncated only once cumulative
@@ -156,13 +156,37 @@ silence reaches `RETRY_WINDOW` (600 seconds).
 
 The premise is that the response body really is SSE (`Content-Type: text/event-stream`, or
 a 200 event-stream has already been sent in heartbeat mode); otherwise inserting a comment
-line would corrupt the body, and in that case the 30-second silence truncation still applies.
+line would corrupt the body, and in that case the 60-second silence truncation still applies.
 
 **The window is not a hard cap**: `RETRY_WINDOW` only decides "whether to still start new
 attempts". The attempt already in flight is allowed to finish (connect 10 seconds + send 90
-seconds + wait for headers 30 seconds at most), so the actual duration when giving up may
+seconds + wait for headers 60 seconds at most), so the actual duration when giving up may
 slightly exceed the window; the "retried continuously for N seconds" figure in the give-up
 message records the real elapsed time.
+
+### Give-up in heartbeat mode: anchor + RST (V0.2.10)
+
+Once the 200 + heartbeats are on the wire the status line can no longer change, so the only
+remaining ways out are an SSE error event or a transport reset. An SSE error event does not
+produce a retry here: the client's stream-recovery entry requires **both**
+`discardedReasoningBytes + discardedTextBytes > 0` **and** a retryable error, and with
+heartbeats only the discarded byte count is 0.
+
+So `_seed_retry_anchor()` writes one tiny `content` delta (a zero-width space) and then
+`_reset_client()` closes the socket with `SO_LINGER=0`. The client now has discarded text,
+sees `ECONNRESET`, drops the partial output and resends with `previous-message-anchor`.
+
+Two guard rails:
+
+- `PROXY_ANCHOR_SETTLE_MS` (default 300 ms) between the write and the reset. `SO_LINGER=0`
+  makes the kernel discard data the peer has not read yet; an immediate reset lost the
+  anchor in 11 of 43 measured runs on 2026-11-06, which silently degrades to "no fix at all".
+- `claim_retry_once(session)` — a one-shot token per session, TTL `PROXY_RETRY_ONCE_TTL`
+  (default 900 s). The client retries up to 10 times and each proxy window is 10 minutes, so
+  without the gate a long outage rolls into dozens of upstream requests. The token is
+  released again if the anchor write fails. The gate covers this give-up branch only;
+  `reset_for_recovery` (incomplete content) still resets whenever the content demands it.
+
 
 **The worst case overshoots the window**: each attempt also spends connect time (10 seconds
 at most) and request-body send time (90 seconds at most). If the upstream can be connected
