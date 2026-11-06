@@ -54,7 +54,7 @@ Changing these defaults equals changing the product spec; you **must** update `R
 ## What must be done after changes
 
 1. Run the accelerated test in section 4 of `docs/06-ai-maintenance-guide.md` (all four assertions pass).
-2. Run `python -I tools/selftest_hook.py`, `tools/selftest_proxy_429.py`, `tools/selftest_stream.py`, `tools/selftest_watch.py`, `tools/selftest_route.py`, `tools/selftest_upstreams.py` (11 / 12 / 32 / 12 / 13 / 8 all pass; run `tools/selftest_ensure.py` after changing `ensure_proxy.py`). If `pipe_response` changed you must run the streaming set; if `error_watch.py` changed you must run the fourth set.
+2. Run `python -I tools/selftest_hook.py`, `tools/selftest_proxy_429.py`, `tools/selftest_stream.py`, `tools/selftest_watch.py`, `tools/selftest_route.py`, `tools/selftest_upstreams.py` (11 / 12 / 34 / 12 / 13 / 8 all pass; run `tools/selftest_ensure.py` after changing `ensure_proxy.py`). If `pipe_response` changed you must run the streaming set; if `error_watch.py` changed you must run the fourth set.
 3. Bump `VERSION`, `tools/install.py`, `src/retry_proxy.py` (`PROXY_VERSION`) and `src/error_watch.py` (`clientInfo.version`); all four must agree.
 4. Record "what changed + why" in `CHANGELOG.md`.
 5. Repackage, **excluding** `__pycache__`, `*.pyc`, `*.log`.

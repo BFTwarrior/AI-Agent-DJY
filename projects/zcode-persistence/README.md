@@ -84,7 +84,7 @@ projects/zcode-persistence/
 ├─ AGENTS.md                Hard constraints for AI maintainers
 ├─ VERSION                  Version number
 ├─ CHANGELOG.md             Change log
-├─ src/                     Runtime scripts (5; includes route_providers.py)
+├─ src/                     Runtime scripts (5 Python files) + upstreams.example.json
 ├─ tools/                   Install/uninstall/self-test/restart (11)
 ├─ docs/                    Current documentation (00-07)
 └─ diagrams/                Current structure diagrams
