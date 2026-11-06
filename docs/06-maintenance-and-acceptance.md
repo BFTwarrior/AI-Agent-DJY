@@ -56,6 +56,14 @@ python -I tools/selftest_ensure.py
 
 All seven must pass; details are in the project's `docs/04-test-record.md`.
 
+### 6. Release asset documents
+
+The public asset ships Chinese documents while the repository keeps English ones, so
+the two sets can silently drift. Before publishing, compare them item by item:
+version string, parameter defaults, scenario counts, and any mechanism added in the
+release. A release note that describes behaviour the asset documents do not mention is
+a blocker.
+
 ## After committing
 
 ```bash
