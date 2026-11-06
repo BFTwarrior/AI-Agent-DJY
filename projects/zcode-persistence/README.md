@@ -3,10 +3,23 @@
 A ZCode failure-retry toolkit: **suggests a retry when a tool fails**, **automatically
 resends when a model request fails**, plus a default-off **email report of session errors**.
 
-- Version: V0.2.9
+- Version: V0.2.10
 - Build line: 0.4.0
 - Applies to: ZCode Desktop (Windows), Python 3.9+
 - Dependencies: Python standard library only; proxy mode prefers certifi (if installed)
+
+### V0.2.10: longer retry window + one real client retry
+
+`PROXY_RETRY_WINDOW` is 600 s (was 300) and `PROXY_SILENCE_TIMEOUT` is 60 s (was 30):
+a stalled relay often recovers after 6–9 minutes, and a 30-second cutoff throws away
+slow-but-healthy large requests.
+
+When the window is exhausted *after* the 200 + heartbeats were already sent, the proxy
+now writes one zero-width `content` delta and resets the client connection. The client
+resumes a stream only when it has discarded text **and** sees `ECONNRESET`; with
+heartbeats alone the discarded byte count is 0, so a bare RST never triggered a retry.
+A per-session one-shot token (`PROXY_RETRY_ONCE_TTL`, default 900 s) limits this to one
+retry per session, so the client's 10 retries cannot multiply with the proxy window.
 
 ### V0.2.9: relay hosts moved out of the public tree
 
@@ -101,6 +114,6 @@ email addresses.
 ## Distribution
 
 The distribution package lives in the repository Releases:
-`proj-zcode-persistence-v0.2.9`.
+`proj-zcode-persistence-v0.2.10`.
 The archive contains build artifacts; this directory is authoritative for the source, and
 if the two disagree, this directory plus the tag wins.

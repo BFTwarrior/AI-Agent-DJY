@@ -109,7 +109,7 @@ recorded in the project `CHANGELOG` and Releases.
   - Extracts to `history/`, matching the local `Zcode-Persistence` history directory
 
 **Public state after 2026-11-03:** every pre-sanitization release asset was removed when the
-repository became public. `proj-zcode-persistence-v0.2.9` carries the current sanitized asset;
+repository became public. `proj-zcode-persistence-v0.2.10` carries the current sanitized asset;
 `proj-zcode-persistence-v0.2.7` and `proj-zcode-persistence-v0.2.8` remain as Releases without
 assets; `proj-zcode-persistence-v0.2.3`–`v0.2.6` and `v0.1-history` also remain as Releases
 without assets; the `v0.2` and `v0.2.1` Releases were deleted (their tags remain). The upload

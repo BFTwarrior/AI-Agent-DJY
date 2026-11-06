@@ -152,7 +152,7 @@ Silence **before the response headers** is judged a failure with `SILENCE_TIMEOU
 retried; **after the response headers** retrying is no longer possible, and silence is
 handled instead by "reader thread + main thread consuming the queue": one heartbeat every
 80 seconds keeps the wait alive, and the stream is judged truncated only once cumulative
-silence reaches `RETRY_WINDOW` (300 seconds).
+silence reaches `RETRY_WINDOW` (600 seconds).
 
 The premise is that the response body really is SSE (`Content-Type: text/event-stream`, or
 a 200 event-stream has already been sent in heartbeat mode); otherwise inserting a comment

@@ -2,6 +2,29 @@
 
 > 2026-11-01: migrated to the AI-Agent-DJY repository; documentation was translated to English and directories standardized to `docs/` and `diagrams/`. Historical entries keep paths as originally written.
 
+## V0.2.10 — 2026-11-06
+
+- **Retry budget**: `PROXY_RETRY_WINDOW` 300 → 600 s and `PROXY_SILENCE_TIMEOUT`
+  30 → 60 s. Field evidence: a 42 万-token request spent 355 s in five silent attempts
+  and gave up at 08:46; the same upstream answered again at 08:49. A 5-minute window
+  cannot outlast that kind of stall, and a 30-second silence cutoff discards slow but
+  healthy large requests.
+- **One client retry after a heartbeat-mode give-up**: when the window is exhausted
+  after the 200 + heartbeats were already sent, the proxy now writes one tiny
+  zero-width `content` delta and then resets the client connection (`SO_LINGER=0`).
+  The client only resumes a stream when `discardedTextBytes > 0` *and* it sees
+  `ECONNRESET`; with heartbeats only, the discarded byte count is 0, so a bare RST
+  never triggered a retry (observed 2026-11-06).
+- **One-shot token per session**: `PROXY_RETRY_ONCE_TTL` (default 900 s). The first
+  exhaustion of a session gets the anchor + RST; later ones fall back to the ordinary
+  retryable SSE error. Without it the client's 10 retries would multiply with the
+  proxy's 10-minute window.
+- `reset_for_recovery` now delegates the socket teardown to a shared
+  `Handler._reset_client`; behaviour of the V0.2.7 RST paths is unchanged.
+- `selftest_stream.py`: 32 → 34 scenarios (anchor + RST when a session id is present;
+  second exhaustion in the same session must not RST).
+- Version fields bumped to 0.2.10.
+
 ## V0.2.9 — 2026-11-04
 
 - **Public hygiene**: real relay hosts are no longer in the repository or the release

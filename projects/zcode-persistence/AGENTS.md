@@ -22,7 +22,7 @@ Two main components plus one optional side path (off by default):
 8. TLS must use certifi's CA bundle (the Windows built-in root store lacks SSL.com, so validation fails).
 9. The UA fallback must not be removed: the relay's Cloudflare blocks `Python-urllib` (returns 1010).
 10. The hook's stdout JSON **may only use `additionalContext`**. `systemMessage` is visible to the user only and invisible to the model — that is exactly where v0.3.0 came unstuck: the hook dutifully wrote `advise` to the log, yet the model still did not retry. The client parses with zod (non-strict), so unknown keys get stripped — but stripped means written for nothing, so still emit this one key only.
-11. Backoff must not be "retry immediately". 85% of the failures actually observed are upstream **HTTP 429 (concurrency saturated)**, so you must wait for `RETRY_INTERVAL` (20 seconds); if the upstream hands you a longer `Retry-After` (response header or error body), obey it (capped by `RETRY_AFTER_CAP`=60 seconds). The total retry budget is measured by `RETRY_WINDOW` (300 seconds), not by attempt count.
+11. Backoff must not be "retry immediately". 85% of the failures actually observed are upstream **HTTP 429 (concurrency saturated)**, so you must wait for `RETRY_INTERVAL` (20 seconds); if the upstream hands you a longer `Retry-After` (response header or error body), obey it (capped by `RETRY_AFTER_CAP`=60 seconds). The total retry budget is measured by `RETRY_WINDOW` (600 seconds), not by attempt count.
 12. **Do not add "filter by error type" back in**. The user's spec is "any error at all gets three retries": the hook suggests a retry on any failure, the proxy resends on any non-2xx. The FATAL filter from v0.3.x has been deleted; adding it back amounts to violating the requirement.
 13. The heartbeat is "send **only after 80 seconds with no upstream input at all**, then one every 80 seconds, **with no cap on the number of times**". Do not change it to a fixed count, and do not change it to also fire when data is arriving. Before the response headers it is sent by the main loop's independent clock; after the response headers it is sent by `pipe_response`'s reader thread plus the main thread consuming the queue (send one when silence reaches `HEARTBEAT_INTERVAL`, and only call it truncated when silence reaches `RETRY_WINDOW`).
 14. During the backoff wait the thread must `sleep`, not spin (v0.3.1 once pinned a single core at 97% during a 50-second backoff).
@@ -51,7 +51,7 @@ Two main components plus one optional side path (off by default):
 
 ## Current final parameters
 
-`RETRY_WINDOW=300` (seconds, the time window), `RETRY_INTERVAL=20` (seconds, fixed interval; `MAX_ATTEMPTS` is only a runaway fuse, default 200), `SILENCE_TIMEOUT=30`, `HEARTBEAT_START=80`, `HEARTBEAT_INTERVAL=80` (no cap on count), `PROXY_RETRY_WINDOW` / `PROXY_RETRY_INTERVAL` override the window and the interval, `RETRY_AFTER_CAP=60`, port 8787.
+`RETRY_WINDOW=600` (seconds, the time window), `RETRY_INTERVAL=20` (seconds, fixed interval; `MAX_ATTEMPTS` is only a runaway fuse, default 200), `SILENCE_TIMEOUT=60`, `HEARTBEAT_START=80`, `HEARTBEAT_INTERVAL=80` (no cap on count), `PROXY_RETRY_WINDOW` / `PROXY_RETRY_INTERVAL` override the window and the interval, `PROXY_RETRY_ONCE_TTL=900` (one anchor+RST client retry per session), `RETRY_AFTER_CAP=60`, port 8787.
 
 Changing these defaults amounts to changing the product spec; you **must** update `README.md`, `docs/02-maintenance.md`, `docs/04-test-record.md` and `CHANGELOG.md` in step.
 
@@ -59,7 +59,7 @@ Changing these defaults amounts to changing the product spec; you **must** updat
 
 1. Run the accelerated test in section 4 of `docs/06-ai-maintenance-guide.md` (all four assertions must pass).
 2. Run `python -I tools/selftest_hook.py`, `tools/selftest_proxy_429.py`, `tools/selftest_stream.py`, `tools/selftest_watch.py`, `tools/selftest_route.py`, `tools/selftest_upstreams.py`
-   (11 hook checks (10 cases + third-attempt wording) + 12 retry scenarios + 32 streaming scenarios + 12 error-reporting assertions + 13 migration checks + 8 upstream-config checks must all pass; run `tools/selftest_ensure.py` after changing `ensure_proxy.py`). If you changed `pipe_response` you must run the streaming suite;
+   (11 hook checks (10 cases + third-attempt wording) + 12 retry scenarios + 34 streaming scenarios + 12 error-reporting assertions + 13 migration checks + 8 upstream-config checks must all pass; run `tools/selftest_ensure.py` after changing `ensure_proxy.py`). If you changed `pipe_response` you must run the streaming suite;
    if you changed `error_watch.py` you must run the fourth suite.
 3. Bump `VERSION`, `tools/install.py`, `src/retry_proxy.py` (`PROXY_VERSION`) and `src/error_watch.py` (`clientInfo.version`); all four must agree.
 4. Record "what changed + why" in `CHANGELOG.md`.
@@ -68,7 +68,7 @@ Changing these defaults amounts to changing the product spec; you **must** updat
 
 ## Start here to continue development (for the next AI / engineer)
 
-**Get the version numbers straight first**: what is published externally is the official release number (`0.2.9`); the `0.4.0` in the code is the build-line iteration number,
+**Get the version numbers straight first**: what is published externally is the official release number (`0.2.10`); the `0.4.0` in the code is the build-line iteration number,
 and the two are not the same thing. `VERSION`, `tools/install.py`, `PROXY_VERSION` and `clientInfo.version` all carry the official release number;
 the project `README.md` records the current build line.
 

@@ -16,12 +16,23 @@ ZCode 只看到最终结果，看不到中间失败。
   7. 流被读错误/静默超时打断，且只吐了 reasoning、没有正文/完整工具调用
      （客户端会判 upstream_stream_read_error，V0.2.6）：丢弃本次尝试并重发
 
-重试次数：
-  不按次数，按时间窗：默认持续重试 300 秒，每 20 秒一次（窗口内约 15 次尝试）；
-  上游给了更长的 Retry-After（响应头或错误正文）就尊重它（上限 60 秒）。窗口/间隔由
-  PROXY_RETRY_WINDOW / PROXY_RETRY_INTERVAL 覆盖；MAX_ATTEMPTS（默认 200）
-  只是防跑飞的保险丝，正常路径碰不到。流式与非流式一致。
-  实测上游失败以 HTTP 429（并发打满）为主，等几秒再发基本都能过。
+Retry budget:
+  Time-window based, not count-based: 600 seconds by default, one attempt every 20 s.
+  A longer Retry-After (response header or error body) is honoured (capped at 60 s).
+  Override with PROXY_RETRY_WINDOW / PROXY_RETRY_INTERVAL; MAX_ATTEMPTS (default 200)
+  is only a runaway fuse and is never reached on the normal path. Streaming and
+  non-streaming behave the same. In practice most upstream failures are HTTP 429
+  (concurrency saturated); waiting a few seconds and resending usually succeeds.
+
+Give-up in heartbeat mode (V0.2.10):
+  Once 200 + heartbeats have been sent, a mid-stream SSE error is classified by the
+  client as retryable=false and the whole turn ends. So instead the proxy writes one
+  zero-width content delta and then resets the client connection, letting the client
+  discard that output and genuinely resend once. The client only resumes when it has
+  discarded text AND sees ECONNRESET; with heartbeats alone the discarded byte count
+  is 0, so a bare RST never triggers a retry. Limited to one per session
+  (PROXY_RETRY_ONCE_TTL, default 900 s) so the client's 10 retries cannot multiply
+  with the proxy window.
 
 心跳保活：
   流式请求从请求开始计时，**连续 80 秒没有任何上游输入**时才发第一条心跳
@@ -87,14 +98,20 @@ def env_int(name, default, lo=1, hi=1000000):
 LISTEN_HOST = "127.0.0.1"
 LISTEN_PORT = env_int("PROXY_PORT", 8787, 1, 65535)
 # 只用于 /__zp_health 的能力标记，让 ensure_proxy 能分辨"跑的是不是支持 /p 的新代码"。
-PROXY_VERSION = "0.2.9"
+PROXY_VERSION = "0.2.10"
 
-# 重试策略：按"时间窗"而不是次数。默认持续重试 5 分钟，每 20 秒一次（窗口内约 15 次）。
-# MAX_ATTEMPTS 只保留为防跑飞的保险丝，正常永远碰不到。
-RETRY_WINDOW = env_int("PROXY_RETRY_WINDOW", 300, 1, 3600)
+# Retry policy: a time window, not an attempt count. 600 s by default, one attempt
+# every 20 s. 300→600 s: a stalled upstream often recovers on its own after 6–9
+# minutes (2026-11-06 case: gave up at 355 s, healthy again 157 s later), so a
+# 5-minute window never outlasts the stall.
+# MAX_ATTEMPTS is only a runaway fuse and is never reached on the normal path.
+RETRY_WINDOW = env_int("PROXY_RETRY_WINDOW", 600, 1, 3600)
 RETRY_INTERVAL = max(0.05, min(env_float("PROXY_RETRY_INTERVAL", 20.0), 600.0))
 MAX_ATTEMPTS = env_int("PROXY_MAX_ATTEMPTS", 200, 1, 1000)
-SILENCE_TIMEOUT = env_int("PROXY_SILENCE_TIMEOUT", 30)
+# 30→60 s: a ~420k-token request is often just queued, not broken. Cutting it at
+# 30 s throws away an attempt that would have succeeded and resends the same
+# 1.4 MB body more often than necessary.
+SILENCE_TIMEOUT = env_int("PROXY_SILENCE_TIMEOUT", 60)
 CONNECT_TIMEOUT = env_int("PROXY_CONNECT_TIMEOUT", 10)
 SEND_TIMEOUT = env_int("PROXY_SEND_TIMEOUT", 90)
 
@@ -164,7 +181,41 @@ def invalid_body(message):
     }
 
 
+def claim_retry_once(key):
+    """Claim the one-shot token that allows one real client retry; only the first
+    caller within the TTL gets it.
+
+    When the proxy gives up in heartbeat mode, an SSE business error is never
+    retried by the client (retryable is always false). The only working entry is
+    RST plus already-discarded content. One RST buys up to 10 client resends, each
+    of which re-enters the proxy's 10-minute window, so this gate is mandatory:
+    without it an upstream that stays down rolls into dozens of requests. The key
+    is the session id; when it is absent we cannot rate-limit, so refuse (better
+    no retry than an unbounded storm).
+    """
+    if RETRY_ONCE_TTL <= 0 or not key:
+        return False
+    now = time.time()
+    with _retry_once_lock:
+        # Drop expired entries here: there is at most one per active session, so a
+        # timer would be overkill.
+        for old in [k for k, exp in _retry_once.items() if exp <= now]:
+            del _retry_once[old]
+        if key in _retry_once:
+            return False
+        _retry_once[key] = now + RETRY_ONCE_TTL
+        return True
+
+
 RETRY_AFTER_CAP = max(0.0, env_float("PROXY_RETRY_AFTER_CAP", 60.0))
+
+# One-shot token that allows "let the client retry once for real" after giving up
+# in heartbeat mode. The client retries up to 10 times and each proxy window is
+# 10 minutes, so without a gate an upstream that stays down snowballs into dozens
+# of requests. Rate-limited per session: one trigger per TTL.
+RETRY_ONCE_TTL = env_int("PROXY_RETRY_ONCE_TTL", 900, 0, 86400)
+_retry_once_lock = threading.Lock()
+_retry_once = {}
 
 # 非 2xx 时只探测正文开头这么多字节，找网关写在正文里的等待提示。
 # 错误页可能很大（Cloudflare HTML），整读会拖住重试；正文绝不写日志。
@@ -662,35 +713,8 @@ def pipe_response(handler, resp, conn, path, started, sse_started=False, heartbe
         """
         nonlocal client_reset
         client_reset = True
-        handler._zp_client_reset = True
-        # 必须同时置 close_connection：BaseHTTPRequestHandler.handle() 是
-        # while not close_connection 的循环。只关 socket 不置位的话，下一轮
-        # handle_one_request 会对已关闭的 rfile readline，ValueError 被兜底
-        # 吞掉后继续循环——每次 RST 泄漏一个 100% CPU 的空转线程（实测）。
-        handler.close_connection = True
         log("reset client for recovery (%s) %s" % (why, path))
-        try:
-            sock = handler.connection
-            try:
-                sock.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER,
-                                struct.pack("ii", 1, 0))
-            except Exception as exc:
-                # 设不上也要继续关连接：宁可让客户端看到 FIN，也不能挂着。
-                log("client reset setsockopt failed: %r %s" % (exc, path))
-            # 只关 socket 对象不够：handler.wfile/rfile 还持有同一个 fd 的引用，
-            # CPython 要等引用计数归零才真正 close，结果客户端既收不到 RST、
-            # 也收不到 FIN，只会一直挂着（2026-11-03 Node 端到端实测）。
-            # 先关这两个文件对象，再关 socket，SO_LINGER=0 才会真的发 RST。
-            for name in ("wfile", "rfile"):
-                stream = getattr(handler, name, None)
-                try:
-                    if stream is not None and not stream.closed:
-                        stream.close()
-                except Exception:
-                    pass
-            sock.close()
-        except Exception as exc:
-            log("client reset failed: %r %s" % (exc, path))
+        handler._reset_client(why)
         return True
 
     def process_sse(data, emit_lines=True):
@@ -1100,6 +1124,79 @@ class Handler(BaseHTTPRequestHandler):
         except Exception:
             self.close_connection = True
 
+    def _reset_client(self, why):
+        """Close the client connection with SO_LINGER=0 to emit a RST.
+
+        Since V0.2.7 a RST is the only entry that makes ZCode resend: SSE business
+        errors are always wrapped as ProviderBusinessError (retryable is false).
+        This helper only emits the RST; the caller decides whether it is warranted
+        — incomplete content goes through reset_for_recovery, an exhausted window
+        in heartbeat mode goes through _seed_retry_anchor.
+        """
+        self._zp_client_reset = True
+        # BaseHTTPRequestHandler.handle() loops on `while not close_connection`.
+        # Closing the socket without setting this flag leaves the loop calling
+        # readline on a closed rfile, leaking one 100% CPU spinning thread per RST
+        # (measured 2026-11-03).
+        self.close_connection = True
+        log("client reset (%s)" % why)
+        try:
+            sock = self.connection
+            try:
+                sock.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER,
+                                struct.pack("ii", 1, 0))
+            except Exception as exc:
+                # Close anyway if the option cannot be set: a FIN is better than a
+                # connection left hanging.
+                log("client reset setsockopt failed: %r" % (exc,))
+            # Closing the socket object alone is not enough: wfile/rfile still hold
+            # the same fd, and CPython only closes it when the refcount drops, so the
+            # client receives neither RST nor FIN.
+            for name in ("wfile", "rfile"):
+                stream = getattr(self, name, None)
+                try:
+                    if stream is not None and not stream.closed:
+                        stream.close()
+                except Exception:
+                    pass
+            sock.close()
+        except Exception as exc:
+            log("client reset failed: %r" % (exc,))
+
+    def _session_key(self):
+        "Session id used as the one-shot token key; empty string means no retry."""
+        for name in ("x-session-id", "x-zcode-session-id"):
+            value = self.headers.get(name)
+            if value and value.strip():
+                return value.strip()
+        return ""
+
+    def _seed_retry_anchor(self, reason):
+        """Write a tiny content delta, then RST, so the client really retries once.
+
+        Why this step is needed: the client's recovery path requires
+        `discardedReasoningBytes + discardedTextBytes > 0` AND a retryable error.
+        With heartbeats only the discarded byte count is 0, so a RST alone does not
+        trigger a resend — that is exactly why the 2026-11-06 incident ended with a
+        hard error after five silent attempts.
+        A zero-width space does not change what the user reads, but it is enough for
+        the client to consider content started, so it discards this output and
+        resends with previous-message-anchor.
+        """
+        try:
+            self._sse_write("data: " + json.dumps({
+                "id": "chatcmpl-zp-anchor",
+                "object": "chat.completion.chunk",
+                "created": int(time.time()),
+                "model": "zp-anchor",
+                "choices": [{"index": 0,
+                             "delta": {"content": "\u200b"},
+                             "finish_reason": None}],
+            }, ensure_ascii=False) + "\n\n")
+        except Exception as exc:
+            log("retry anchor write failed: %r" % (exc,))
+        self._reset_client(reason)
+
     # ---------- 主流程 ----------
     def _handle(self, method):
         "主流程：解析路径选上游 → 读 body → 重试状态机 → 回写。"
@@ -1307,7 +1404,20 @@ class Handler(BaseHTTPRequestHandler):
         detail = ("已持续重试 %.0f 秒仍失败（共 %d 次尝试：%s）"
                   % (waited, attempt, ",".join(reasons[-5:])))
         if sse_mode:
-            self._sse_error(detail)
+            # 200 + heartbeats are already on the wire: a mid-stream SSE error is
+            # wrapped as ProviderBusinessError (retryable always false) and kills
+            # the turn. The only entry that makes the client retry is "discarded
+            # text + ECONNRESET", so seed a zero-width delta and then RST.
+            # One attempt per session, otherwise this becomes a 10×N storm.
+            key = self._session_key()
+            if claim_retry_once(key):
+                log("retry anchor + reset for one client retry (session=%s) %s"
+                    % (key[:12] or "-", path))
+                self._seed_retry_anchor("window exhausted; one client retry")
+            else:
+                log("no client retry token left (session=%s), plain error %s"
+                    % (key[:12] or "-", path))
+                self._sse_error(detail)
         else:
             self._reject(503, detail)
 

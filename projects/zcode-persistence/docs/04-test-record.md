@@ -317,7 +317,7 @@ Two production failures share one recovery path:
 | 31 | legacy `function_call` (no index) | validated under `-1` and passed through | ✅ |
 | 32 | empty `arguments` | treated as incomplete; RST | ✅ |
 
-`selftest_stream.py`: 32 scenarios pass. The other suites (hook 11, 429 5, watch 12,
+`selftest_stream.py`: 34 scenarios pass. The other suites (hook 11, 429 5, watch 12,
 route 13, ensure serialization) also pass. A Node/undici probe against the real proxy
 receives `TypeError: terminated` with cause `read ECONNRESET` after 61 content bytes;
 the client's `sqa()` matches. Independent review: overall 4.7/5, code 4.4/5.
@@ -333,7 +333,7 @@ logged.
 
 `selftest_proxy_429.py`: 12 scenarios pass (5 existing + body JSON hint / cap / text form /
 split number / 64 KB bound / empty body / stall budget). The body-hint case also asserts
-the marker string is absent from `proxy.log`. Full regression: hook 11, stream 32,
+the marker string is absent from `proxy.log`. Full regression: hook 11, stream 34,
 watch 12, route 13, ensure serialization. Independent review (2026-11-04, independent
 subagent review): overall 4.8/5, code 4.8/5.
 
@@ -346,5 +346,28 @@ excluded from the release asset; `upstreams.example.json` documents the format.
 
 `selftest_upstreams.py`: 8 checks pass (placeholder default, override `/ap`, add `/xx`,
 invalid entries ignored, installer host lookup, explicit prefix wins, unknown host returns
-None, unsupported prefix returns None). Full regression: hook 11, 429 12, stream 32, watch 12, route 13,
+None, unsupported prefix returns None). Full regression: hook 11, 429 12, stream 34, watch 12, route 13,
 ensure serialization. No default retry parameter changed.
+
+## 20. V0.2.10 — longer window + one real client retry
+
+Field evidence (2026-11-06): a request carrying ~420k input tokens spent 355 s in five
+silent attempts and gave up at 08:46:24; the same upstream answered normally again at
+08:49:24. A 5-minute window cannot outlast that kind of stall, and a 30-second silence
+cutoff discards slow-but-healthy large requests.
+
+- `PROXY_RETRY_WINDOW` 300 → 600 s; `PROXY_SILENCE_TIMEOUT` 30 → 60 s.
+- After the window is exhausted **and** the 200 + heartbeats were already sent, the
+  proxy writes one zero-width `content` delta (`chatcmpl-zp-anchor`) and then resets
+  the client connection with `SO_LINGER=0`. ZCode only resumes a stream when it has
+  discarded text **and** sees `ECONNRESET`; with heartbeats alone the discarded byte
+  count is 0, so a bare RST never triggered a retry.
+- `PROXY_RETRY_ONCE_TTL` (default 900 s): the first exhaustion of a session gets the
+  anchor + RST, later ones fall back to the ordinary retryable SSE error. Without this
+  the client's 10 retries would multiply with the proxy window.
+- `reset_for_recovery` now delegates socket teardown to a shared `Handler._reset_client`;
+  the V0.2.7 RST paths are unchanged.
+
+`selftest_stream.py`: 34 scenarios pass, including the two new ones (anchor + RST when
+an `x-session-id` is present; a second exhaustion in the same session must not RST).
+Full regression: hook 11, 429 12, watch 12, route 13, upstreams 8, ensure serialization.

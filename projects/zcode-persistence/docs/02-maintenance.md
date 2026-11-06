@@ -94,12 +94,13 @@ All of the proxy's timing can be overridden with environment variables; changes 
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `PROXY_RETRY_WINDOW` | `300` | Duration of the retry window (seconds). Once it is reached no new attempts are started; an attempt already in flight is allowed to finish, so the actual duration may slightly exceed the window |
+| `PROXY_RETRY_WINDOW` | `600` | Duration of the retry window (seconds). Once it is reached no new attempts are started; an attempt already in flight is allowed to finish, so the actual duration may slightly exceed the window |
 | `PROXY_RETRY_INTERVAL` | `20` | Interval between two attempts (seconds) |
 | `PROXY_MAX_ATTEMPTS` | `200` | Fuse against runaway retries; not reached in normal operation |
-| `PROXY_SILENCE_TIMEOUT` | `30` | Seconds a single attempt waits for the first byte |
+| `PROXY_SILENCE_TIMEOUT` | `60` | Seconds a single attempt waits for the first byte |
 | `PROXY_HEARTBEAT_START` | `80` | How many consecutive seconds without upstream input before heartbeats start |
 | `PROXY_HEARTBEAT_INTERVAL` | `80` | While upstream is silent, send one extra heartbeat every N seconds, unlimited count |
+| `PROXY_RETRY_ONCE_TTL` | `900` | Per-session one-shot window for the anchor + RST client retry; `0` disables it |
 | `PROXY_CONNECT_TIMEOUT` | `10` | Connect timeout (seconds) |
 | `PROXY_SEND_TIMEOUT` | `90` | Timeout for sending the request body (seconds) |
 | `PROXY_RETRY_AFTER_CAP` | `60` | Upper bound (seconds) on how far the upstream `Retry-After` (header or error body) is honored |

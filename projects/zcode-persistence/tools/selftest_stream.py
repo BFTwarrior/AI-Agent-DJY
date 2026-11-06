@@ -3,7 +3,7 @@
 
 不碰真实中转：假上游在本机回环上按脚本吐字节，代理用临时副本 + 临时端口。
 
-验证三十二件事（对应 2026-10-31 三轮复审与终验、2026-11-01 自动暂停修复）：
+验证三十四件事（对应 2026-10-31 三轮复审与终验、2026-11-01 自动暂停修复）：
   1. 逐条透传：上游每 0.2 秒发一条 80 字节事件，客户端应当在每条到达后
      几十毫秒内收到，而不是攒到 8KB 或流结束才一起到
   2. 流中静默：响应头之后上游停 2.5 秒、空闲超时设 1 秒时，代理应当发
@@ -54,6 +54,13 @@
  30. `NaN`/`Infinity` 参数不是合法 JSON：必须判残缺并 RST（V0.2.7）
  31. legacy `function_call`（无 index）完整时能校验并原样透传（V0.2.7）
  32. `arguments` 为空字符串：客户端 `JSON.parse("")` 必失败，代理也判残缺（V0.2.7）
+ 33. Window exhausted in heartbeat mode with an `x-session-id`: write one
+     zero-width content delta, then RST. The client only resends when it has
+     discarded text AND sees ECONNRESET; with heartbeats only the discarded byte
+     count is 0, so a bare RST never triggers a retry (V0.2.10, 2026-11-06).
+ 34. A second exhaustion in the same session: the one-shot token is gone, so this
+     must fall back to a retryable SSE error instead of another RST, otherwise the
+     client's 10 retries roll into an upstream request storm (V0.2.10).
 
 用法：python tools/selftest_stream.py            （默认读同包 src/retry_proxy.py）
       python tools/selftest_stream.py --src X
@@ -233,20 +240,24 @@ class FakeUpstream(object):
 
 
 def call_stream(proxy_port, read_seconds, idle=0.15, start_delay=0.0, prefix="ap",
-                query="", meta=None):
+                query="", meta=None, session=None):
     """发一个流式请求，返回 (每条数据到达的时刻, 原始字节)。
 
     start_delay > 0 时先不读（模拟慢客户端/卡住的界面），用来验证背压不丢数据。
     query 非空时拼在请求路径后面，用来验证 baseUrl 查询串是否保留。
     meta 非空时记录传输层事实：reset=True 表示 recv 收到 WSAECONNRESET，
     这是“代理真的发了 RST”的唯一证据（只缺终止块可能是挂住或 FIN）。
+    session, when non-empty, adds x-session-id: the V0.2.10 one-shot token is
+    rate-limited per session, so without this header the proxy falls back to a
+    plain SSE error.
     """
     body = (b'{"model":"t","stream":true,"messages":'
             b'[{"role":"user","content":"hi"}]}')
     tail = ("?" + query) if query else ""
+    sess = (b"x-session-id: " + session.encode() + b"\r\n") if session else b""
     req = (b"POST /" + prefix.encode() + b"/v1/chat/completions" + tail.encode()
-           + b" HTTP/1.1\r\nHost: x\r\n"
-           b"Content-Type: application/json\r\n"
+           + b" HTTP/1.1\r\nHost: x\r\n" + sess
+           + b"Content-Type: application/json\r\n"
            b"Content-Length: " + str(len(body)).encode() + b"\r\n\r\n") + body
     s = socket.create_connection(("127.0.0.1", proxy_port), timeout=5)
     s.sendall(req)
@@ -336,7 +347,7 @@ def run_case(name, src, script, content_length=None, chunked=True,
              env_extra=None, read_seconds=4.0, heartbeat_start="100",
              hold_after=0, start_delay=0.0, no_response=False, scripts=None,
              rst_after=0, prefix="ap", generic=False, generic_path="",
-             echo=False, query="", meta=None, cpu_probe=False):
+             echo=False, query="", meta=None, cpu_probe=False, session=None):
     "跑一个用例：起假上游 → 起代理副本 → 发流式请求 → 收日志与字节。"
     workdir = tempfile.mkdtemp(prefix="streamtest-")
     proxy_port = free_pair()
@@ -373,7 +384,7 @@ def run_case(name, src, script, content_length=None, chunked=True,
                         time.sleep(0.05)
                 chunks, tail = call_stream(proxy_port, read_seconds,
                                            start_delay=start_delay, prefix=prefix,
-                                           query=query, meta=meta)
+                                           query=query, meta=meta, session=session)
                 if cpu_probe and meta is not None:
                     c0 = proc_cpu_seconds(proc.pid)
                     time.sleep(0.6)
@@ -401,7 +412,7 @@ def run_case(name, src, script, content_length=None, chunked=True,
 
 
 def main():
-    "依次跑 32 个场景并汇总；全部通过退出码 0。"
+    "Run all 34 scenarios and summarise; exit code 0 when everything passes."
     ap = argparse.ArgumentParser()
     ap.add_argument("--src", default=os.path.join(
         os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -1039,6 +1050,81 @@ def main():
                                          meta32.get("reset") is True))
     print("   判定:", "PASS" if pass32 else "FAIL")
     ok = ok and pass32
+
+    # 33) Exhausted in heartbeat mode with an x-session-id: the proxy must write a
+    #     zero-width content delta before the RST. The client only resends when it
+    #     has discarded text AND sees ECONNRESET; with heartbeats only the
+    #     discarded byte count is 0, so a bare RST never triggers a retry.
+    meta33 = {}
+    chunks, logtext, tail = run_case(
+        "anchor before RST on exhausted window", args.src, [], read_seconds=9.0,
+        heartbeat_start="1", hold_after=12, no_response=True, meta=meta33,
+        session="sess-anchor-1",
+        env_extra={"PROXY_RETRY_WINDOW": "3", "PROXY_RETRY_INTERVAL": "0.5",
+                   "PROXY_SILENCE_TIMEOUT": "1"})
+    data = b"\n\n".join(c for _t, c in chunks) + tail
+    anchor = b"chatcmpl-zp-anchor" in data
+    pass33 = (anchor and meta33.get("reset") is True
+              and "retry anchor + reset for one client retry" in logtext
+              and b"0\r\n\r\n" not in tail)
+    print("   anchor=%s rst=%s no_terminal=%s"
+          % (anchor, meta33.get("reset") is True, b"0\r\n\r\n" not in tail))
+    print("   判定:", "PASS" if pass33 else "FAIL")
+    ok = ok and pass33
+
+    # 34) Second exhaustion in the same session: the token is gone, so it must fall
+    #     back to the ordinary retryable SSE error instead of another RST, otherwise
+    #     10 client retries roll into an upstream storm. The token table lives in the
+    #     proxy process, so both requests have to hit the same process: built here.
+    meta34 = {}
+    workdir = tempfile.mkdtemp(prefix="streamtest-")
+    proxy_port = free_pair()
+    env = {k: v for k, v in os.environ.items() if not k.startswith("PROXY_")}
+    env.update(PROXY_PORT=str(proxy_port), PROXY_SILENCE_TIMEOUT="1",
+               PROXY_HEARTBEAT_START="1", PROXY_HEARTBEAT_INTERVAL="1",
+               PROXY_RETRY_WINDOW="3", PROXY_RETRY_INTERVAL="0.5")
+    try:
+        proxy = make_proxy_copy(args.src, workdir, proxy_port + 1)
+        with FakeUpstream(proxy_port + 1, [], no_response=True, hold_after=20):
+            out = open(os.path.join(workdir, "proxy.log"), "w", encoding="utf-8")
+            proc = subprocess.Popen([sys.executable, proxy], env=env, cwd=workdir,
+                                    stdout=out, stderr=subprocess.STDOUT)
+            try:
+                end = time.time() + 8
+                while time.time() < end:
+                    try:
+                        sk = socket.create_connection(("127.0.0.1", proxy_port), 0.3)
+                        sk.close()
+                        break
+                    except OSError:
+                        time.sleep(0.05)
+                first_meta = {}
+                call_stream(proxy_port, 9.0, meta=first_meta, session="sess-twice")
+                chunks34, tail34 = call_stream(proxy_port, 9.0, meta=meta34,
+                                               session="sess-twice")
+            finally:
+                proc.terminate()
+                try:
+                    proc.wait(timeout=5)
+                except Exception:
+                    proc.kill()
+                out.close()
+        logtext = open(os.path.join(workdir, "proxy.log"),
+                       encoding="utf-8", errors="replace").read()
+    finally:
+        shutil.rmtree(workdir, ignore_errors=True)
+    print("== second exhaustion in one session does not RST")
+    data = b"\n\n".join(c for _t, c in chunks34) + tail34
+    no_anchor = b"chatcmpl-zp-anchor" not in data
+    retryable = b'"retryable": true' in data or b'"retryable":true' in data
+    pass34 = (first_meta.get("reset") is True and no_anchor and retryable
+              and meta34.get("reset") is not True
+              and "no client retry token left" in logtext)
+    print("   first_rst=%s no_anchor=%s retryable=%s second_rst=%s"
+          % (first_meta.get("reset") is True, no_anchor, retryable,
+             meta34.get("reset") is not True))
+    print("   判定:", "PASS" if pass34 else "FAIL")
+    ok = ok and pass34
 
     # 23) /p 坏 token 必须回 400（空 token / 非 base64 / 非 http(s) / 非法端口），
     #     不能落到 8787 上无限重试，也不能 500。

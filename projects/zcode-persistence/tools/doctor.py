@@ -393,9 +393,9 @@ def main():
             last_listen = find_last_line(log, "proxy listening on")
             if last_listen:
                 want = [
-                    "retry %ss window" % as_int_text(_script_default(prefix, "retry_proxy.py", "PROXY_RETRY_WINDOW", "300")),
+                    "retry %ss window" % as_int_text(_script_default(prefix, "retry_proxy.py", "PROXY_RETRY_WINDOW", "600")),
                     "every %ss" % as_int_text(_script_default(prefix, "retry_proxy.py", "PROXY_RETRY_INTERVAL", "20")),
-                    "silence=%ss" % as_int_text(_script_default(prefix, "retry_proxy.py", "PROXY_SILENCE_TIMEOUT", "30")),
+                    "silence=%ss" % as_int_text(_script_default(prefix, "retry_proxy.py", "PROXY_SILENCE_TIMEOUT", "60")),
                     "heartbeat>=%ss" % as_int_text(_script_default(prefix, "retry_proxy.py", "PROXY_HEARTBEAT_START", "80")),
                 ]
                 fresh = all(x in last_listen for x in want)

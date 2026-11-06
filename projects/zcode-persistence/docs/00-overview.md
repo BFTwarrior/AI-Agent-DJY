@@ -4,8 +4,8 @@
 
 It adds three things to ZCode: **automatically suggest a retry when a tool fails**, **automatically resend when a model request fails**, and (off by default) **email the reason when a session errors**.
 
-- Version: V0.2.9 (build line 0.4.0)
-- Build date: 2026-11-04 (V0.2.9: real relay hosts moved to git-ignored `upstreams.json`; placeholder defaults; V0.2.8: read `retry_after` from the error body, split-body handling and a ~1 s probe budget (2 s worst case); V0.2.7: JSON validation for buffered tool calls + RST recovery after content for incomplete tool args and upstream SSE errors; V0.2.6: generic `/p` routing + automatic provider migration + retry after a reasoning-only read error + 300 s default window; V0.2.5: buffer tool-call deltas; V0.2.4: absorb upstream SSE `error`; V0.2.3: internal retry for early-finished streams)
+- Version: V0.2.10 (build line 0.4.0)
+- Build date: 2026-11-06 (V0.2.10: retry window 300→600 s and silence 30→60 s, plus a one-shot "anchor + RST" so the client itself retries once after a heartbeat-mode give-up; V0.2.9: real relay hosts moved to git-ignored `upstreams.json`; placeholder defaults; V0.2.8: read `retry_after` from the error body, split-body handling and a ~1 s probe budget (2 s worst case); V0.2.7: JSON validation for buffered tool calls + RST recovery after content for incomplete tool args and upstream SSE errors; V0.2.6: generic `/p` routing + automatic provider migration + retry after a reasoning-only read error + 300 s default window; V0.2.5: buffer tool-call deltas; V0.2.4: absorb upstream SSE `error`; V0.2.3: internal retry for early-finished streams)
 - Applies to: ZCode Desktop (Windows), Python 3.9+
 - Dependencies: Python standard library only; in proxy mode, TLS verification prefers certifi when it is installed
 
@@ -102,7 +102,7 @@ projects/zcode-persistence/
 │  ├─ doctor.py             Health check
 │  ├─ selftest_hook.py      Self-test: 11 hook checks (10 decision cases + third-attempt wording; exit 1 with no output is not a failure)
 │  ├─ selftest_proxy_429.py Self-test: twelve retry-semantics scenarios (including 400 not retryable, body-supplied retry_after, split numbers, bounded and stalled probes)
-│  ├─ selftest_stream.py    Self-test: 32 streaming scenarios (including RST recovery, multi-index order, CPU, NaN)
+│  ├─ selftest_stream.py    Self-test: 34 streaming scenarios (including RST recovery, multi-index order, CPU, NaN)
 │  ├─ selftest_watch.py     Self-test: 12 error-reporting assertions (cooldown/rate limit/send failure/cause attribution/--once does not persist)
 │  ├─ selftest_route.py     Self-test: 13 /p routing and migration checks
 │  ├─ selftest_upstreams.py Self-test: 8 upstream-config and installer host-lookup checks
@@ -176,13 +176,13 @@ So a provider's baseUrl becomes `http://127.0.0.1:8787/p/<b64>` for any relay, o
 
 1. Cannot connect, or the connection is dropped
 2. The upstream returns **any non-2xx** (including 4xx; the spec is to retry on any error)
-3. The upstream emits not a single byte within 30 seconds
+3. The upstream emits not a single byte within 60 seconds
 
 **Retry count**
 
 Not by count but by time window: **keep retrying for 5 minutes, once every 20 seconds** (about 15 attempts inside the window), identical for streaming and non-streaming.
 Wait **20 seconds** between two attempts; if the upstream returns a longer `Retry-After` (response header or error body), honour that instead (capped at 60 seconds). When the header is absent, the proxy probes the first 64 KB of the non-2xx body for `"retry_after":N` or `Retry-After: N`; the body itself is never logged. When the window expires no new attempt is started;
-the attempt already in flight is allowed to run to completion (connect 10 s + send 90 s + wait for headers 30 s maximum), so the total duration may be slightly longer than the window.
+the attempt already in flight is allowed to run to completion (connect 10 s + send 90 s + wait for headers 60 s maximum), so the total duration may be slightly longer than the window.
 In practice failures are mostly **HTTP 429 (concurrency saturated)**; waiting a few seconds before resending almost always gets through.
 
 
@@ -211,9 +211,9 @@ with a chunked terminating block appended at the end — scenario 7 in `tools/se
 When a streaming request reaches **80 seconds** with no upstream input at all, the proxy writes an SSE comment line (`: keepalive`) into the conversation:
 the client ignores the content but can see that bytes are arriving, so it does not abort outright because of "no output for 95 seconds".
 This works equally after the response headers have come back: when the upstream stalls mid-stream, a heartbeat is added every 80 seconds to keep waiting,
-and truncation is only declared after 5 minutes of cumulative silence (content already received is not lost).
+and truncation is only declared after 10 minutes of cumulative silence (content already received is not lost).
 **Precondition**: the response must be `Content-Type: text/event-stream` (every normal streaming request is);
-with any other type, inserting a comment line would corrupt the body, so only the 30-second silence truncation applies.
+with any other type, inserting a comment line would corrupt the body, so only the 60-second silence truncation applies.
 A slow-reading client only makes the whole stream slower (the proxy uses a queue to create backpressure) and never loses chunks;
 a half-open connection that reads nothing and never disconnects blocks forever (until reading resumes or TCP reports an error) — that is the price of having no client write timeout.
 After that another heartbeat is added **every 80 seconds** without input, **with no cap on the number of heartbeats**. The heartbeat is driven by an independent clock and does not wait for an attempt to fail before being sent.
@@ -226,7 +226,7 @@ After that another heartbeat is added **every 80 seconds** without input, **with
 
 - The relay's Cloudflare blocks user agents such as `Python-urllib` and returns 1010; the proxy automatically substitutes a normal browser UA.
 - TLS verification prefers certifi's CA bundle; the Windows built-in root store is missing some roots (such as SSL.com), which causes verification failures.
-- Every attempt has its own independent timeouts: connect 10 s, send the request body 90 s (the payloads are large, so the connect timeout cannot be reused), wait for the first byte 30 s.
+- Every attempt has its own independent timeouts: connect 10 s, send the request body 90 s (the payloads are large, so the connect timeout cannot be reused), wait for the first byte 60 s.
 - No request/response content is logged; only status lines are written (time, path, status code, byte count, first-byte latency).
 
 ---

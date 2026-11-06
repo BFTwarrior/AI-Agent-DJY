@@ -25,7 +25,7 @@ Three components (the third is off by default):
 8. TLS must use certifi's CA (the Windows built-in root store lacks SSL.com and validation fails).
 9. The UA fallback must not be deleted: the relay's Cloudflare blocks `Python-urllib` (returns 1010).
 10. The hook's stdout JSON **may only use `additionalContext`**. `systemMessage` is visible only to the user and invisible to the model — that is exactly where v0.3.0 fell over: the hook clearly logged `advise`, yet the model still did not retry. The client parses with zod (non-strict), so unknown keys are stripped — but stripped equals written for nothing, so it still outputs only this one key.
-11. Backoff must not be "retry immediately". In measured failures 85% are the upstream **HTTP 429 (concurrency saturated)**, so you must wait per `RETRY_INTERVAL` (20 seconds); if the upstream gives a longer `Retry-After` (response header or error body), obey it (capped at `RETRY_AFTER_CAP`=60 seconds). Total retry volume is governed by `RETRY_WINDOW` (300 seconds), not by a count.
+11. Backoff must not be "retry immediately". In measured failures 85% are the upstream **HTTP 429 (concurrency saturated)**, so you must wait per `RETRY_INTERVAL` (20 seconds); if the upstream gives a longer `Retry-After` (response header or error body), obey it (capped at `RETRY_AFTER_CAP`=60 seconds). Total retry volume is governed by `RETRY_WINDOW` (600 seconds), not by a count.
 12. **Do not reintroduce "filter by error type"**. The user spec is "retry three times on any error at all": the hook advises a retry on any failure, and the proxy resends on any non-2xx. The v0.3.x FATAL filter has been deleted; adding it back equals violating the requirement.
 13. The heartbeat is "sent only after **80 seconds with no upstream input**, then one every 80 seconds, **with no cap on count**". Do not change it to a fixed count, and do not make it send when data arrives. Before the response headers it is sent by the main loop's independent clock; after the response headers it is sent by `pipe_response`'s reader thread plus the main thread consuming the queue (one line at `HEARTBEAT_INTERVAL` of silence; truncation is judged only at `RETRY_WINDOW` of silence).
 14. During the backoff wait the thread must `sleep` and must not spin (v0.3.1 once saturated a single core at 97% during a 50-second backoff).
@@ -47,7 +47,7 @@ Three components (the third is off by default):
 
 ## Current finalized parameters
 
-`RETRY_WINDOW=300` (seconds, the time window), `RETRY_INTERVAL=20` (seconds, fixed interval; `MAX_ATTEMPTS` is only a runaway fuse, default 200), `SILENCE_TIMEOUT=30`, `HEARTBEAT_START=80`, `HEARTBEAT_INTERVAL=80` (no cap on count), `PROXY_RETRY_WINDOW` / `PROXY_RETRY_INTERVAL` override the window and the interval, `RETRY_AFTER_CAP=60`, port 8787.
+`RETRY_WINDOW=600` (seconds, the time window), `RETRY_INTERVAL=20` (seconds, fixed interval; `MAX_ATTEMPTS` is only a runaway fuse, default 200), `SILENCE_TIMEOUT=60`, `HEARTBEAT_START=80`, `HEARTBEAT_INTERVAL=80` (no cap on count), `PROXY_RETRY_WINDOW` / `PROXY_RETRY_INTERVAL` override the window and the interval, `PROXY_RETRY_ONCE_TTL=900` (one anchor+RST client retry per session), `RETRY_AFTER_CAP=60`, port 8787.
 
 Changing these defaults equals changing the product spec; you **must** update `README.md`, `docs/02-maintenance.md`, `docs/04-test-record.md` and `CHANGELOG.md` in sync.
 
@@ -62,7 +62,7 @@ Changing these defaults equals changing the product spec; you **must** update `R
 
 ## Continuing development starts here (for the next AI / engineer)
 
-**First get the version numbers straight**: what you ship externally is the formal release number (`0.2.9`); `0.4.0` is the build-line iteration number,
+**First get the version numbers straight**: what you ship externally is the formal release number (`0.2.10`); `0.4.0` is the build-line iteration number,
 and the two are not the same thing. `VERSION`, `tools/install.py`, `PROXY_VERSION` and `clientInfo.version` all carry the formal release number;
 the project `README.md` records the current build line.
 

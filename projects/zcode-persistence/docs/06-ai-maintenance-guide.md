@@ -100,7 +100,7 @@ Error reporting: polls `session.last_outcome` in `~/.zcode/cli/db/db.sqlite`; wh
 - `doctor.py`: script, interpreter, `hooks.enabled`, the three hooks (the two tool hooks validate matcher=Bash, all three validate the script path), provider, port, proxy version (running vs installed), proxy runtime parameters, error-watch status, log tail. The log tail reads only the last 64KB; finding the "start line" walks back from the end of the file in 64KB blocks, up to 8MB.
 - `selftest_hook.py`: 11 hook checks (10 decision cases + third-attempt wording; including exit 1 with no output, timeouts and cancelled calls).
 - `selftest_proxy_429.py`: twelve retry-semantics scenarios (429 recovers / persistent 429 / 400 recovers / persistent 400 / unknown prefix 400 must be `retryable:false` / body-supplied `retry_after` / cap / text form / split number / 64 KB bound / empty body / stall budget).
-- `selftest_stream.py`: 32 streaming scenarios (including missing-finish-reason, upstream-error, partial-tool-call, RST-after-content, multi-index ordering, CPU after reset, `NaN` and legacy `function_call` cases).
+- `selftest_stream.py`: 34 streaming scenarios (including missing-finish-reason, upstream-error, partial-tool-call, RST-after-content, multi-index ordering, CPU after reset, `NaN` and legacy `function_call` cases).
 - `selftest_watch.py`: 12 assertions for error reporting (new red dot / dedupe / historical baseline / completed and stopped are not reported / rate limit / multiple sessions merged / wording when there are no relevant records / failure but not given up · new format / same · old format / cooldown and expiry / send failure retry / `--once` writes nothing to disk).
 - `selftest_route.py`: 13 `/p` routing and provider-migration checks.
 - `selftest_upstreams.py`: 8 upstream-config checks (placeholder defaults, override/add/invalid entries, installer host lookup, explicit prefix wins, unknown/unsupported host returns `None`).
@@ -206,7 +206,7 @@ print("assert 4: error event    :", b"server_error" in raw)
 
 Non-streaming control: set `stream` to `False`; expect **no** `keepalive`, and an HTTP **503** after the window expires (plain JSON, not SSE; about 3 seconds with the accelerated parameters).
 
-**The response body (streaming write-back) has its own self-test**: `python tools/selftest_stream.py`, whose 32 scenarios each stress "pass through chunk by chunk / keep alive during mid-stream silence / short read on a fixed length judged truncated / normal finish / silence until the window is judged truncated / slow client loses no data / give up in heartbeat mode must carry a retryable error body". You must run it after changing `pipe_response` — behavior after the response headers cannot be tested with this recipe.
+**The response body (streaming write-back) has its own self-test**: `python tools/selftest_stream.py`, whose 34 scenarios each stress "pass through chunk by chunk / keep alive during mid-stream silence / short read on a fixed length judged truncated / normal finish / silence until the window is judged truncated / slow client loses no data / give up in heartbeat mode must carry a retryable error body / anchor + RST for one client retry". You must run it after changing `pipe_response` — behavior after the response headers cannot be tested with this recipe.
 
 ## 5. Troubleshooting
 
@@ -268,7 +268,7 @@ the project `README.md` records the current build line.
 1. Read the "What it is / Limitations" sections of `README.md`.
 2. Read this file (`docs/06-ai-maintenance-guide.md`), section 2 code map and section 3 invariants.
 3. Run a health check once: `python <install directory>/doctor.py`; it must show 0 failed (the item count depends on how many providers are configured).
-4. Run the self-tests: `tools/selftest_hook.py` (11 checks), `tools/selftest_proxy_429.py` (12 scenarios), `tools/selftest_stream.py` (32 scenarios), `tools/selftest_route.py` (13 checks),
+4. Run the self-tests: `tools/selftest_hook.py` (11 checks), `tools/selftest_proxy_429.py` (12 scenarios), `tools/selftest_stream.py` (34 scenarios), `tools/selftest_route.py` (13 checks),
    `tools/selftest_watch.py` (12 assertions), `tools/selftest_upstreams.py` (8 checks), `tools/selftest_ensure.py` (serialization); all should PASS.
 
 **Three things you must know before changing code**
@@ -322,14 +322,14 @@ These are all real problems that were hit and fixed. **Do not reintroduce them.*
 1. **The hook cannot catch a whole-turn failure**. `PostToolUseFailure` requires `toolName`/`toolCallId`; a model-level `Turn execution failed` has no tool involved, so none of the seven hook events fires. This class can only be handled by the proxy.
 2. **The proxy cannot rescue "the upstream slowly swallows the request body"**. 95 seconds is a hard client timeout, and the proxy cannot make the upstream faster.
 3. **Heartbeats work only for streaming**. A non-streaming response must be complete JSON; nothing can be inserted in the middle.
-4. **The heartbeat comes online at 80 seconds**, after which the client's 95-second timeout no longer counts; after the response headers, if the upstream emits no bytes for a long time, the reader thread + main loop keep sending heartbeats, and truncation is judged only when accumulated silence reaches the retry window (300 seconds).
+4. **The heartbeat comes online at 80 seconds**, after which the client's 95-second timeout no longer counts; after the response headers, if the upstream emits no bytes for a long time, the reader thread + main loop keep sending heartbeats, and truncation is judged only when accumulated silence reaches the retry window (600 seconds).
 5. **The provider config may be rewritten by the ZCode UI**; re-running `install.py --with-proxy` restores it.
 6. **`retryable` is decided locally, not by the upstream** (corrected 2026-10-31). When the proxy gives up it returns
    `code=model_server_error` + `retryable:true` itself, and only then does the client retry using stream recovery and continue writing;
    older versions treated `retryable=false` in the client's popup as "decided by the upstream", which caused the whole turn to be judged dead.
    400 (the client itself wrote something wrong) still returns `retryable:false`.
 7. **Windows `SO_REUSEADDR` allows two processes to bind 8787 at the same time** (not allowed on Linux). So "the port is listening" does not equal "this proxy is the one running": both `ensure_proxy`/`doctor` first request `/__zp_health` to confirm. When two proxies appear, kill the extra one by PID from `netstat -ano`; do not leave both.
-8. **The time window is not a hard upper bound**. `RETRY_WINDOW` only decides "whether to still launch new attempts"; an attempt already in flight is allowed to finish (connect 10 seconds + send 90 seconds + wait for headers 30 seconds maximum), so the worst-case duration may exceed the window.
+8. **The time window is not a hard upper bound**. `RETRY_WINDOW` only decides "whether to still launch new attempts"; an attempt already in flight is allowed to finish (connect 10 seconds + send 90 seconds + wait for headers 60 seconds maximum), so the worst-case duration may exceed the window.
 9. **`proxy.log` does not rotate**. It keeps growing during long runs; `doctor` reads only the tail (walking back at most 8MB for the start line), and when cleanup is needed you can simply delete it (the proxy recreates it).
 10. **Response-body heartbeats apply only to SSE**. `can_hb` requires the client to want streaming and the response to be `text/event-stream` (or heartbeat mode to have already sent a 200);
     for other Content-Types, inserting a comment line would corrupt the body, so that case is still truncated per `SILENCE_TIMEOUT=30` seconds.
