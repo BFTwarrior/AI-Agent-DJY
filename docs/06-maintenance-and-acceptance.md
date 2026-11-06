@@ -62,7 +62,8 @@ The public asset ships Chinese documents while the repository keeps English ones
 the two sets can silently drift. Before publishing, compare them item by item:
 version string, parameter defaults, scenario counts, and any mechanism added in the
 release. A release note that describes behaviour the asset documents do not mention is
-a blocker.
+a blocker. Check both the root `README.md` and `projects/README.md`: the version
+column in each must name the release being published.
 
 ## After committing
 
