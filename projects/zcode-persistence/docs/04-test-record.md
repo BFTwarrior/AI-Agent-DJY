@@ -5,8 +5,8 @@ The old expectations of v0.3.x (filtering out by error type, no retry on `permis
 
 > **Reading order**: Sections 1 through 16 are historical batches kept as-is for traceability
 > (fixed-count retries, the v1.1.0 heartbeat parameters, the v0.4.0 build line, the 2026-10-31 fixes,
-> and the V0.2.1–V0.2.6 changes). **Section 20 (V0.2.10) is the current result; sections 17–19
-> record V0.2.7–V0.2.9.** The current defaults
+> and the V0.2.1–V0.2.6 changes). **Section 21 (V0.2.11) is the current result; sections 17–20
+> record V0.2.7–V0.2.10.** The current defaults
 > are a 600-second retry window, one attempt every 20 seconds, a 60-second silence timeout and
 > 80-second heartbeats; the "180-second window" and "503 after 3 retries" wording in old batches is historical only.
 
@@ -374,3 +374,25 @@ cutoff discards slow-but-healthy large requests.
 `selftest_stream.py`: 34 scenarios pass, including the two new ones (anchor + RST when
 an `x-session-id` is present; a second exhaustion in the same session must not RST).
 Full regression: hook 11, 429 12, watch 12, route 13, upstreams 8, ensure serialization.
+
+## 21. V0.2.11 — early incomplete tool calls get one real client retry
+
+An upstream may end an SSE stream with a partial tool-call name or JSON arguments before
+any content has reached the client. Replaying the unchanged request internally can repeat
+the same short `[DONE]` for the entire 600-second retry window and can overlap with a new
+client request. V0.2.11 gives this case a bounded real client retry instead:
+
+- with `x-session-id` or `x-zcode-session-id`, claim the per-session one-shot token, write
+the zero-width `chatcmpl-zp-anchor`, wait for `PROXY_ANCHOR_SETTLE_MS`, and reset the
+client connection with `SO_LINGER=0`;
+- without a session id, fail closed with a retryable SSE error rather than creating an
+unbounded retry chain;
+- after the one-shot token is consumed, fail fast with the same retryable SSE error;
+- complete tool calls and incomplete tool calls after visible content keep their existing
+buffering and RST recovery behavior.
+
+`selftest_stream.py`: 35 scenarios pass. The new end-to-end scenario verifies that the
+first request receives the anchor and an actual reset, the proxy does not start a second
+internal `retry after early finish` loop, and a second request on the same session receives
+a complete tool call with `finish_reason=tool_calls`. Full regression: hook 11, 429 12,
+watch 12, route 13, upstreams 8, ensure serialization.

@@ -77,11 +77,11 @@ repo projects/<name>/ ──tag/Release──►  GitHub Releases (archives)
 
 Details: [03-Deployment and Sync](03-deployment-and-sync.md).
 
-## Current contents (2026-11-07)
+## Current contents (2026-11-10)
 
 - 3 skills: `code-review-and-quality`, `code-simplification`, `constraint-driven-development`
 - 2 MCP entries: `github`, `ms365` (config templates only, no secrets)
-- 1 project: `zcode-persistence` V0.2.10 (source + docs + diagrams; 12 retry + 34 streaming + 8 upstream-config checks)
+- 1 project: `zcode-persistence` V0.2.11 (source + docs + diagrams; 12 retry + 35 streaming + 8 upstream-config checks)
 - `shared/`: scaffold only; no cross-project scripts or prompts have been added yet
 
 ## Non-goals

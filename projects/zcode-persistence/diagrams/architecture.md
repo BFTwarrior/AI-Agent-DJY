@@ -1,4 +1,4 @@
-# Architecture Diagram (V0.2.10)
+# Architecture Diagram (V0.2.11)
 
 > Build line 0.4.0. Parameters and semantics follow the code in this project's `src/`;
 > this document sketches the relationships without repeating every detail.
@@ -49,9 +49,11 @@ main loop (window started .. started+600s, one attempt every RETRY_INTERVAL=20s)
                  then one every 80s, no cap (independent clock, not tied to attempt boundaries)
    │
    ├─ success → write response headers → read and flush
-   │    ├─ no text/tool yet and the stream ends without finish_reason, or sends {"error":...},
-   │    │    or dies mid-tool-arguments → discard and re-request into the same client
-   │    │    response (V0.2.3/V0.2.4/V0.2.5; tool deltas are buffered until finish)
+   │    ├─ no text/tool yet and the stream ends without finish_reason, or sends {"error":...}
+   │    │    → discard and re-request into the same client response (V0.2.3/V0.2.4)
+   │    ├─ no text and dies mid-tool-arguments → with a session token, write the anchor and
+   │    │    RST once for a real client retry; without one, return a retryable SSE error (V0.2.11)
+   │    │    (tool deltas are buffered until finish)
    │    ├─ content + incomplete tool args or an SSE error, no complete call/finish
    │    │    → validate zero bytes, then RST the client (V0.2.7)
    │    ├─ stream breaks after a complete tool call / finish → stop; no terminator

@@ -2,6 +2,22 @@
 
 > 2026-11-01: migrated to the AI-Agent-DJY repository; documentation was translated to English and directories standardized to `docs/` and `diagrams/`. Historical entries keep paths as originally written.
 
+## V0.2.11 — 2026-11-10
+
+- **Real client retry for incomplete tool calls**: when an upstream ends an SSE stream with
+  an incomplete buffered tool call before any client-visible content, the proxy no longer
+  replays the unchanged request internally for up to 600 seconds. With a session id it
+  writes the zero-width anchor and resets the client connection immediately, giving ZCode
+  one genuine retry; without a session id it fails closed with a retryable SSE error.
+- A second incomplete-tool-call failure in the same session does not consume another
+  client retry or start another long internal retry chain.
+- Existing recovery remains unchanged for complete tool calls and for incomplete tool
+  arguments after client-visible content: those paths still prevent duplicate execution
+  and use the established RST recovery.
+- `selftest_stream.py`: 34 → 35 scenarios, including an end-to-end second client request
+  after the early tool-call RST.
+- Version fields bumped to 0.2.11.
+
 ## V0.2.10 — 2026-11-06
 
 - **Retry budget**: `PROXY_RETRY_WINDOW` 300 → 600 s and `PROXY_SILENCE_TIMEOUT`

@@ -84,7 +84,7 @@ Constraints:
 | Object | Format | Example |
 |---|---|---|
 | Repository | `v<major>.<minor>.<patch>` | `v0.1.0` |
-| Single project | `proj-<project>-v<major>.<minor>[.<patch>]` | `proj-zcode-persistence-v0.2.10` |
+| Single project | `proj-<project>-v<major>.<minor>[.<patch>]` | `proj-zcode-persistence-v0.2.11` |
 | Pre-import project history | `proj-<project>-v<version>-history` | `proj-zcode-persistence-v0.1-history` |
 
 - Repository tags and project tags are separate, so "which package was released" is

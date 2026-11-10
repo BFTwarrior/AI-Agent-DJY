@@ -99,7 +99,10 @@ write response headers (strip hop-by-hop) → read1 chunk by chunk, flush to the
    │   ├─ text written, no complete tool call ──► RST the client (V0.2.7)
    │   └─ complete tool call / finish emitted ──► pass through
    ├─ stream ends mid-tool-arguments (tool_args_invalid shape)
-   │   ├─ nothing written out yet ──► drop the buffer, mark early, re-request (V0.2.5)
+   │   ├─ nothing written out yet + session token available ──► write zero-width anchor,
+   │   │   wait for settle, RST once for a real client retry (V0.2.11)
+   │   ├─ nothing written out yet + no token ──► retryable SSE error; do not start an
+   │   │   internal retry chain (V0.2.11)
    │   └─ text written, incomplete JSON ──► write zero bytes, RST the client (V0.2.7)
    ├─ read error/silence with no text/tool call/finish reason and the client connected
    │   ──► mark early, re-request (V0.2.6; a client disconnect is logged as

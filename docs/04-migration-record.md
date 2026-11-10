@@ -108,8 +108,8 @@ recorded in the project `CHANGELOG` and Releases.
   - sha256: `f9aaed855ac2b538b298dc88477c2360ae95939477fbb386fd87d3d25a4b27d9`
   - Extracts to `history/`, matching the local `Zcode-Persistence` history directory
 
-**Public state after 2026-11-03:** every pre-sanitization release asset was removed when the
-repository became public. `proj-zcode-persistence-v0.2.10` carries the current sanitized asset;
+**Public state after 2026-11-03 (historical snapshot):** every pre-sanitization release asset was removed when the
+repository became public. At that time, `proj-zcode-persistence-v0.2.10` carried the sanitized asset;
 `proj-zcode-persistence-v0.2.7` and `proj-zcode-persistence-v0.2.8` remain as Releases without
 assets; `proj-zcode-persistence-v0.2.3`–`v0.2.6` and `v0.1-history` also remain as Releases
 without assets; the `v0.2` and `v0.2.1` Releases were deleted (their tags remain). The upload

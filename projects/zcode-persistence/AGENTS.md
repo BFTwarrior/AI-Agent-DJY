@@ -41,8 +41,8 @@ Two main components plus one optional side path (off by default):
     such as `grep -q` with no match, `diff --quiet` with differences, or a false `test`; the client nevertheless marks the call
     `status="failed"`, so status alone is not enough. Any exit code other than 1, any output, a timeout, or cancellation still counts
     as a failure. The 2026-11-01 "pause once a minute" bug missed exactly this: three retry advices, and the third told the model to stop.
-23. **Tool-call deltas must be buffered and only written out at `finish_reason` or at the end** (V0.2.5; JSON validation from V0.2.7). A stream that ends mid-arguments with nothing written out must be discarded and re-requested; once a complete tool call has been written out, it must pass through (resending would run the tools twice). Reverting the buffer to direct streaming brings `tool_args_invalid` back.
-24. **A read error may be retried internally only when nothing has been written out** (V0.2.6; V0.2.7 resets the client when content exists). Check SSE, `client_gone`, `text_out`, `tool_out`, `finish_out`: only when all are false may the attempt be marked early and re-requested. If content was emitted but there is no complete tool call or finish reason, reset the client (see 29). Content already sent must never be retried internally, and a client disconnect is not an upstream failure.
+23. **Tool-call deltas must be buffered and only written out at `finish_reason` or at the end** (V0.2.5; JSON validation from V0.2.7). A complete tool call must pass through once validated; a partial call must never be written. If a stream ends mid-arguments before any client-visible content, V0.2.11 uses the per-session one-shot anchor + RST path for a real client retry when a session id is present, and fails closed with a retryable SSE error otherwise. Reverting the buffer to direct streaming brings `tool_args_invalid` back.
+24. **A read error may be retried internally only when nothing has been written out** (V0.2.6; V0.2.7 resets the client when content exists). Check SSE, `client_gone`, `text_out`, `tool_out`, `finish_out`: only when all are false may a non-tool early attempt be marked and re-requested. An incomplete early tool call must follow invariant 23 instead of entering the unchanged-body retry loop. If content was emitted but there is no complete tool call or finish reason, reset the client (see 29). Content already sent must never be retried internally, and a client disconnect is not an upstream failure.
 25. **`/p/<token>` is base64url of the original baseUrl** (V0.2.6); validate scheme/host/port after decoding, preserve base and request queries, include non-default ports in Host, and return 400 for a bad token.
 26. **Provider migration is idempotent, sidecar-first and restorable** (V0.2.6); compare proxy addresses with `urlsplit` host+port, skip unusable URLs, write the sidecar before the config.
 27. **Automatic migration requires `features` containing `p_route` and a matching non-empty `root`** (V0.2.6, fail-closed); `uninstall` must restore `/p` from the sidecar, including before `--purge`.
@@ -59,7 +59,7 @@ Changing these defaults amounts to changing the product spec; you **must** updat
 
 1. Run the accelerated test in section 4 of `docs/06-ai-maintenance-guide.md` (all four assertions must pass).
 2. Run `python -I tools/selftest_hook.py`, `tools/selftest_proxy_429.py`, `tools/selftest_stream.py`, `tools/selftest_watch.py`, `tools/selftest_route.py`, `tools/selftest_upstreams.py`
-   (11 hook checks (10 cases + third-attempt wording) + 12 retry scenarios + 34 streaming scenarios + 12 error-reporting assertions + 13 migration checks + 8 upstream-config checks must all pass; run `tools/selftest_ensure.py` after changing `ensure_proxy.py`). If you changed `pipe_response` you must run the streaming suite;
+   (11 hook checks (10 cases + third-attempt wording) + 12 retry scenarios + 35 streaming scenarios + 12 error-reporting assertions + 13 migration checks + 8 upstream-config checks must all pass; run `tools/selftest_ensure.py` after changing `ensure_proxy.py`). If you changed `pipe_response` you must run the streaming suite;
    if you changed `error_watch.py` you must run the fourth suite.
 3. Bump `VERSION`, `tools/install.py`, `src/retry_proxy.py` (`PROXY_VERSION`) and `src/error_watch.py` (`clientInfo.version`); all four must agree.
 4. Record "what changed + why" in `CHANGELOG.md`.
@@ -68,7 +68,7 @@ Changing these defaults amounts to changing the product spec; you **must** updat
 
 ## Start here to continue development (for the next AI / engineer)
 
-**Get the version numbers straight first**: what is published externally is the official release number (`0.2.10`); the `0.4.0` in the code is the build-line iteration number,
+**Get the version numbers straight first**: what is published externally is the official release number (`0.2.11`); the `0.4.0` in the code is the build-line iteration number,
 and the two are not the same thing. `VERSION`, `tools/install.py`, `PROXY_VERSION` and `clientInfo.version` all carry the official release number;
 the project `README.md` records the current build line.
 

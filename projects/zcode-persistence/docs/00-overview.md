@@ -4,8 +4,8 @@
 
 It adds three things to ZCode: **automatically suggest a retry when a tool fails**, **automatically resend when a model request fails**, and (off by default) **email the reason when a session errors**.
 
-- Version: V0.2.10 (build line 0.4.0)
-- Build date: 2026-11-06 (V0.2.10: retry window 300→600 s and silence 30→60 s, plus a one-shot "anchor + RST" so the client itself retries once after a heartbeat-mode give-up; V0.2.9: real relay hosts moved to git-ignored `upstreams.json`; placeholder defaults; V0.2.8: read `retry_after` from the error body, split-body handling and a ~1 s probe budget (2 s worst case); V0.2.7: JSON validation for buffered tool calls + RST recovery after content for incomplete tool args and upstream SSE errors; V0.2.6: generic `/p` routing + automatic provider migration + retry after a reasoning-only read error + 300 s default window; V0.2.5: buffer tool-call deltas; V0.2.4: absorb upstream SSE `error`; V0.2.3: internal retry for early-finished streams)
+- Version: V0.2.11 (build line 0.4.0)
+- Build date: 2026-11-10 (V0.2.11: incomplete tool calls before client-visible content use one real client retry instead of a long unchanged internal replay; V0.2.10: retry window 300→600 s and silence 30→60 s, plus a one-shot "anchor + RST" after a heartbeat-mode give-up; V0.2.9: real relay hosts moved to git-ignored `upstreams.json`; placeholder defaults; V0.2.8: read `retry_after` from the error body, split-body handling and a ~1 s probe budget (2 s worst case); V0.2.7: JSON validation for buffered tool calls + RST recovery after content for incomplete tool args and upstream SSE errors; V0.2.6: generic `/p` routing + automatic provider migration + retry after a reasoning-only read error + 300 s default window; V0.2.5: buffer tool-call deltas; V0.2.4: absorb upstream SSE `error`; V0.2.3: internal retry for early-finished streams)
 - Applies to: ZCode Desktop (Windows), Python 3.9+
 - Dependencies: Python standard library only; in proxy mode, TLS verification prefers certifi when it is installed
 
@@ -102,7 +102,7 @@ projects/zcode-persistence/
 │  ├─ doctor.py             Health check
 │  ├─ selftest_hook.py      Self-test: 11 hook checks (10 decision cases + third-attempt wording; exit 1 with no output is not a failure)
 │  ├─ selftest_proxy_429.py Self-test: twelve retry-semantics scenarios (including 400 not retryable, body-supplied retry_after, split numbers, bounded and stalled probes)
-│  ├─ selftest_stream.py    Self-test: 34 streaming scenarios (including RST recovery, multi-index order, CPU, NaN)
+│  ├─ selftest_stream.py    Self-test: 35 streaming scenarios (including early-tool client retry, RST recovery, multi-index order, CPU, NaN)
 │  ├─ selftest_watch.py     Self-test: 12 error-reporting assertions (cooldown/rate limit/send failure/cause attribution/--once does not persist)
 │  ├─ selftest_route.py     Self-test: 13 /p routing and migration checks
 │  ├─ selftest_upstreams.py Self-test: 8 upstream-config and installer host-lookup checks

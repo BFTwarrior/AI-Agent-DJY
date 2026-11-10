@@ -3,12 +3,21 @@
 A ZCode failure-retry toolkit: **suggests a retry when a tool fails**, **automatically
 resends when a model request fails**, plus a default-off **email report of session errors**.
 
-- Version: V0.2.10
+- Version: V0.2.11
 - Build line: 0.4.0
 - Applies to: ZCode Desktop (Windows), Python 3.9+
 - Dependencies: Python standard library only; proxy mode prefers certifi (if installed)
 
 ## Version history
+
+### V0.2.11: early incomplete tool calls get one real client retry
+
+When an upstream ends a stream with an incomplete buffered tool call before any
+client-visible content, the proxy immediately uses the per-session anchor + RST path
+instead of replaying the unchanged request internally for up to 600 seconds. A session
+id is required for this one-shot client retry; without one, the proxy fails closed with
+a retryable SSE error. Complete tool calls and post-content recovery keep their existing
+behavior.
 
 ### V0.2.10: longer retry window + one real client retry
 
@@ -121,6 +130,6 @@ email addresses.
 ## Distribution
 
 The distribution package lives in the repository Releases:
-`proj-zcode-persistence-v0.2.10`.
+`proj-zcode-persistence-v0.2.11`.
 The archive contains build artifacts; this directory is authoritative for the source, and
 if the two disagree, this directory plus the tag wins.

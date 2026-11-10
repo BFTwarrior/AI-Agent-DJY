@@ -3,7 +3,7 @@
 
 不碰真实中转：假上游在本机回环上按脚本吐字节，代理用临时副本 + 临时端口。
 
-验证三十四件事（对应 2026-10-31 三轮复审与终验、2026-11-01 自动暂停修复）：
+验证三十五件事（对应 2026-10-31 三轮复审与终验、2026-11-01 自动暂停修复、2026-11-10 工具调用真重试修复）：
   1. 逐条透传：上游每 0.2 秒发一条 80 字节事件，客户端应当在每条到达后
      几十毫秒内收到，而不是攒到 8KB 或流结束才一起到
   2. 流中静默：响应头之后上游停 2.5 秒、空闲超时设 1 秒时，代理应当发
@@ -58,9 +58,12 @@
      zero-width content delta, then RST. The client only resends when it has
      discarded text AND sees ECONNRESET; with heartbeats only the discarded byte
      count is 0, so a bare RST never triggers a retry (V0.2.10, 2026-11-06).
- 34. A second exhaustion in the same session: the one-shot token is gone, so this
+  34. A second exhaustion in the same session: the one-shot token is gone, so this
      must fall back to a retryable SSE error instead of another RST, otherwise the
      client's 10 retries roll into an upstream request storm (V0.2.10).
+  35. An incomplete tool call with no client-visible content must immediately seed
+     the anchor and RST once; it must not start a second internal retry (V0.2.11).
+
 
 用法：python tools/selftest_stream.py            （默认读同包 src/retry_proxy.py）
       python tools/selftest_stream.py --src X
@@ -247,7 +250,7 @@ def call_stream(proxy_port, read_seconds, idle=0.15, start_delay=0.0, prefix="ap
     query 非空时拼在请求路径后面，用来验证 baseUrl 查询串是否保留。
     meta 非空时记录传输层事实：reset=True 表示 recv 收到 WSAECONNRESET，
     这是“代理真的发了 RST”的唯一证据（只缺终止块可能是挂住或 FIN）。
-    session, when non-empty, adds x-session-id: the V0.2.10 one-shot token is
+    session, when non-empty, adds x-session-id: the V0.2.11 one-shot token is
     rate-limited per session, so without this header the proxy falls back to a
     plain SSE error.
     """
@@ -412,7 +415,7 @@ def run_case(name, src, script, content_length=None, chunked=True,
 
 
 def main():
-    "Run all 34 scenarios and summarise; exit code 0 when everything passes."
+    "Run all 35 scenarios and summarise; exit code 0 when everything passes."
     ap = argparse.ArgumentParser()
     ap.add_argument("--src", default=os.path.join(
         os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -722,34 +725,28 @@ def main():
     print("   判定:", "PASS" if pass17 else "FAIL")
     ok = ok and pass17
 
-    # 18) 工具调用参数发到一半流就结束（线上 tool_args_invalid 形态）：工具增量
-    #     已缓冲、未写出，EOF 时整体丢弃并重发；客户端只收到完整的工具调用。
+    # 18) 工具调用参数发到一半、没有 session id：必须 fail-closed，快速返回
+    #     retryable SSE 错误；不能把同一个请求内部重放到 600 秒，也不能伪造 RST。
     first_partial = [
         (b'data: {"choices":[{"delta":{"reasoning_content":"need a tool"}}]}\n\n', 0.05),
         (b'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_1",'
          b'"type":"function","function":{"name":"Bash","arguments":"PARTIALARGS"}}]}}]}\n\n', 0.05),
         (b"data: [DONE]\n\n", 0.0),
     ]
-    second_tool = [
-        (b'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_2",'
-         b'"type":"function","function":{"name":"Bash",'
-         b'"arguments":"{\\"command\\":\\"ls -la\\"}"}}]}}]}\n\n', 0.05),
-        (b'data: {"choices":[{"delta":{},"finish_reason":"tool_calls"}]}\n\n', 0.05),
-        (b"data: [DONE]\n\n", 0.0),
-    ]
-    chunks, logtext, tail = run_case("残缺工具调用透明续写", args.src, first_partial,
-                                     scripts=[first_partial, second_tool],
-                                     read_seconds=8.0)
+    meta18 = {}
+    chunks, logtext, tail = run_case("残缺工具调用无 session 快速失败", args.src,
+                                     first_partial, read_seconds=4.0, meta=meta18)
     data = b"\n\n".join(c for _t, c in chunks) + tail
     text = data.decode("utf-8", "replace")
-    pass18 = (b"ls -la" in data and b'"finish_reason":"tool_calls"' in data
-              and b"PARTIALARGS" not in data and '"error"' not in text
+    pass18 = (b"PARTIALARGS" not in data
+              and b'"retryable"' in data
+              and meta18.get("reset") is not True
               and "early finish incomplete tool call at DONE" in logtext
-              and "retry after early finish" in logtext
-              and "stream broken" not in logtext)
-    print("   收到完整工具=%s tool_calls收尾=%s 残缺未泄漏=%s 日志重发=%s"
-          % (b"ls -la" in data, b'"finish_reason":"tool_calls"' in data,
-             b"PARTIALARGS" not in data, "retry after early finish" in logtext))
+              and "retry after early finish" not in logtext)
+    print("   残缺未泄漏=%s retryable错误=%s 未RST=%s 未内部重试=%s"
+          % (b"PARTIALARGS" not in data, b'"retryable"' in data,
+             meta18.get("reset") is not True,
+             "retry after early finish" not in logtext))
     print("   判定:", "PASS" if pass18 else "FAIL")
     ok = ok and pass18
 
@@ -1050,6 +1047,70 @@ def main():
                                          meta32.get("reset") is True))
     print("   判定:", "PASS" if pass32 else "FAIL")
     ok = ok and pass32
+
+    # 35) An incomplete tool call with no client-visible content must use the
+    #     one-shot client retry immediately, rather than replaying the same body
+    #     internally until the six-minute window expires.
+    early_tool = sse({"choices": [{"delta": {"tool_calls": [{
+        "index": 0, "id": "call-early", "type": "function",
+        "function": {"name": "Bash", "arguments": "{\"command\":"}}]}}]})
+    meta35 = {}
+    workdir35 = tempfile.mkdtemp(prefix="streamtest-")
+    proxy_port35 = free_pair()
+    upstream_port35 = proxy_port35 + 1
+    env35 = {k: v for k, v in os.environ.items() if not k.startswith("PROXY_")}
+    env35.update(PROXY_PORT=str(proxy_port35), PROXY_SILENCE_TIMEOUT="1",
+                 PROXY_HEARTBEAT_START="1", PROXY_HEARTBEAT_INTERVAL="1",
+                 PROXY_RETRY_WINDOW="5", PROXY_RETRY_INTERVAL="0.2")
+    try:
+        proxy35 = make_proxy_copy(args.src, workdir35, upstream_port35)
+        early_script35 = [(early_tool, 0.05), (b"data: [DONE]\n\n", 0.0)]
+        with FakeUpstream(upstream_port35, early_script35,
+                          scripts=[early_script35, full_tool]):
+            logfile35 = os.path.join(workdir35, "proxy.log")
+            out35 = open(logfile35, "w", encoding="utf-8")
+            proc35 = subprocess.Popen([sys.executable, proxy35], env=env35,
+                                      cwd=workdir35, stdout=out35,
+                                      stderr=subprocess.STDOUT)
+            try:
+                end35 = time.time() + 8
+                while time.time() < end35:
+                    try:
+                        sk35 = socket.create_connection(("127.0.0.1", proxy_port35), 0.3)
+                        sk35.close()
+                        break
+                    except OSError:
+                        time.sleep(0.05)
+                first35, first_tail35 = call_stream(
+                    proxy_port35, 3.0, meta=meta35, session="sess-early-tool")
+                second35, second_tail35 = call_stream(
+                    proxy_port35, 4.0, session="sess-early-tool")
+            finally:
+                proc35.terminate()
+                try:
+                    proc35.wait(timeout=5)
+                except Exception:
+                    proc35.kill()
+                out35.close()
+        log35 = open(logfile35, encoding="utf-8", errors="replace").read()
+    finally:
+        shutil.rmtree(workdir35, ignore_errors=True)
+    first_data35 = b"\n\n".join(c for _t, c in first35) + first_tail35
+    second_data35 = b"\n\n".join(c for _t, c in second35) + second_tail35
+    pass35 = (b"chatcmpl-zp-anchor" in first_data35
+              and meta35.get("reset") is True
+              and b'"finish_reason":"tool_calls"' in second_data35
+              and b"echo done" in second_data35
+              and "early tool finish; retry anchor + reset" in log35
+              and "retry after early finish" not in log35)
+    print("== early incomplete tool call gets one real client retry")
+    print("   first_anchor=%s first_reset=%s second_tool=%s no_internal_retry=%s"
+          % (b"chatcmpl-zp-anchor" in first_data35,
+             meta35.get("reset") is True,
+             b"echo done" in second_data35,
+             "retry after early finish" not in log35))
+    print("   判定:", "PASS" if pass35 else "FAIL")
+    ok = ok and pass35
 
     # 33) Exhausted in heartbeat mode with an x-session-id: the proxy must write a
     #     zero-width content delta before the RST. The client only resends when it

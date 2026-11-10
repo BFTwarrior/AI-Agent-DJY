@@ -98,7 +98,7 @@ def env_int(name, default, lo=1, hi=1000000):
 LISTEN_HOST = "127.0.0.1"
 LISTEN_PORT = env_int("PROXY_PORT", 8787, 1, 65535)
 # 只用于 /__zp_health 的能力标记，让 ensure_proxy 能分辨"跑的是不是支持 /p 的新代码"。
-PROXY_VERSION = "0.2.10"
+PROXY_VERSION = "0.2.11"
 
 # Retry policy: a time window, not an attempt count. 600 s by default, one attempt
 # every 20 s. 300→600 s: a stalled upstream often recovers on its own after 6–9
@@ -592,6 +592,10 @@ def pipe_response(handler, resp, conn, path, started, sse_started=False, heartbe
     saw_choices = False
     finish_out = False
     early = False
+    early_tool = False
+    # V0.2.11: an incomplete tool call with no client-visible content is not useful
+    # to retry internally. The request body is unchanged, so repeated attempts can
+    # reproduce the same short DONE forever; the client must get one real retry.
     # V0.2.7: once content is out, an internal resend would duplicate it, so this
     # cannot go through the early path. The client resumes only when it has
     # discarded text AND the error is retryable: a transport-level ECONNRESET
@@ -628,18 +632,21 @@ def pipe_response(handler, resp, conn, path, started, sse_started=False, heartbe
             raise
         total += len(data)
 
-    def early_finish(why):
-        """记录一次“上游没产出就结束”，交给 _handle 丢弃并重发。
+    def early_finish(why, tool=False):
+        """Record an upstream stream that ended before producing a usable result.
 
-        这里刻意不向客户端发错误：2026-11-02 实测，mid-stream 的 SSE error 会被
-        ZCode 归成 ProviderBusinessError（retryable=false），整轮直接失败，不会自动
-        续写。真正可行的做法是代理内部再发一次上游请求，把新流的 reasoning/正文
-        接着写进同一个响应；客户端只看到流还在继续。
+        A tool-call fragment with no client-visible content is special in V0.2.11:
+        retrying the unchanged request internally can repeat the same short DONE,
+        so the caller must trigger one real client retry instead.
         """
-        nonlocal early
+        nonlocal early, early_tool
         early = True
+        early_tool = early_tool or tool
         log("early finish %s after %d bytes %s" % (why, total, path))
         return True
+
+    def early_result():
+        return "early_tool" if early_tool else "early"
 
     def reject_constant(value):
         """JSON.parse 不接受 NaN/Infinity；Python 默认接受，这里必须对齐。"""
@@ -771,11 +778,11 @@ def pipe_response(handler, resp, conn, path, started, sse_started=False, heartbe
                         if tool_buf:
                             if (not text_out and not tool_out
                                     and not finish_out):
-                                return early_finish("incomplete tool call at DONE")
+                                return early_finish("incomplete tool call at DONE", tool=True)
                             if not flush_tools():
                                 if (not text_out and not tool_out
                                         and not finish_out):
-                                    return early_finish("incomplete tool call at DONE")
+                                    return early_finish("incomplete tool call at DONE", tool=True)
                                 if not tool_out and not finish_out:
                                     return reset_for_recovery("incomplete tool call at DONE")
                                 # 已经有完整工具调用写出，重试会重复执行；
@@ -829,7 +836,7 @@ def pipe_response(handler, resp, conn, path, started, sse_started=False, heartbe
                                     if not flush_tools():
                                         if (not text_out and not tool_out
                                                 and not finish_out):
-                                            return early_finish("incomplete tool call")
+                                            return early_finish("incomplete tool call", tool=True)
                                         if not tool_out and not finish_out:
                                             return reset_for_recovery("incomplete tool call at finish")
                                         tool_buf.clear()
@@ -973,7 +980,7 @@ def pipe_response(handler, resp, conn, path, started, sse_started=False, heartbe
         if client_reset:
             return "client_reset"
         if early:
-            return "early"
+            return "early_tool" if early_tool else "early"
         # pending 只可能是“最后一行没有换行”。它可能是完整事件，也可能在 JSON
         # 中间被断开：半截 data: 行绝不能转发（重试流再追加时会合成非法事件）。
         # 完整行必须正常转发——否则正文被解析出来却没写给客户端，
@@ -988,7 +995,7 @@ def pipe_response(handler, resp, conn, path, started, sse_started=False, heartbe
                     except Exception:
                         complete = False
             if process_sse(b"\n", emit_lines=complete):
-                return "client_reset" if client_reset else "early"
+                return "client_reset" if client_reset else early_result()
             if complete:
                 # SSE 以空行分事件。最后一行补的 \n 只结束行、不结束事件；
                 # 若随后 early 重发，新流的第一行会粘进同一个事件，data 里
@@ -1002,8 +1009,8 @@ def pipe_response(handler, resp, conn, path, started, sse_started=False, heartbe
         if is_sse and tool_buf:
             if not flush_tools():
                 if not text_out and not tool_out and not finish_out:
-                    early_finish("incomplete tool call at EOF")
-                    return "early"
+                    early_finish("incomplete tool call at EOF", tool=True)
+                    return early_result()
                 if not tool_out and not finish_out:
                     reset_for_recovery("incomplete tool call at EOF")
                     return "client_reset"
@@ -1012,7 +1019,7 @@ def pipe_response(handler, resp, conn, path, started, sse_started=False, heartbe
         if (is_sse and saw_choices and not finish_out
                 and not text_out and not tool_out):
             early_finish("missing finish_reason at EOF")
-            return "early"
+            return early_result()
         # Content-Length 定长响应：上游声明 N 字节却提前 EOF 时，http.client
         # 的 read1 只返回短数据、不抛异常，不能当成完整响应（否则还会误补终止块）。
         completed = not getattr(resp, "length", 0)
@@ -1067,7 +1074,7 @@ def pipe_response(handler, resp, conn, path, started, sse_started=False, heartbe
     if client_reset:
         return "client_reset"
     if early:
-        return "early"
+        return early_result()
     if completed:
         log("ok %s status=%d bytes=%d first=%.2fs" % (
             path, resp.status, total, first if first is not None else -1))
@@ -1366,14 +1373,37 @@ class Handler(BaseHTTPRequestHandler):
                     # 非 2xx 在 fetch_once 里已经转成 reason=status，这里只可能是成功响应
                     result = pipe_response(self, a.resp, a.conn, path, started,
                                            sse_mode, heartbeat=wants_stream)
+                    if result == "early_tool":
+                        # A partial tool call is not useful to replay internally: the
+                        # request body stays identical and can reproduce the same short
+                        # DONE. Give the client one real retry instead of holding the
+                        # turn for the full internal retry window.
+                        # pipe_response() already sent the 200/SSE headers for this
+                        # attempt; mark the outer state without sending them again.
+                        sse_mode = True
+
+                        key = self._session_key()
+                        if claim_retry_once(key):
+                            log("early tool finish; retry anchor + reset for one client retry (session=%s) %s"
+                                % (key[:12] or "-", path))
+                            if not self._seed_retry_anchor(
+                                    "early tool finish; one client retry"):
+                                release_retry_once(key)
+                        else:
+                            log("early tool finish; no client retry token (session=%s), plain error %s"
+                                % (key[:12] or "-", path))
+                            self._sse_error(
+                                "tool call ended before its arguments were complete")
+                        return
                     if result != "early":
                         return
-                    # 这次上游只吐了 reasoning 就结束，没有正文/工具调用。代理已经
+                    # 这次上游只吐了 reasoning、没有正文/工具调用。代理已经
                     # 在同一个客户端响应上发过 200（可能还有心跳），后续尝试必须
                     # 沿用这个响应：sse_mode=True 阻止再发状态行。
                     sse_mode = True
                     reasons.append("early")
                     elapsed = time.time() - started
+
                     nxt = time.time() + RETRY_INTERVAL
                     # 先判窗口再写日志：静默 early 只在窗口到点时才被判定，
                     # 这种情况下不会再发请求，日志不能写成“retry after”。

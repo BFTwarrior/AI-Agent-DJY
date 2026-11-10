@@ -2,6 +2,19 @@
 
 > 2026-11-01: migrated to the AI-Agent-DJY repository; documentation was translated to English and directories standardized to `docs/` and `diagrams/`. Historical entries keep paths as originally written.
 
+## V0.2.11 — 2026-11-10
+
+- **Early incomplete tool calls now trigger one real client retry**: before any content or
+  complete tool call reaches the client, the proxy no longer replays the unchanged request
+  internally for the full retry window. With `x-session-id` it writes the zero-width anchor
+  and RSTs immediately; without a session id it fails closed with a retryable SSE error.
+- The per-session one-shot gate also covers this early-tool path, so a second failure does
+  not create another long retry chain. Complete tool calls and post-content RST recovery
+  keep their existing behavior.
+- `selftest_stream.py` now has 35 scenarios, including a second client request that
+  succeeds after the early-tool anchor + RST.
+- Version fields bumped to 0.2.11.
+
 ## V0.2.10 — 2026-11-06
 
 - **Retry budget**: `PROXY_RETRY_WINDOW` 300 → 600 s and `PROXY_SILENCE_TIMEOUT`
