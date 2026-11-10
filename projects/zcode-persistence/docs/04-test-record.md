@@ -6,7 +6,7 @@ The old expectations of v0.3.x (filtering out by error type, no retry on `permis
 > **Reading order**: Sections 1 through 20 are historical batches kept as-is for traceability
 > (fixed-count retries, the v1.1.0 heartbeat parameters, the v0.4.0 build line, the 2026-10-31 fixes,
 > and the V0.2.1–V0.2.10 changes). **Section 21 records the original V0.2.11 release behavior
-> and is historical; Section 22 records the V0.2.12 local hotfix candidate and its test results.**
+> and is historical; Section 22 records V0.2.12 behavior and its test results.**
 > The current defaults are a 600-second retry window, one attempt every 20 seconds, a 60-second
 > silence timeout and 80-second heartbeats; the "180-second window" and "503 after 3 retries"
 > wording in old batches is historical only.
@@ -383,13 +383,13 @@ JSON arguments before any client-visible content used a session-token-gated retr
 with a session id the proxy claimed the one-shot token, wrote the zero-width anchor, waited
 for `PROXY_ANCHOR_SETTLE_MS`, and reset the connection; without a session id, or once the
 token was consumed, it returned a retryable SSE error. This section records that release
-behavior only; it is superseded by the current working-tree behavior in Section 22.
+behavior only; it is superseded by the V0.2.12 behavior in Section 22.
 
 The original `selftest_stream.py` release record listed 35 scenarios, including one
 end-to-end anchor/reset followed by a complete tool call. It is retained here for release
 traceability, not as a statement of the current test run.
 
-## 22. V0.2.12 local hotfix candidate — early incomplete tool calls (not published)
+## 22. V0.2.12 release record — early incomplete tool calls
 
 Whenever an upstream ends with an incomplete buffered tool call before any client-visible
 content, the proxy returns `early_tool` and writes the zero-width `chatcmpl-zp-anchor`,
@@ -412,4 +412,4 @@ proof of deterministic delivery. Full regression passed: hook 11, 429 12, watch 
 upstreams 8, and ensure serialization. `doctor.py`: 18 PASS / 0 WARN / 0 FAIL;
 `git diff --check` passed. The installed client bundle sets its stream-recovery budget to 10,
 but a real ZCode UI recovery run was not performed; UI completion state remains unverified.
-No release asset or GitHub release was created.
+At the time this test record was first written, no release asset or GitHub release had been created.

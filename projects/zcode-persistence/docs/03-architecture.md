@@ -100,7 +100,7 @@ write response headers (strip hop-by-hop) → read1 chunk by chunk, flush to the
    │   └─ complete tool call / finish emitted ──► pass through
    ├─ stream ends mid-tool-arguments (tool_args_invalid shape)
    │   ├─ no client-visible content yet ──► write zero-width anchor, wait for settle,
-   │   │   then RST for each early-tool failure (V0.2.12 local candidate; retry budget is client-side)
+   │   │   then RST for each early-tool failure (V0.2.12; retry budget is client-side)
    │   └─ text written, incomplete JSON ──► write zero bytes, RST the client (V0.2.7)
    ├─ read error/silence with no text/tool call/finish reason and the client connected
    │   ──► mark early, re-request (V0.2.6; a client disconnect is logged as
@@ -133,7 +133,7 @@ new stream continuing in the same client response. An explicit upstream SSE
 swallowed and retried when no text/tool call has been emitted (V0.2.4). In contrast, an
 incomplete buffered tool call with no client-visible content takes the `early_tool` path:
 the proxy sends an anchor, waits for settle, and RSTs the client on every occurrence,
-without a session-token gate or internal replay (current working-tree behavior). Once
+without a session-token gate or internal replay (V0.2.12). Once
 content exists but no complete tool call has been sent, the client is reset instead
 (V0.2.7). If a complete tool call or a `finish_reason` has already been written, it is
 passed through — a retry could run tools twice.
@@ -191,7 +191,7 @@ Two guard rails apply to this long-window exhaustion branch:
   without the gate a long outage rolls into dozens of upstream requests. The token is
   released again if the anchor write fails. This token is only for this give-up branch.
 
-**Early incomplete-tool calls are separate** (V0.2.12 local hotfix candidate; not published): each such failure writes the anchor, waits the same settle delay, and RSTs,
+**Early incomplete-tool calls are separate** (V0.2.12): each such failure writes the anchor, waits the same settle delay, and RSTs,
 regardless of whether a session id exists or an earlier early-tool RST occurred. The
 ZCode client's own bounded recovery limits repeats; this path does not claim
 `PROXY_RETRY_ONCE_TTL` and does not internally replay the unchanged request. The historical V0.2.11 release record describes the earlier token-gated behavior.
