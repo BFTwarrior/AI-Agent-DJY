@@ -409,6 +409,11 @@ probe. The ten-round long-window anchor check was timing-sensitive: the first ru
 9/10 anchors, then the same full command after a three-minute wait observed 10/10 anchors
 and 10/10 resets. Treat this as a successful rerun with a recorded intermittent miss, not as
 proof of deterministic delivery. Full regression passed: hook 11, 429 12, watch 12, route 13,
-upstreams 8, and ensure serialization. `doctor.py`: 18 PASS / 0 WARN / 0 FAIL on the existing V0.2.11 installation before upgrade; V0.2.12 is not installed locally, so its post-install health check has not been performed. `git diff --check` passed. The installed client bundle sets its stream-recovery budget to 10,
+upstreams 8, and ensure serialization. `doctor.py`: 18 PASS / 0 WARN / 0 FAIL on the existing V0.2.11 installation before upgrade, and again 18 PASS / 0 WARN / 0 FAIL after installing V0.2.12 locally (`/__zp_health` version 0.2.12, one listener on 8787). `git diff --check` passed. The installed client bundle sets its stream-recovery budget to 10,
 but a real ZCode UI recovery run was not performed; UI completion state remains unverified.
-No release asset or GitHub release has been created yet.
+The release asset `Zcode-Persistence-V0.2.12-20261111.zip` (38 files) is published under `proj-zcode-persistence-v0.2.12`.
+
+Post-upgrade field evidence (not a UI E2E run): one session produced two early incomplete
+tool calls 7 s apart (`session_0d09`, 04:48:48 and 04:48:55). Both wrote the anchor and reset
+the client, the next request succeeded, and `proxy.log` recorded no `gave up`; under V0.2.11
+the second occurrence would have exhausted the one-shot token.

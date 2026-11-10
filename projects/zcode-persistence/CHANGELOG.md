@@ -2,7 +2,7 @@
 
 > 2026-11-01: migrated to the AI-Agent-DJY repository; documentation was translated to English and directories standardized to `docs/` and `diagrams/`. Historical entries keep paths as originally written.
 
-## V0.2.12 release candidate — 2026-11-11 (not published)
+## V0.2.12 — 2026-11-11 (released)
 
 - **Fix repeated early incomplete-tool failures**: each early incomplete buffered tool call
   before client-visible content now writes the zero-width anchor, waits
@@ -21,7 +21,13 @@
   observed 9/10 anchors; a delayed rerun observed 10/10 anchors and resets.
 - Full regression: hook 11, 429 12, watch 12, route 13, upstreams 8, ensure serialization,
   compilation, and `git diff --check` pass. `doctor.py` showed 18 PASS / 0 WARN / 0 FAIL on the
-  existing V0.2.11 installation before upgrade. V0.2.12 has not been installed locally yet; its post-install health verification is not performed.
+  existing V0.2.11 installation before upgrade. After installing V0.2.12 locally,
+  `doctor.py` reported 18 PASS / 0 WARN / 0 FAIL, `/__zp_health` reported version 0.2.12
+  with `root` at the install directory, and 8787 had exactly one listener.
+- **Field evidence after upgrade**: one session hit two early incomplete tool calls 7 s apart
+  (`session_0d09`, 04:48:48 and 04:48:55); both wrote the anchor and reset the client, the
+  following request succeeded, and `proxy.log` recorded no `gave up`. Under V0.2.11 the second
+  occurrence would have exhausted the one-shot token.
 - Release asset, tag, and checksum will be recorded here after publication; no public asset has been created yet.
 
 ## V0.2.11 — 2026-11-10 (historical release behavior)

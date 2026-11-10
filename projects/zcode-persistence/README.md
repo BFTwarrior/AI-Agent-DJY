@@ -3,14 +3,14 @@
 A ZCode failure-retry toolkit: **suggests a retry when a tool fails**, **automatically
 resends when a model request fails**, plus a default-off **email report of session errors**.
 
-- Version: V0.2.12 release candidate (prepared 2026-11-11; not published)
+- Version: V0.2.12 (released 2026-11-11)
 - Build line: 0.4.0
 - Applies to: ZCode Desktop (Windows), Python 3.9+
 - Dependencies: Python standard library only; proxy mode prefers certifi (if installed)
 
 ## Version history
 
-### V0.2.12 release candidate: repeated early incomplete-tool recovery
+### V0.2.12: repeated early incomplete-tool recovery
 
 When an upstream ends a stream with a buffered incomplete tool call before any
 client-visible content, every `early_tool` outcome writes the zero-width anchor, waits
@@ -138,6 +138,6 @@ email addresses.
 ## Distribution
 
 The distribution package lives in the repository Releases:
-`proj-zcode-persistence-v0.2.11`; V0.2.12 is prepared but has not been published.
+`proj-zcode-persistence-v0.2.12`.
 The archive contains build artifacts; this directory is authoritative for the source, and
 if the two disagree, this directory plus the tag wins.

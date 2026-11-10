@@ -68,7 +68,7 @@ Changing these defaults amounts to changing the product spec; you **must** updat
 
 ## Start here to continue development (for the next AI / engineer)
 
-**Get the version numbers straight first**: the public release remains `0.2.11`; V0.2.12 is a local candidate and is not published; the `0.4.0` in the code is the build-line iteration number,
+**Get the version numbers straight first**: the public release is `0.2.12`; the `0.4.0` in the code is the build-line iteration number,
 and the two are not the same thing. In a candidate worktree, `VERSION`, `tools/install.py`, `PROXY_VERSION` and `clientInfo.version` must agree with the candidate version;
 the project `README.md` records the current build line.
 

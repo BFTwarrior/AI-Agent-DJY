@@ -1,4 +1,4 @@
-# Architecture Diagram (V0.2.12 local release candidate; not published)
+# Architecture Diagram (V0.2.12; released 2026-11-11)
 
 > Public GitHub release: V0.2.11. Build line 0.4.0. Parameters and semantics follow the code
 > in this project's `src/`; this document sketches the relationships without repeating every detail.
