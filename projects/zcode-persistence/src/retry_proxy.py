@@ -11,8 +11,8 @@ ZCode 只看到最终结果，看不到中间失败。
      （含字面 other），或只发 [DONE] / 正常 EOF（V0.2.3）
   5. 上游直接发 SSE `{"error":...}`（如 stream_truncated），且尚无正文/工具调用
      （V0.2.4）
-  6. 流在工具调用参数中途结束（客户端会判 tool_args_invalid，V0.2.5）：
-     工具增量先缓冲，收尾时没有已写出内容就整体丢弃重发
+  6. 流在工具调用参数中途结束（客户端会判 tool_args_invalid）：
+     工具增量先缓冲；无客户端可见内容时写锚点并 RST，让客户端按自身恢复预算重试（V0.2.12 candidate）
   7. 流被读错误/静默超时打断，且只吐了 reasoning、没有正文/完整工具调用
      （客户端会判 upstream_stream_read_error，V0.2.6）：丢弃本次尝试并重发
 
@@ -98,7 +98,7 @@ def env_int(name, default, lo=1, hi=1000000):
 LISTEN_HOST = "127.0.0.1"
 LISTEN_PORT = env_int("PROXY_PORT", 8787, 1, 65535)
 # 只用于 /__zp_health 的能力标记，让 ensure_proxy 能分辨"跑的是不是支持 /p 的新代码"。
-PROXY_VERSION = "0.2.11"
+PROXY_VERSION = "0.2.12"
 
 # Retry policy: a time window, not an attempt count. 600 s by default, one attempt
 # every 20 s. 300→600 s: a stalled upstream often recovers on its own after 6–9
@@ -593,9 +593,9 @@ def pipe_response(handler, resp, conn, path, started, sse_started=False, heartbe
     finish_out = False
     early = False
     early_tool = False
-    # V0.2.11: an incomplete tool call with no client-visible content is not useful
-    # to retry internally. The request body is unchanged, so repeated attempts can
-    # reproduce the same short DONE forever; the client must get one real retry.
+    # V0.2.12 candidate: an incomplete tool call with no client-visible content is not
+    # useful to retry internally. The unchanged request body can reproduce the same
+    # short DONE; trigger client recovery instead of replaying it in this request.
     # V0.2.7: once content is out, an internal resend would duplicate it, so this
     # cannot go through the early path. The client resumes only when it has
     # discarded text AND the error is retryable: a transport-level ECONNRESET
@@ -635,9 +635,9 @@ def pipe_response(handler, resp, conn, path, started, sse_started=False, heartbe
     def early_finish(why, tool=False):
         """Record an upstream stream that ended before producing a usable result.
 
-        A tool-call fragment with no client-visible content is special in V0.2.11:
+        A tool-call fragment with no client-visible content is handled separately:
         retrying the unchanged request internally can repeat the same short DONE,
-        so the caller must trigger one real client retry instead.
+        so the caller must trigger client recovery instead.
         """
         nonlocal early, early_tool
         early = True
@@ -1374,26 +1374,25 @@ class Handler(BaseHTTPRequestHandler):
                     result = pipe_response(self, a.resp, a.conn, path, started,
                                            sse_mode, heartbeat=wants_stream)
                     if result == "early_tool":
-                        # A partial tool call is not useful to replay internally: the
-                        # request body stays identical and can reproduce the same short
-                        # DONE. Give the client one real retry instead of holding the
-                        # turn for the full internal retry window.
+                        # Replaying the unchanged body internally can reproduce the
+                        # same short DONE. Each anchor + RST ends this request quickly,
+                        # so let the ZCode client's own bounded retry budget handle
+                        # repeated incomplete tool calls; the long-window one-shot
+                        # token below is only for requests held through window expiry.
                         # pipe_response() already sent the 200/SSE headers for this
                         # attempt; mark the outer state without sending them again.
                         sse_mode = True
-
                         key = self._session_key()
-                        if claim_retry_once(key):
-                            log("early tool finish; retry anchor + reset for one client retry (session=%s) %s"
+                        log("early tool finish; anchor + reset for client retry (session=%s) %s"
+                            % (key[:12] or "-", path))
+                        if not self._seed_retry_anchor(
+                                "early tool finish; client retry"):
+                            log("early tool anchor unavailable; stop response (session=%s) %s"
                                 % (key[:12] or "-", path))
-                            if not self._seed_retry_anchor(
-                                    "early tool finish; one client retry"):
-                                release_retry_once(key)
-                        else:
-                            log("early tool finish; no client retry token (session=%s), plain error %s"
-                                % (key[:12] or "-", path))
-                            self._sse_error(
-                                "tool call ended before its arguments were complete")
+                            # The anchor may have been partially written before the
+                            # client disconnected. Do not leave the HTTP handler open;
+                            # make one best-effort transport close and end this request.
+                            self._reset_client("early tool anchor unavailable")
                         return
                     if result != "early":
                         return

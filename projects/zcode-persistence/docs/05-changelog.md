@@ -2,17 +2,28 @@
 
 > 2026-11-01: migrated to the AI-Agent-DJY repository; documentation was translated to English and directories standardized to `docs/` and `diagrams/`. Historical entries keep paths as originally written.
 
-## V0.2.11 — 2026-11-10
+## V0.2.12 local hotfix candidate — 2026-11-11 (not published)
 
-- **Early incomplete tool calls now trigger one real client retry**: before any content or
-  complete tool call reaches the client, the proxy no longer replays the unchanged request
-  internally for the full retry window. With `x-session-id` it writes the zero-width anchor
-  and RSTs immediately; without a session id it fails closed with a retryable SSE error.
-- The per-session one-shot gate also covers this early-tool path, so a second failure does
-  not create another long retry chain. Complete tool calls and post-content RST recovery
-  keep their existing behavior.
-- `selftest_stream.py` now has 35 scenarios, including a second client request that
-  succeeds after the early-tool anchor + RST.
+- Every early incomplete buffered tool call before client-visible content now writes the
+  zero-width anchor, waits for settle, and resets the client, including without a session id
+  and after an earlier early-tool RST. This avoids fatal SSE errors and unchanged-body
+  internal replay when the client's immediate retry is also incomplete.
+- The installed ZCode bundle sets the stream-recovery budget to 10; a real UI recovery run
+  was not performed, so end-to-end UI behavior remains unverified.
+- Anchor-write failure is logged and followed by best-effort transport reset.
+- `selftest_stream.py`: 36 scenarios pass, including repeated early-tool failures,
+  anchor-write failure, RST cleanup, and window-exhaustion token behavior.
+- Full regression: hook 11, 429 12, watch 12, route 13, upstreams 8, ensure serialization;
+  `py_compile`, `doctor.py` (18 PASS / 0 WARN / 0 FAIL), and `git diff --check` pass.
+- Public GitHub release remains V0.2.11; this candidate has not been published.
+
+## V0.2.11 — 2026-11-10 (historical release behavior)
+
+- At release time, the early-tool path used a per-session one-shot token; without a session
+  id or after the token was consumed, it returned a retryable SSE business error.
+- The original release had 35 streaming scenarios and one subsequent successful client
+  request. This record describes V0.2.11 only; see the local V0.2.12 candidate above for
+  current behavior and verification.
 - Version fields bumped to 0.2.11.
 
 ## V0.2.10 — 2026-11-06

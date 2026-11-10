@@ -3,7 +3,7 @@
 
 不碰真实中转：假上游在本机回环上按脚本吐字节，代理用临时副本 + 临时端口。
 
-验证三十五件事（对应 2026-10-31 三轮复审与终验、2026-11-01 自动暂停修复、2026-11-10 工具调用真重试修复）：
+验证三十六件事（对应 2026-10-31 三轮复审与终验、2026-11-01 自动暂停修复、2026-11-10 工具调用真重试修复和 2026-11-11 修复）：
   1. 逐条透传：上游每 0.2 秒发一条 80 字节事件，客户端应当在每条到达后
      几十毫秒内收到，而不是攒到 8KB 或流结束才一起到
   2. 流中静默：响应头之后上游停 2.5 秒、空闲超时设 1 秒时，代理应当发
@@ -32,8 +32,7 @@
      工具调用：代理吞掉错误事件并内部重发
  17. 已经有正文后上游才发 error：不能内部重发（会重复正文），也不能原样转发
      （客户端会当 retryable=false 直接失败）；必须 RST 客户端让它自行续写（V0.2.7）
- 18. 工具调用参数发到一半流就结束（线上 tool_args_invalid 形态，V0.2.5）：
-     工具增量先缓冲不写出，EOF 时整体丢弃并内部重发，客户端只收到完整的工具调用
+  18. 无 session id 的早期残缺工具调用：仍必须通过 anchor + RST 触发客户端恢复，不能发客户端会判 fatal 的 SSE 错误，也不能内部重放不变请求
  19. 完整工具调用 + `finish_reason=tool_calls`：缓冲在收尾时写出，原样透传不重试
  20. 只吐 reasoning 后上游 RST（客户端判 upstream_stream_read_error）：代理丢弃
      本次尝试并内部重发，客户端只看到第二段的正文（V0.2.6）
@@ -103,7 +102,7 @@ def free_pair():
     raise RuntimeError("找不到空闲端口")
 
 
-def make_proxy_copy(src, workdir, upstream_port):
+def make_proxy_copy(src, workdir, upstream_port, fail_anchor=False):
     "复制代理脚本并改写上游表，避免影响真实代理。"
     text = open(src, encoding="utf-8").read()
     block = ("UPSTREAMS = {\n"
@@ -113,6 +112,15 @@ def make_proxy_copy(src, workdir, upstream_port):
              "}" % (upstream_port, upstream_port, upstream_port))
     text, n = re.subn(r"UPSTREAMS = \{.*?\n\}", block, text, count=1, flags=re.S)
     assert n == 1, "改写 UPSTREAMS 失败，脚本结构变了"
+    if fail_anchor:
+        needle = ('            self._sse_write("data: " + json.dumps({\n'
+                  '                "id": "chatcmpl-zp-anchor",')
+        replacement = ('            self._sse_write("data: partial-anchor\\n\\n")\n'
+                       '            raise OSError("injected anchor write failure")\n'
+                       + needle)
+        n = text.count(needle)
+        assert n == 1, "注入 anchor 写失败失败，脚本结构变了"
+        text = text.replace(needle, replacement, 1)
     dst = os.path.join(workdir, "retry_proxy.py")
     open(dst, "w", encoding="utf-8").write(text)
     return dst
@@ -250,9 +258,8 @@ def call_stream(proxy_port, read_seconds, idle=0.15, start_delay=0.0, prefix="ap
     query 非空时拼在请求路径后面，用来验证 baseUrl 查询串是否保留。
     meta 非空时记录传输层事实：reset=True 表示 recv 收到 WSAECONNRESET，
     这是“代理真的发了 RST”的唯一证据（只缺终止块可能是挂住或 FIN）。
-    session, when non-empty, adds x-session-id: the V0.2.11 one-shot token is
-    rate-limited per session, so without this header the proxy falls back to a
-    plain SSE error.
+    session, when non-empty, adds x-session-id. Early incomplete-tool recovery does not
+    require a session id; the one-shot token is used only by long-window exhaustion.
     """
     body = (b'{"model":"t","stream":true,"messages":'
             b'[{"role":"user","content":"hi"}]}')
@@ -350,7 +357,8 @@ def run_case(name, src, script, content_length=None, chunked=True,
              env_extra=None, read_seconds=4.0, heartbeat_start="100",
              hold_after=0, start_delay=0.0, no_response=False, scripts=None,
              rst_after=0, prefix="ap", generic=False, generic_path="",
-             echo=False, query="", meta=None, cpu_probe=False, session=None):
+             echo=False, query="", meta=None, cpu_probe=False, session=None,
+             fail_anchor=False):
     "跑一个用例：起假上游 → 起代理副本 → 发流式请求 → 收日志与字节。"
     workdir = tempfile.mkdtemp(prefix="streamtest-")
     proxy_port = free_pair()
@@ -368,7 +376,8 @@ def run_case(name, src, script, content_length=None, chunked=True,
         prefix = "p/" + token
     logfile = os.path.join(workdir, "proxy.log")
     try:
-        proxy = make_proxy_copy(src, workdir, upstream_port)
+        proxy = make_proxy_copy(src, workdir, upstream_port,
+                                fail_anchor=fail_anchor)
         with FakeUpstream(upstream_port, script, content_length=content_length,
                           chunked=chunked, hold_after=hold_after,
                           no_response=no_response, scripts=scripts,
@@ -415,7 +424,7 @@ def run_case(name, src, script, content_length=None, chunked=True,
 
 
 def main():
-    "Run all 35 scenarios and summarise; exit code 0 when everything passes."
+    "Run all 36 scenarios and summarise; exit code 0 when everything passes."
     ap = argparse.ArgumentParser()
     ap.add_argument("--src", default=os.path.join(
         os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -725,8 +734,8 @@ def main():
     print("   判定:", "PASS" if pass17 else "FAIL")
     ok = ok and pass17
 
-    # 18) 工具调用参数发到一半、没有 session id：必须 fail-closed，快速返回
-    #     retryable SSE 错误；不能把同一个请求内部重放到 600 秒，也不能伪造 RST。
+    # 18) 工具调用参数发到一半、没有 session id：必须用 anchor + RST 让客户端
+    #     恢复，不能发送客户端会判 fatal 的 SSE 业务错误或内部重放不变请求。
     first_partial = [
         (b'data: {"choices":[{"delta":{"reasoning_content":"need a tool"}}]}\n\n', 0.05),
         (b'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_1",'
@@ -739,16 +748,39 @@ def main():
     data = b"\n\n".join(c for _t, c in chunks) + tail
     text = data.decode("utf-8", "replace")
     pass18 = (b"PARTIALARGS" not in data
-              and b'"retryable"' in data
-              and meta18.get("reset") is not True
+              and b"chatcmpl-zp-anchor" in data
+              and b'"retryable"' not in data
+              and meta18.get("reset") is True
               and "early finish incomplete tool call at DONE" in logtext
+              and "early tool finish; anchor + reset" in logtext
               and "retry after early finish" not in logtext)
-    print("   残缺未泄漏=%s retryable错误=%s 未RST=%s 未内部重试=%s"
-          % (b"PARTIALARGS" not in data, b'"retryable"' in data,
-             meta18.get("reset") is not True,
+    print("   残缺未泄漏=%s anchor=%s 已RST=%s 无fatal错误=%s 未内部重试=%s"
+          % (b"PARTIALARGS" not in data, b"chatcmpl-zp-anchor" in data,
+             meta18.get("reset") is True, b'"retryable"' not in data,
              "retry after early finish" not in logtext))
     print("   判定:", "PASS" if pass18 else "FAIL")
     ok = ok and pass18
+
+    # 36) A failed/partial anchor write must still close the client transport
+    #     promptly; it must not leave the request open or try the unchanged body.
+    meta36 = {}
+    chunks, logtext, tail = run_case(
+        "anchor 写失败仍关闭响应", args.src, first_partial, read_seconds=3.0,
+        meta=meta36, fail_anchor=True)
+    data = b"\n\n".join(c for _t, c in chunks) + tail
+    pass36 = (b"PARTIALARGS" not in data
+              and b"injected anchor write failure" not in data
+              and "early tool anchor unavailable" in logtext
+              and "client reset (early tool anchor unavailable)" in logtext
+              and meta36.get("reset") is True
+              and "retry after early finish" not in logtext)
+    print("   残缺未泄漏=%s 失败已记录=%s 已RST=%s 未内部重试=%s"
+          % (b"PARTIALARGS" not in data,
+             "early tool anchor unavailable" in logtext,
+             meta36.get("reset") is True,
+             "retry after early finish" not in logtext))
+    print("   判定:", "PASS" if pass36 else "FAIL")
+    ok = ok and pass36
 
     # 19) 完整工具调用 + finish_reason=tool_calls：缓冲在收尾时写出，原样透传。
     full_tool = [
@@ -1048,9 +1080,9 @@ def main():
     print("   判定:", "PASS" if pass32 else "FAIL")
     ok = ok and pass32
 
-    # 35) An incomplete tool call with no client-visible content must use the
-    #     one-shot client retry immediately, rather than replaying the same body
-    #     internally until the six-minute window expires.
+    # 35) Consecutive incomplete tool calls must each trigger a real client retry;
+    #     the third request succeeds. No request may enter the unchanged-body
+    #     internal retry loop or fail with a fatal SSE business error.
     early_tool = sse({"choices": [{"delta": {"tool_calls": [{
         "index": 0, "id": "call-early", "type": "function",
         "function": {"name": "Bash", "arguments": "{\"command\":"}}]}}]})
@@ -1066,7 +1098,7 @@ def main():
         proxy35 = make_proxy_copy(args.src, workdir35, upstream_port35)
         early_script35 = [(early_tool, 0.05), (b"data: [DONE]\n\n", 0.0)]
         with FakeUpstream(upstream_port35, early_script35,
-                          scripts=[early_script35, full_tool]):
+                          scripts=[early_script35, early_script35, full_tool]):
             logfile35 = os.path.join(workdir35, "proxy.log")
             out35 = open(logfile35, "w", encoding="utf-8")
             proc35 = subprocess.Popen([sys.executable, proxy35], env=env35,
@@ -1084,6 +1116,8 @@ def main():
                 first35, first_tail35 = call_stream(
                     proxy_port35, 3.0, meta=meta35, session="sess-early-tool")
                 second35, second_tail35 = call_stream(
+                    proxy_port35, 4.0, meta={}, session="sess-early-tool")
+                third35, third_tail35 = call_stream(
                     proxy_port35, 4.0, session="sess-early-tool")
             finally:
                 proc35.terminate()
@@ -1097,17 +1131,23 @@ def main():
         shutil.rmtree(workdir35, ignore_errors=True)
     first_data35 = b"\n\n".join(c for _t, c in first35) + first_tail35
     second_data35 = b"\n\n".join(c for _t, c in second35) + second_tail35
+    third_data35 = b"\n\n".join(c for _t, c in third35) + third_tail35
+    reset_count35 = log35.count("client reset (early tool finish; client retry)")
     pass35 = (b"chatcmpl-zp-anchor" in first_data35
               and meta35.get("reset") is True
-              and b'"finish_reason":"tool_calls"' in second_data35
-              and b"echo done" in second_data35
-              and "early tool finish; retry anchor + reset" in log35
+              and b"chatcmpl-zp-anchor" in second_data35
+              and b'"retryable"' not in second_data35
+              and b'"finish_reason":"tool_calls"' in third_data35
+              and b"echo done" in third_data35
+              and reset_count35 == 2
+              and "early tool finish; anchor + reset for client retry" in log35
+              and "no client retry token" not in log35
               and "retry after early finish" not in log35)
-    print("== early incomplete tool call gets one real client retry")
-    print("   first_anchor=%s first_reset=%s second_tool=%s no_internal_retry=%s"
-          % (b"chatcmpl-zp-anchor" in first_data35,
-             meta35.get("reset") is True,
-             b"echo done" in second_data35,
+    print("== repeated early incomplete tool calls get bounded real client retries")
+    print("   first_anchor_reset=%s second_anchor_no_fatal=%s third_tool=%s resets=%d no_internal_retry=%s"
+          % (b"chatcmpl-zp-anchor" in first_data35 and meta35.get("reset") is True,
+             b"chatcmpl-zp-anchor" in second_data35 and b'"retryable"' not in second_data35,
+             b"echo done" in third_data35, reset_count35,
              "retry after early finish" not in log35))
     print("   判定:", "PASS" if pass35 else "FAIL")
     ok = ok and pass35
