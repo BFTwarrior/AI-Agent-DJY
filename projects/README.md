@@ -2,7 +2,7 @@
 
 | Project | Description | Version | Status | Docs |
 |---|---|---|---|---|
-| [zcode-persistence](zcode-persistence/) | ZCode retry toolkit: hook suggestions, local retry proxy, optional error email reports | V0.2.11 | Active | [00-Overview](zcode-persistence/docs/00-overview.md) |
+| [zcode-persistence](zcode-persistence/) | ZCode retry toolkit: hook suggestions, local retry proxy, optional error email reports | V0.2.12 | Active | [00-Overview](zcode-persistence/docs/00-overview.md) |
 
 ## Conventions
 
