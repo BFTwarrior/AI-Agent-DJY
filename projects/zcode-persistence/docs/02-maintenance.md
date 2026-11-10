@@ -100,8 +100,8 @@ All of the proxy's timing can be overridden with environment variables; changes 
 | `PROXY_SILENCE_TIMEOUT` | `60` | Seconds a single attempt waits for the first byte |
 | `PROXY_HEARTBEAT_START` | `80` | How many consecutive seconds without upstream input before heartbeats start |
 | `PROXY_HEARTBEAT_INTERVAL` | `80` | While upstream is silent, send one extra heartbeat every N seconds, unlimited count |
-| `PROXY_RETRY_ONCE_TTL` | `900` | Per-session one-shot window for the anchor + RST client retry; `0` disables it |
-| `PROXY_ANCHOR_SETTLE_MS` | `300` | Delay between writing the retry anchor and resetting the client; `SO_LINGER=0` drops unread peer data, so an immediate reset loses the anchor |
+| `PROXY_RETRY_ONCE_TTL` | `900` | Per-session one-shot gate for anchor + RST only when the long retry window is exhausted in heartbeat mode; `0` disables this gate. Early incomplete-tool recovery does not use it |
+| `PROXY_ANCHOR_SETTLE_MS` | `300` | Delay between writing any retry anchor and resetting the client, including early incomplete-tool recovery; `SO_LINGER=0` drops unread peer data, so an immediate reset can lose the anchor |
 | `PROXY_CONNECT_TIMEOUT` | `10` | Connect timeout (seconds) |
 | `PROXY_SEND_TIMEOUT` | `90` | Timeout for sending the request body (seconds) |
 | `PROXY_RETRY_AFTER_CAP` | `60` | Upper bound (seconds) on how far the upstream `Retry-After` (header or error body) is honored |
@@ -155,7 +155,7 @@ When the install directory is empty (nothing is listening on the port) no restar
 |---|---|---|
 | Hook log | `%TEMP%\Zcode-Persistence\hook.log` | `advise: n/3`, `cap: limit reached`, `skip: reason`, `error: exception` |
 | Hook state | `%TEMP%\Zcode-Persistence\state.json` | Counters keyed by "session + command"; safe to delete to reset |
-| Proxy log | `<install directory>\proxy.log` | `ok path status=200 bytes=... first=x.xxs`, `attempt fail (...)`, `early finish ...` + `retry after early finish ...` (discarded and re-requested internally), `reset client for recovery (...)` (V0.2.7: the client connection was reset so the client can retry with its anchor), `truncated ...` |
+| Proxy log | `<install directory>\proxy.log` | `ok path status=200 bytes=... first=x.xxs`, `attempt fail (...)`, `early finish ...` + `retry after early finish ...` (discarded and re-requested internally for ordinary early outcomes), `early tool finish; anchor + reset for client retry` (incomplete buffered tool call; each occurrence uses anchor + settle + RST), `reset client for recovery (...)` (V0.2.7: the client connection was reset so it can retry with its anchor), `truncated ...` |
 
 An `attempt fail` followed by `ok` in the log is a good sign — the resend succeeded. Only `gave up after N attempts in Ns` is a genuine failure (it only stops once the retry window expires).
 

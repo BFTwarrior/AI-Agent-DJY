@@ -9,7 +9,7 @@ The audience for this document is an AI or engineer with **absolutely no context
 | Question | Answer |
 |---|---|
 | What is this | A two-piece "automatic retry on failure" kit for ZCode plus one optional bypass: hook + local proxy + error reporting (off by default) |
-| Version | See `VERSION` (`0.2.11`; the build line is `0.4.0`, and the project `README.md` records the current build line) |
+| Version | Local candidate `0.2.12` (not published); public release `0.2.11`; build line `0.4.0` |
 | Where is the code | Five Python files in `src/` (hook / proxy / auto-start / route migration / error reporting), no third-party dependencies (certifi optional) |
 | Where it is installed | `C:\Program Files (x86)\AI\Zcode-Persistence\` |
 | Which system config is modified | `~/.zcode/cli/config.json` (hook), `~/.zcode/v2/provider_config.json` (the provider's baseUrl) |
@@ -100,7 +100,7 @@ Error reporting: polls `session.last_outcome` in `~/.zcode/cli/db/db.sqlite`; wh
 - `doctor.py`: script, interpreter, `hooks.enabled`, the three hooks (the two tool hooks validate matcher=Bash, all three validate the script path), provider, port, proxy version (running vs installed), proxy runtime parameters, error-watch status, log tail. The log tail reads only the last 64KB; finding the "start line" walks back from the end of the file in 64KB blocks, up to 8MB.
 - `selftest_hook.py`: 11 hook checks (10 decision cases + third-attempt wording; including exit 1 with no output, timeouts and cancelled calls).
 - `selftest_proxy_429.py`: twelve retry-semantics scenarios (429 recovers / persistent 429 / 400 recovers / persistent 400 / unknown prefix 400 must be `retryable:false` / body-supplied `retry_after` / cap / text form / split number / 64 KB bound / empty body / stall budget).
-- `selftest_stream.py`: 35 streaming scenarios (including missing-finish-reason, upstream-error, early incomplete-tool client retry, RST-after-content, multi-index ordering, CPU after reset, `NaN` and legacy `function_call` cases).
+- `selftest_stream.py`: 36 streaming scenarios (including repeated early incomplete-tool recovery, anchor-write failure, missing-finish-reason, upstream-error, RST-after-content, multi-index ordering, CPU after reset, `NaN` and legacy `function_call` cases).
 - `selftest_watch.py`: 12 assertions for error reporting (new red dot / dedupe / historical baseline / completed and stopped are not reported / rate limit / multiple sessions merged / wording when there are no relevant records / failure but not given up · new format / same · old format / cooldown and expiry / send failure retry / `--once` writes nothing to disk).
 - `selftest_route.py`: 13 `/p` routing and provider-migration checks.
 - `selftest_upstreams.py`: 8 upstream-config checks (placeholder defaults, override/add/invalid entries, installer host lookup, explicit prefix wins, unknown/unsupported host returns `None`).
@@ -206,7 +206,7 @@ print("assert 4: error event    :", b"server_error" in raw)
 
 Non-streaming control: set `stream` to `False`; expect **no** `keepalive`, and an HTTP **503** after the window expires (plain JSON, not SSE; about 3 seconds with the accelerated parameters).
 
-**The response body (streaming write-back) has its own self-test**: `python tools/selftest_stream.py`, whose 35 scenarios each stress "pass through chunk by chunk / keep alive during mid-stream silence / short read on a fixed length judged truncated / normal finish / silence until the window is judged truncated / slow client loses no data / give up in heartbeat mode must carry a retryable error body / anchor + RST for one client retry". You must run it after changing `pipe_response` — behavior after the response headers cannot be tested with this recipe.
+**The response body (streaming write-back) has its own self-test**: `python tools/selftest_stream.py`, whose 36 scenarios cover chunk-by-chunk pass-through, mid-stream keepalive, truncation, normal finish, window exhaustion, slow-client backpressure, retryable give-up, repeated early-tool anchor + RST, anchor-write failure, and RST cleanup. You must run it after changing `pipe_response` — behavior after the response headers cannot be tested with the heartbeat recipe.
 
 ## 5. Troubleshooting
 
@@ -259,7 +259,7 @@ with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
 
 ## Continuing development starts here (for the next AI / engineer)
 
-**First get the version numbers straight**: what you ship externally is the formal release number (`0.2.11`); `0.4.0` is the build-line iteration number,
+**First get the version numbers straight**: the public release remains `0.2.11`; the local hotfix candidate is `0.2.12` and is not published; `0.4.0` is the build-line iteration number,
 and the two are not the same thing. `VERSION`, `tools/install.py`, `PROXY_VERSION` and `clientInfo.version` all carry the formal release number;
 the project `README.md` records the current build line.
 
@@ -268,7 +268,7 @@ the project `README.md` records the current build line.
 1. Read the "What it is / Limitations" sections of `README.md`.
 2. Read this file (`docs/06-ai-maintenance-guide.md`), section 2 code map and section 3 invariants.
 3. Run a health check once: `python <install directory>/doctor.py`; it must show 0 failed (the item count depends on how many providers are configured).
-4. Run the self-tests: `tools/selftest_hook.py` (11 checks), `tools/selftest_proxy_429.py` (12 scenarios), `tools/selftest_stream.py` (35 scenarios), `tools/selftest_route.py` (13 checks),
+4. Run the self-tests: `tools/selftest_hook.py` (11 checks), `tools/selftest_proxy_429.py` (12 scenarios), `tools/selftest_stream.py` (36 scenarios), `tools/selftest_route.py` (13 checks),
    `tools/selftest_watch.py` (12 assertions), `tools/selftest_upstreams.py` (8 checks), `tools/selftest_ensure.py` (serialization); all should PASS.
 
 **Three things you must know before changing code**

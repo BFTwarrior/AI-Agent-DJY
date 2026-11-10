@@ -3,21 +3,28 @@
 A ZCode failure-retry toolkit: **suggests a retry when a tool fails**, **automatically
 resends when a model request fails**, plus a default-off **email report of session errors**.
 
-- Version: V0.2.11
+- Version: V0.2.12 (local hotfix candidate; not published)
 - Build line: 0.4.0
 - Applies to: ZCode Desktop (Windows), Python 3.9+
 - Dependencies: Python standard library only; proxy mode prefers certifi (if installed)
 
 ## Version history
 
-### V0.2.11: early incomplete tool calls get one real client retry
+### V0.2.12 local hotfix candidate (not published)
 
-When an upstream ends a stream with an incomplete buffered tool call before any
-client-visible content, the proxy immediately uses the per-session anchor + RST path
-instead of replaying the unchanged request internally for up to 600 seconds. A session
-id is required for this one-shot client retry; without one, the proxy fails closed with
-a retryable SSE error. Complete tool calls and post-content recovery keep their existing
-behavior.
+When an upstream ends a stream with a buffered incomplete tool call before any
+client-visible content, every `early_tool` outcome writes the zero-width anchor, waits
+`PROXY_ANCHOR_SETTLE_MS`, and resets the client connection. This applies even without a
+session id and after an earlier early-tool reset; ZCode's own bounded recovery budget
+limits retries. This path does not use `PROXY_RETRY_ONCE_TTL`. Anchor-write failure is
+logged and followed by best-effort transport reset. Complete tool calls and incomplete
+calls after visible content retain their existing handling.
+
+Validation: the 36-scenario streaming suite and full regression pass locally. The real ZCode
+UI recovery state was not exercised end to end; this remains an acceptance limitation.
+
+The public GitHub release remains V0.2.11. This V0.2.12 candidate is local-only and has
+not been packaged or published.
 
 ### V0.2.10: longer retry window + one real client retry
 
@@ -33,9 +40,11 @@ A settle delay (`PROXY_ANCHOR_SETTLE_MS`, default 300 ms) sits between the write
 reset: `SO_LINGER=0` drops unread peer data, and an immediate reset lost the anchor in
 11 of 43 measured runs.
 
-A per-session one-shot token (`PROXY_RETRY_ONCE_TTL`, default 900 s) limits this to one
-retry per session, so the client's 10 retries cannot multiply with the proxy window. The
-token is released if the anchor write fails.
+For this long-window exhaustion branch only, a per-session one-shot token
+(`PROXY_RETRY_ONCE_TTL`, default 900 s) limits the anchor + RST to one retry per session,
+so the client's 10 retries cannot multiply with the proxy window. The token is released if
+the anchor write fails. Early incomplete-tool recovery does not claim this token; it relies
+on ZCode's bounded client recovery instead.
 
 ### V0.2.9: relay hosts moved out of the public tree
 

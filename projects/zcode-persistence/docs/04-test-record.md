@@ -3,12 +3,13 @@
 This record documents the hook's v0.4.0 decision semantics (any Bash failure is advised to retry; the single exception is exit 1 with completely empty output) and the later proxy streaming fixes. After a change, re-run the relevant suites and only release once everything passes.
 The old expectations of v0.3.x (filtering out by error type, no retry on `permission denied`) are void; do not change the code back according to the old tables.
 
-> **Reading order**: Sections 1 through 16 are historical batches kept as-is for traceability
+> **Reading order**: Sections 1 through 20 are historical batches kept as-is for traceability
 > (fixed-count retries, the v1.1.0 heartbeat parameters, the v0.4.0 build line, the 2026-10-31 fixes,
-> and the V0.2.1–V0.2.6 changes). **Section 21 (V0.2.11) is the current result; sections 17–20
-> record V0.2.7–V0.2.10.** The current defaults
-> are a 600-second retry window, one attempt every 20 seconds, a 60-second silence timeout and
-> 80-second heartbeats; the "180-second window" and "503 after 3 retries" wording in old batches is historical only.
+> and the V0.2.1–V0.2.10 changes). **Section 21 records the original V0.2.11 release behavior
+> and is historical; Section 22 records the V0.2.12 local hotfix candidate and its test results.**
+> The current defaults are a 600-second retry window, one attempt every 20 seconds, a 60-second
+> silence timeout and 80-second heartbeats; the "180-second window" and "503 after 3 retries"
+> wording in old batches is historical only.
 
 ## 1. Hook (retry_hook.py)
 
@@ -375,24 +376,37 @@ cutoff discards slow-but-healthy large requests.
 an `x-session-id` is present; a second exhaustion in the same session must not RST).
 Full regression: hook 11, 429 12, watch 12, route 13, upstreams 8, ensure serialization.
 
-## 21. V0.2.11 — early incomplete tool calls get one real client retry
+## 21. V0.2.11 release record — original early-tool behavior (historical)
 
-An upstream may end an SSE stream with a partial tool-call name or JSON arguments before
-any content has reached the client. Replaying the unchanged request internally can repeat
-the same short `[DONE]` for the entire 600-second retry window and can overlap with a new
-client request. V0.2.11 gives this case a bounded real client retry instead:
+At the V0.2.11 release, an upstream ending an SSE stream with a partial tool-call name or
+JSON arguments before any client-visible content used a session-token-gated retry:
+with a session id the proxy claimed the one-shot token, wrote the zero-width anchor, waited
+for `PROXY_ANCHOR_SETTLE_MS`, and reset the connection; without a session id, or once the
+token was consumed, it returned a retryable SSE error. This section records that release
+behavior only; it is superseded by the current working-tree behavior in Section 22.
 
-- with `x-session-id` or `x-zcode-session-id`, claim the per-session one-shot token, write
-the zero-width `chatcmpl-zp-anchor`, wait for `PROXY_ANCHOR_SETTLE_MS`, and reset the
-client connection with `SO_LINGER=0`;
-- without a session id, fail closed with a retryable SSE error rather than creating an
-unbounded retry chain;
-- after the one-shot token is consumed, fail fast with the same retryable SSE error;
-- complete tool calls and incomplete tool calls after visible content keep their existing
-buffering and RST recovery behavior.
+The original `selftest_stream.py` release record listed 35 scenarios, including one
+end-to-end anchor/reset followed by a complete tool call. It is retained here for release
+traceability, not as a statement of the current test run.
 
-`selftest_stream.py`: 35 scenarios pass. The new end-to-end scenario verifies that the
-first request receives the anchor and an actual reset, the proxy does not start a second
-internal `retry after early finish` loop, and a second request on the same session receives
-a complete tool call with `finish_reason=tool_calls`. Full regression: hook 11, 429 12,
-watch 12, route 13, upstreams 8, ensure serialization.
+## 22. V0.2.12 local hotfix candidate — early incomplete tool calls (not published)
+
+Whenever an upstream ends with an incomplete buffered tool call before any client-visible
+content, the proxy returns `early_tool` and writes the zero-width `chatcmpl-zp-anchor`,
+waits `PROXY_ANCHOR_SETTLE_MS`, then resets the client connection with `SO_LINGER=0`.
+This applies on every occurrence, including when no session id is present and when the
+same session has already had an early-tool reset. The proxy does not claim
+`PROXY_RETRY_ONCE_TTL`, return a retryable SSE business error for these cases, or replay
+the unchanged request internally. ZCode's own bounded stream-recovery budget limits the
+client retries. The long-window exhaustion branch remains separately gated by
+`PROXY_RETRY_ONCE_TTL`.
+
+Verification on 2026-11-11: `py_compile` passed; `selftest_stream.py` passed all 36 scenarios,
+including no-session early-tool anchor + RST, two repeated early-tool RSTs followed by a
+successful third tool call, anchor-write failure with transport reset, ten-round anchor
+reliability, second long-window exhaustion retaining its token behavior, and 0.000 s CPU
+increase in the 0.6-second post-RST probe. Full regression passed: hook 11, 429 12, watch 12,
+route 13, upstreams 8, and ensure serialization. `doctor.py`: 18 PASS / 0 WARN / 0 FAIL;
+`git diff --check` passed. The installed client bundle sets its stream-recovery budget to 10,
+but a real ZCode UI recovery run was not performed; UI completion state remains unverified.
+No release asset or GitHub release was created.

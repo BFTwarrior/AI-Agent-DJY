@@ -41,7 +41,7 @@ Two main components plus one optional side path (off by default):
     such as `grep -q` with no match, `diff --quiet` with differences, or a false `test`; the client nevertheless marks the call
     `status="failed"`, so status alone is not enough. Any exit code other than 1, any output, a timeout, or cancellation still counts
     as a failure. The 2026-11-01 "pause once a minute" bug missed exactly this: three retry advices, and the third told the model to stop.
-23. **Tool-call deltas must be buffered and only written out at `finish_reason` or at the end** (V0.2.5; JSON validation from V0.2.7). A complete tool call must pass through once validated; a partial call must never be written. If a stream ends mid-arguments before any client-visible content, V0.2.11 uses the per-session one-shot anchor + RST path for a real client retry when a session id is present, and fails closed with a retryable SSE error otherwise. Reverting the buffer to direct streaming brings `tool_args_invalid` back.
+23. **Tool-call deltas must be buffered and only written out at `finish_reason` or at the end** (V0.2.5; JSON validation from V0.2.7). A complete tool call must pass through once validated; partial arguments must never be written. If a stream ends mid-arguments before client-visible content, the V0.2.12 local candidate writes the zero-width anchor, waits for settle, and resets the client on every occurrence, with or without a session id. Anchor-write failure is logged and followed by best-effort transport reset. Do not replay the unchanged body internally or send a fatal SSE business error. The installed ZCode bundle sets stream-recovery budget to 10; real UI recovery remains an end-to-end verification item. Reverting the buffer to direct streaming brings `tool_args_invalid` back.
 24. **A read error may be retried internally only when nothing has been written out** (V0.2.6; V0.2.7 resets the client when content exists). Check SSE, `client_gone`, `text_out`, `tool_out`, `finish_out`: only when all are false may a non-tool early attempt be marked and re-requested. An incomplete early tool call must follow invariant 23 instead of entering the unchanged-body retry loop. If content was emitted but there is no complete tool call or finish reason, reset the client (see 29). Content already sent must never be retried internally, and a client disconnect is not an upstream failure.
 25. **`/p/<token>` is base64url of the original baseUrl** (V0.2.6); validate scheme/host/port after decoding, preserve base and request queries, include non-default ports in Host, and return 400 for a bad token.
 26. **Provider migration is idempotent, sidecar-first and restorable** (V0.2.6); compare proxy addresses with `urlsplit` host+port, skip unusable URLs, write the sidecar before the config.
@@ -51,7 +51,7 @@ Two main components plus one optional side path (off by default):
 
 ## Current final parameters
 
-`RETRY_WINDOW=600` (seconds, the time window), `RETRY_INTERVAL=20` (seconds, fixed interval; `MAX_ATTEMPTS` is only a runaway fuse, default 200), `SILENCE_TIMEOUT=60`, `HEARTBEAT_START=80`, `HEARTBEAT_INTERVAL=80` (no cap on count), `PROXY_RETRY_WINDOW` / `PROXY_RETRY_INTERVAL` override the window and the interval, `PROXY_RETRY_ONCE_TTL=900` (one anchor+RST client retry per session), `PROXY_ANCHOR_SETTLE_MS=300` (wait after the anchor write before the reset, otherwise the kernel drops it), `PROXY_RETRY_AFTER_CAP=60`, port 8787.
+`RETRY_WINDOW=600` (seconds, the time window), `RETRY_INTERVAL=20` (seconds, fixed interval; `MAX_ATTEMPTS` is only a runaway fuse, default 200), `SILENCE_TIMEOUT=60`, `HEARTBEAT_START=80`, `HEARTBEAT_INTERVAL=80` (no cap on count), `PROXY_RETRY_WINDOW` / `PROXY_RETRY_INTERVAL` override the window and the interval, `PROXY_RETRY_ONCE_TTL=900` (one anchor+RST per session only after long-window exhaustion; early incomplete-tool recovery does not use this gate), `PROXY_ANCHOR_SETTLE_MS=300` (wait after the anchor write before the reset, otherwise the kernel drops it), `PROXY_RETRY_AFTER_CAP=60`, port 8787.
 
 Changing these defaults amounts to changing the product spec; you **must** update `README.md`, `docs/02-maintenance.md`, `docs/04-test-record.md` and `CHANGELOG.md` in step.
 
@@ -59,7 +59,7 @@ Changing these defaults amounts to changing the product spec; you **must** updat
 
 1. Run the accelerated test in section 4 of `docs/06-ai-maintenance-guide.md` (all four assertions must pass).
 2. Run `python -I tools/selftest_hook.py`, `tools/selftest_proxy_429.py`, `tools/selftest_stream.py`, `tools/selftest_watch.py`, `tools/selftest_route.py`, `tools/selftest_upstreams.py`
-   (11 hook checks (10 cases + third-attempt wording) + 12 retry scenarios + 35 streaming scenarios + 12 error-reporting assertions + 13 migration checks + 8 upstream-config checks must all pass; run `tools/selftest_ensure.py` after changing `ensure_proxy.py`). If you changed `pipe_response` you must run the streaming suite;
+   (11 hook checks (10 cases + third-attempt wording) + 12 retry scenarios + 36 streaming scenarios + 12 error-reporting assertions + 13 migration checks + 8 upstream-config checks must all pass; run `tools/selftest_ensure.py` after changing `ensure_proxy.py`). If you changed `pipe_response` you must run the streaming suite;
    if you changed `error_watch.py` you must run the fourth suite.
 3. Bump `VERSION`, `tools/install.py`, `src/retry_proxy.py` (`PROXY_VERSION`) and `src/error_watch.py` (`clientInfo.version`); all four must agree.
 4. Record "what changed + why" in `CHANGELOG.md`.
@@ -68,8 +68,8 @@ Changing these defaults amounts to changing the product spec; you **must** updat
 
 ## Start here to continue development (for the next AI / engineer)
 
-**Get the version numbers straight first**: what is published externally is the official release number (`0.2.11`); the `0.4.0` in the code is the build-line iteration number,
-and the two are not the same thing. `VERSION`, `tools/install.py`, `PROXY_VERSION` and `clientInfo.version` all carry the official release number;
+**Get the version numbers straight first**: the public release remains `0.2.11`; the local hotfix candidate is `0.2.12` and is not published; the `0.4.0` in the code is the build-line iteration number,
+and the two are not the same thing. In a candidate worktree, `VERSION`, `tools/install.py`, `PROXY_VERSION` and `clientInfo.version` must agree with the candidate version;
 the project `README.md` records the current build line.
 
 **Five-minute orientation**

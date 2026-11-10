@@ -99,10 +99,8 @@ write response headers (strip hop-by-hop) → read1 chunk by chunk, flush to the
    │   ├─ text written, no complete tool call ──► RST the client (V0.2.7)
    │   └─ complete tool call / finish emitted ──► pass through
    ├─ stream ends mid-tool-arguments (tool_args_invalid shape)
-   │   ├─ nothing written out yet + session token available ──► write zero-width anchor,
-   │   │   wait for settle, RST once for a real client retry (V0.2.11)
-   │   ├─ nothing written out yet + no token ──► retryable SSE error; do not start an
-   │   │   internal retry chain (V0.2.11)
+   │   ├─ no client-visible content yet ──► write zero-width anchor, wait for settle,
+   │   │   then RST for each early-tool failure (V0.2.12 local candidate; retry budget is client-side)
    │   └─ text written, incomplete JSON ──► write zero bytes, RST the client (V0.2.7)
    ├─ read error/silence with no text/tool call/finish reason and the client connected
    │   ──► mark early, re-request (V0.2.6; a client disconnect is logged as
@@ -114,27 +112,31 @@ write response headers (strip hop-by-hop) → read1 chunk by chunk, flush to the
    └─ normal end ──► log ok
 ```
 
-**The retry decision (since v0.4.0; 600-second window since V0.2.10)**: every failed attempt is resent — connection errors, any
-non-2xx from upstream, and silence timeouts. It is not count-based but time-window-based:
-keep retrying for 10 minutes, once every 20 seconds (`Retry-After` from the response header
-or the error body is honored, capped at 60 seconds), and only stop when the window expires; `MAX_ATTEMPTS=200` is merely a fuse against
-runaway retries. During backoff the thread does a `time.sleep` until the next attempt
-instead of spinning. Heartbeats are independent of attempt boundaries: after 80 consecutive
-seconds without upstream input one `: keepalive` is sent, and then one every 80 seconds,
-with no upper limit.
+**The retry decision (since v0.4.0; 600-second window since V0.2.10)**: ordinary failed
+attempts are resent — connection errors, any non-2xx from upstream, and silence timeouts.
+This retry loop is time-window-based: keep retrying for 10 minutes, once every 20 seconds
+(`Retry-After` from the response header or error body is honored, capped at 60 seconds),
+and stop when the window expires; `MAX_ATTEMPTS=200` is merely a fuse against runaway
+retries. During backoff the thread sleeps until the next attempt. Heartbeats are independent
+of attempt boundaries: after 80 consecutive seconds without upstream input one
+`: keepalive` is sent, and then one every 80 seconds, with no upper limit. An incomplete
+buffered tool call before client-visible content is a separate `early_tool` outcome: it
+immediately uses anchor + settle + RST on each occurrence instead of continuing this
+internal retry loop. ZCode's bounded recovery limits those client retries.
 
 **Key design point: retries happen before any user-visible text is written** (V0.2.3).
 Once text has been written there is no going back; that is a physical constraint of HTTP
-streaming. The one recoverable case is a stream that ends with **no text and no tool call**
-(missing/unknown `finish_reason`, or literal `other`): the proxy discards that upstream
-attempt and re-requests it internally, and the new stream continues writing into the same
-client response. It does **not** send a mid-stream SSE error — production testing showed the
-client classifies that as `ProviderBusinessError` with `retryable=false`. The same
-recoverable shape is an explicit upstream SSE `{"error":...}` event (production:
-`stream_truncated`/`upstream_error`): it is swallowed and retried when no text/tool call
-has been emitted (V0.2.4); once content exists but no complete tool call has been sent,
-the client is reset instead (V0.2.7). If a complete tool call or a `finish_reason` has
-already been written, the event is passed through — a retry would run tools twice.
+streaming. A recoverable stream that ends with **no text and no tool call** (missing/unknown
+`finish_reason`, or literal `other`) is discarded and re-requested internally, with the
+new stream continuing in the same client response. An explicit upstream SSE
+`{"error":...}` event (production: `stream_truncated`/`upstream_error`) is likewise
+swallowed and retried when no text/tool call has been emitted (V0.2.4). In contrast, an
+incomplete buffered tool call with no client-visible content takes the `early_tool` path:
+the proxy sends an anchor, waits for settle, and RSTs the client on every occurrence,
+without a session-token gate or internal replay (current working-tree behavior). Once
+content exists but no complete tool call has been sent, the client is reset instead
+(V0.2.7). If a complete tool call or a `finish_reason` has already been written, it is
+passed through — a retry could run tools twice.
 
 **Recovering after content (V0.2.7)**: an internal re-request would duplicate the text,
 and an SSE business error becomes `ProviderBusinessError`, which is not retryable. The
@@ -179,7 +181,7 @@ So `_seed_retry_anchor()` writes one tiny `content` delta (a zero-width space) a
 `_reset_client()` closes the socket with `SO_LINGER=0`. The client now has discarded text,
 sees `ECONNRESET`, drops the partial output and resends with `previous-message-anchor`.
 
-Two guard rails:
+Two guard rails apply to this long-window exhaustion branch:
 
 - `PROXY_ANCHOR_SETTLE_MS` (default 300 ms) between the write and the reset. `SO_LINGER=0`
   makes the kernel discard data the peer has not read yet; an immediate reset lost the
@@ -187,8 +189,12 @@ Two guard rails:
 - `claim_retry_once(session)` — a one-shot token per session, TTL `PROXY_RETRY_ONCE_TTL`
   (default 900 s). The client retries up to 10 times and each proxy window is 10 minutes, so
   without the gate a long outage rolls into dozens of upstream requests. The token is
-  released again if the anchor write fails. The gate covers this give-up branch only;
-  `reset_for_recovery` (incomplete content) still resets whenever the content demands it.
+  released again if the anchor write fails. This token is only for this give-up branch.
+
+**Early incomplete-tool calls are separate** (V0.2.12 local hotfix candidate; not published): each such failure writes the anchor, waits the same settle delay, and RSTs,
+regardless of whether a session id exists or an earlier early-tool RST occurred. The
+ZCode client's own bounded recovery limits repeats; this path does not claim
+`PROXY_RETRY_ONCE_TTL` and does not internally replay the unchanged request. The historical V0.2.11 release record describes the earlier token-gated behavior.
 
 
 **The worst case overshoots the window**: each attempt also spends connect time (10 seconds

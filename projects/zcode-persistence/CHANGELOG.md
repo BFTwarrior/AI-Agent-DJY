@@ -2,20 +2,38 @@
 
 > 2026-11-01: migrated to the AI-Agent-DJY repository; documentation was translated to English and directories standardized to `docs/` and `diagrams/`. Historical entries keep paths as originally written.
 
-## V0.2.11 — 2026-11-10
+## V0.2.12 local hotfix candidate — 2026-11-11 (not published)
 
-- **Real client retry for incomplete tool calls**: when an upstream ends an SSE stream with
-  an incomplete buffered tool call before any client-visible content, the proxy no longer
-  replays the unchanged request internally for up to 600 seconds. With a session id it
-  writes the zero-width anchor and resets the client connection immediately, giving ZCode
-  one genuine retry; without a session id it fails closed with a retryable SSE error.
-- A second incomplete-tool-call failure in the same session does not consume another
-  client retry or start another long internal retry chain.
-- Existing recovery remains unchanged for complete tool calls and for incomplete tool
-  arguments after client-visible content: those paths still prevent duplicate execution
-  and use the established RST recovery.
-- `selftest_stream.py`: 34 → 35 scenarios, including an end-to-end second client request
-  after the early tool-call RST.
+- **Fix repeated early incomplete-tool failures**: each early incomplete buffered tool call
+  before client-visible content now writes the zero-width anchor, waits
+  `PROXY_ANCHOR_SETTLE_MS`, and resets the client connection. This applies with or without
+  a session id and after prior early-tool resets; the proxy no longer falls back to a fatal
+  SSE business error or replays the unchanged body internally.
+- The actual ZCode bundle contains a stream-recovery retry budget of 10. The proxy relies on
+  that client-side budget for repeated early-tool resets; a live ZCode UI recovery run was not
+  performed, so UI behavior remains unverified.
+- Anchor-write failure is logged and followed by best-effort transport reset. A fault-injection
+  regression covers partial anchor output followed by a write exception.
+- `PROXY_RETRY_ONCE_TTL` remains limited to long-window exhaustion after heartbeat mode.
+- `selftest_stream.py`: 36 scenarios pass, including no-session early-tool RST, two repeated
+  early-tool failures followed by a successful third request, anchor-write failure, 10-round
+  anchor delivery, and no CPU spin after RST.
+- Full regression: hook 11, 429 12, watch 12, route 13, upstreams 8, ensure serialization;
+  compilation, `doctor.py` (18 PASS / 0 WARN / 0 FAIL), and `git diff --check` pass.
+- This is a local candidate only. No release asset or GitHub release was created.
+
+## V0.2.11 — 2026-11-10 (historical release behavior)
+
+- **Real client retry for incomplete tool calls**: at release time, an incomplete buffered
+  tool call before any client-visible content used a per-session one-shot token to gate
+  anchor + reset; without a session id or after the token was consumed, the proxy returned
+  a retryable SSE error. That behavior is historical and superseded by the current
+  working-tree behavior above.
+- The original release record stated that a repeated incomplete-tool failure did not
+  consume another client retry and listed `selftest_stream.py` 34 → 35 scenarios. Those
+  test counts and results are retained as release history, not as the current test status.
+- Existing recovery for complete tool calls and incomplete tool arguments after
+  client-visible content retained its established behavior.
 - Version fields bumped to 0.2.11.
 
 ## V0.2.10 — 2026-11-06

@@ -37,7 +37,7 @@ Three components (the third is off by default):
 20. **`error_watch`'s `seen` advances only after the email is sent successfully**. Being blocked by cooldown/rate limiting, a failed send, `--once`/`--no-send` must never advance it, otherwise the error is lost forever (on 2026-10-31 it sent 8 emails in a row and then silently dropped one, for exactly this reason).
 21. **Proxy log timestamps must include the date** (`%Y-%m-%d %H:%M:%S`). Error reporting uses it to align `gave up` with the error moment; with time-of-day only, cross-day alignment goes wrong.
 22. **`exitCode == 1` with completely empty stdout/stderr is not a failure**. It is the normal negative result of predicate commands such as `grep -q` with no match, `diff --quiet` with differences, or a false `test`; the client nevertheless marks the call `status="failed"`, so status alone is not enough. Any exit code other than 1, any output, a timeout, or cancellation still counts as a failure. The 2026-11-01 "pause once a minute" bug missed exactly this: three retry advices, and the third told the model to stop.
-23. **Tool-call deltas must be buffered and only written out at `finish_reason` or at the end** (V0.2.5; JSON validation from V0.2.7). A stream that ends mid-arguments with nothing written out must be discarded and re-requested; once a complete tool call has been written out, it must pass through (resending would run the tools twice). Reverting the buffer to direct streaming brings `tool_args_invalid` back.
+23. **Tool-call deltas must be buffered and only written out at `finish_reason` or at the end** (V0.2.5; JSON validation from V0.2.7). A complete call must pass through once validated; partial arguments must never be written. If a stream ends mid-arguments before client-visible content, the V0.2.12 local candidate writes the zero-width anchor, waits for settle, and resets the client on every occurrence, with or without a session id. Anchor-write failure is logged and followed by best-effort transport reset. Do not replay the unchanged body internally or send a fatal SSE business error. The installed ZCode bundle sets stream-recovery budget to 10; real UI recovery remains an end-to-end verification item. Reverting the buffer to direct streaming brings `tool_args_invalid` back.
 24. **A read error may be retried internally only when nothing has been written out** (V0.2.6; V0.2.7 resets the client when content exists). The exception path must check SSE, `client_gone`, `text_out`, `tool_out` and `finish_out`; only when all are false may it mark early and re-request. If content was emitted but no complete tool call or finish reason was sent, reset the client (see 29). Content already sent must never be retried internally, and a client disconnect must never be treated as an upstream failure (log `client gone`, not `stream broken`).
 25. **The `/p/<token>` token is base64url (padding stripped) of the original baseUrl** (V0.2.6). After decoding, validate that the scheme is http/https and the host is non-empty; build the path as `base_path.rstrip("/") + "/" + tail` without duplicating `/v1`; preserve both the base query and the request query; add a non-default port to the Host header (bracket IPv6 literals). An invalid token must return 400.
 26. **Provider migration must be idempotent, sidecar-first and restorable** (V0.2.6). Compare proxy addresses with `urlsplit` host+port, not string prefixes; back up first; write the sidecar before the config; skip non-http(s), hostless, invalid-port and userinfo URLs.
@@ -47,14 +47,14 @@ Three components (the third is off by default):
 
 ## Current finalized parameters
 
-`RETRY_WINDOW=600` (seconds, the time window), `RETRY_INTERVAL=20` (seconds, fixed interval; `MAX_ATTEMPTS` is only a runaway fuse, default 200), `SILENCE_TIMEOUT=60`, `HEARTBEAT_START=80`, `HEARTBEAT_INTERVAL=80` (no cap on count), `PROXY_RETRY_WINDOW` / `PROXY_RETRY_INTERVAL` override the window and the interval, `PROXY_RETRY_ONCE_TTL=900` (one anchor+RST client retry per session), `PROXY_ANCHOR_SETTLE_MS=300` (wait after the anchor write before the reset, otherwise the kernel drops it), `PROXY_RETRY_AFTER_CAP=60`, port 8787.
+`RETRY_WINDOW=600` (seconds, the time window), `RETRY_INTERVAL=20` (seconds, fixed interval; `MAX_ATTEMPTS` is only a runaway fuse, default 200), `SILENCE_TIMEOUT=60`, `HEARTBEAT_START=80`, `HEARTBEAT_INTERVAL=80` (no cap on count), `PROXY_RETRY_WINDOW` / `PROXY_RETRY_INTERVAL` override the window and the interval, `PROXY_RETRY_ONCE_TTL=900` (one anchor+RST retry per session only after long-window exhaustion; early incomplete-tool recovery does not use this gate), `PROXY_ANCHOR_SETTLE_MS=300` (wait after the anchor write before the reset, otherwise the kernel drops it), `PROXY_RETRY_AFTER_CAP=60`, port 8787.
 
 Changing these defaults equals changing the product spec; you **must** update `README.md`, `docs/02-maintenance.md`, `docs/04-test-record.md` and `CHANGELOG.md` in sync.
 
 ## What must be done after changes
 
 1. Run the accelerated test in section 4 of `docs/06-ai-maintenance-guide.md` (all four assertions pass).
-2. Run `python -I tools/selftest_hook.py`, `tools/selftest_proxy_429.py`, `tools/selftest_stream.py`, `tools/selftest_watch.py`, `tools/selftest_route.py`, `tools/selftest_upstreams.py` (11 / 12 / 35 / 12 / 13 / 8 all pass; run `tools/selftest_ensure.py` after changing `ensure_proxy.py`). If `pipe_response` changed you must run the streaming set; if `error_watch.py` changed you must run the fourth set.
+2. Run `python -I tools/selftest_hook.py`, `tools/selftest_proxy_429.py`, `tools/selftest_stream.py`, `tools/selftest_watch.py`, `tools/selftest_route.py`, `tools/selftest_upstreams.py` (11 / 12 / 36 / 12 / 13 / 8 all pass; run `tools/selftest_ensure.py` after changing `ensure_proxy.py`). If `pipe_response` changed you must run the streaming set; if `error_watch.py` changed you must run the fourth set.
 3. Bump `VERSION`, `tools/install.py`, `src/retry_proxy.py` (`PROXY_VERSION`) and `src/error_watch.py` (`clientInfo.version`); all four must agree.
 4. Record "what changed + why" in `CHANGELOG.md`.
 5. Repackage, **excluding** `__pycache__`, `*.pyc`, `*.log`.
@@ -62,7 +62,7 @@ Changing these defaults equals changing the product spec; you **must** update `R
 
 ## Continuing development starts here (for the next AI / engineer)
 
-**First get the version numbers straight**: what you ship externally is the formal release number (`0.2.11`); `0.4.0` is the build-line iteration number,
+**First get the version numbers straight**: the public release remains `0.2.11`; the local hotfix candidate is `0.2.12` and is not published; `0.4.0` is the build-line iteration number,
 and the two are not the same thing. `VERSION`, `tools/install.py`, `PROXY_VERSION` and `clientInfo.version` all carry the formal release number;
 the project `README.md` records the current build line.
 
