@@ -1,0 +1,109 @@
+# AI Agent Teams
+
+> Formal release: 0.1.8. Current source/package metadata: 0.2.2 (unreleased; no installed-plugin or production acceptance implied).
+> Team control plane for ZCode: 1 captain, 1-2 teams, lazy v0.6 members with licenses, warm/cold lifecycle and contractors; legacy 6/3-3 configs still work.
+
+## Start here
+- docs/guides/START-HERE.md: routing for humans and models
+- AGENTS.md: invariants, read order, change protocol
+- docs/status/STATUS.md: component status
+- docs/status/HANDOFF.md: done/not done, next tasks, verification
+- SPEC.md: authoritative target specification (19 sections, 51 numbered invariant entries including unimplemented INV-046, 55 counted baseline tests; retired/supplementary cases are documented separately)
+- docs/guides/INSTALL.md: install from ZIP or source
+- docs/guides/INSTALL-WITH-AI.md: four-stage AI-assisted install
+- docs/guides/CONSTRAINTS.md: quality contract
+- docs/guides/LOCALIZATION.md: supported locales, detection order, locale/time-zone config, message catalog, English-prompt boundary
+- CHANGELOG.md: release history
+
+## Configuration
+- config/schema.json: JSON Schema
+- config/example.v06.json: v0.6 lazy members, presets, licenses, contractors, patrol
+- config/example.two-teams.json: legacy 2 x 16 (max 32), 6 active
+- config/example.minimal.json: worktree-only minimal
+- config/roster.two-teams.json: 16 members per team, one lead per team
+- config/README.md: field reference
+
+## Contracts and decisions
+- docs/contracts.md: HTTP, SSE, SQL, discovery, protocol mapping
+- docs/decisions.md: ADRs
+- docs/roadmap.md: historical milestone plan and 2026-11-10 source checkpoint
+- docs/verification.md: verified ZCode facts
+- docs/test-matrix.md: 55 numbered baseline acceptance tests plus separately tracked v0.6 additions and retired IDs
+- docs/review-2026-10-26.md: subagent review, fixes, remaining gaps
+- docs/design-v0.6-roster-and-licenses.md: implemented v0.6 roster/license/contractor design
+- docs/known-limits.md: physical/environmental limits
+- docs/glossary.md: terms
+
+## Prompts
+- prompts/handoff.md: takeover prompt
+- prompts/captain.md
+- prompts/team-lead.md
+- prompts/member.md
+- prompts/reviewer.md
+- prompts/shadow.md
+- prompts/delivery-auditor.md
+
+## Code
+- .zcode-plugin/plugin.json: ZCode plugin manifest
+- skills/agent-teams/SKILL.md: captain protocol
+- commands/agent-teams.md: /agent-teams
+- src/bootstrap.mjs: prerequisite check + daemon auto-start
+- src/mcp-server.mjs: MCP stdio server
+- src/session/protocol.mjs: ZCode Protocol adapter
+- src/session/container-cli.mjs: container-backed CLI session adapter
+- src/native-agent-model.mjs: installed-identity-bound native worker model reader
+- src/service/native-model-dispatch.mjs: native model selection at worker dispatch boundaries
+- src/mcp/handler.mjs: 37 tools
+- src/host-model.mjs: host session model/reasoning reader + ModelWatcher
+- src/team-cli.mjs: member claim/update/heartbeat/message
+- src/git/merge-queue.mjs: worktree commit/cherry-pick, target-ref CAS, revert receipts
+- src/runtime/container.mjs: hardened container args
+- deploy/worker.Dockerfile: worker image base
+- scripts/load-test.mjs: 6/16/32 logical load
+- src/store.mjs: SQLite state
+- src/scheduler-service.mjs: team-service facade, scheduling orchestration and task lifecycle
+- src/service/task-dispatch.mjs: ready-task dispatch and worktree preparation
+- src/service/task-dispatch-session.mjs: session admission, startup, cursor polling and dispatch failures
+- src/service/closed-loop.mjs: completion fan-out and recovery orchestration
+- src/service/restart-recovery.mjs: daemon and contractor restart reconciliation
+- src/service/task-transitions.mjs: task reassignment, claim and state transitions
+- src/service/merge-workflow.mjs: merge review and publication workflow
+- src/service/tick-workflow.mjs: scheduler ticks, backoff and dynamic allocation
+- src/service/pending-adoption.mjs: pending-task adoption and retry recovery
+- src/service/control-sessions.mjs: captain/lead control session lifecycle
+- src/service/red-review.mjs: red-box auto-review lifecycle and delivery accounting
+- src/service/delivery-receipts.mjs: delivery identity + merged receipts
+- src/service/publication-recovery.mjs: publication/integration reconciliation
+- src/service/model-policy.mjs: host-follow/fixed model resolution
+- src/service/turn-recovery.mjs: same-task turn retry and continue recovery
+- src/service/contractor-slots.mjs: merge/patrol slot resolution; reviewPool scheduling is not enabled by config validation
+- src/service/contractors.mjs: contractor slots, send loop, termination proof
+- src/hot-update.mjs: stable hot-update compatibility facade
+- src/hot-update/: package build, manifest, lock, install, pointer, health and recovery modules
+- src/git-bootstrap.mjs: stable git-bootstrap facade for read-only inspection and safe bootstrap operations
+- src/git-bootstrap/: layered inspection, planning, git execution, rollback and transaction modules
+- src/http/server.mjs: HTTP route orchestration
+- src/http/auth.mjs: bearer and UI-session authentication
+- src/http/network.mjs: loopback checks and listener fallback
+- src/http/response.mjs: JSON response and bounded request parsing
+- src/http/sse.mjs: team event stream registry and heartbeat
+- src/http/sse-write.mjs: guarded SSE frame writes
+- src/http/ui-routes.mjs: UI, console and UI API routes
+- src/http/ui-snapshot.mjs: read-only team snapshot projection
+- src/daemon.mjs: daemon entrypoint
+- src/session/adapter.mjs: adapter contract + fake
+- src/session/cli.mjs: ZCode CLI adapter
+- src/gates/verify.mjs: verify runner
+- src/git/worktree.mjs: git worktree manager
+- src/git/worktree-fence.mjs: daemon-level worktree fence
+- src/config.mjs
+- src/i18n.mjs: locale/time-zone detection, resolution and formatting
+- src/domain/scheduler.mjs
+- src/domain/gates.mjs
+- src/domain/artifacts.mjs
+- src/domain/attempts.mjs: attempt/lease lifecycle
+- src/domain/lifecycle.mjs: presets, work states, settlement, summaries, verdict parsing
+- src/cli.mjs
+- test/
+- scripts/check.mjs
+- scripts/package.mjs

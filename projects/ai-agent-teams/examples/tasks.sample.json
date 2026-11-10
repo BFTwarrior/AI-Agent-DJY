@@ -1,0 +1,239 @@
+{
+  "tasks": [
+    {
+      "id": "alpha-req-1",
+      "teamId": "alpha",
+      "subject": "requirements-round-1-1",
+      "kind": "requirements",
+      "assignee": "alpha-analyst-1",
+      "status": "pending",
+      "dependencies": [],
+      "round": 1,
+      "objective": "Converge requirement slice 1",
+      "acceptance": [
+        "Open questions closed or deferred",
+        "Acceptance criteria are testable"
+      ]
+    },
+    {
+      "id": "beta-research-1",
+      "teamId": "beta",
+      "subject": "research-slice-1",
+      "kind": "work",
+      "assignee": "beta-researcher-1",
+      "status": "pending",
+      "dependencies": []
+    },
+    {
+      "id": "alpha-req-2",
+      "teamId": "alpha",
+      "subject": "requirements-round-1-2",
+      "kind": "requirements",
+      "assignee": "alpha-analyst-2",
+      "status": "pending",
+      "dependencies": [],
+      "round": 1,
+      "objective": "Converge requirement slice 2",
+      "acceptance": [
+        "Open questions closed or deferred",
+        "Acceptance criteria are testable"
+      ]
+    },
+    {
+      "id": "beta-research-2",
+      "teamId": "beta",
+      "subject": "research-slice-2",
+      "kind": "work",
+      "assignee": "beta-researcher-2",
+      "status": "pending",
+      "dependencies": []
+    },
+    {
+      "id": "alpha-req-3",
+      "teamId": "alpha",
+      "subject": "requirements-round-1-3",
+      "kind": "requirements",
+      "assignee": "alpha-analyst-3",
+      "status": "pending",
+      "dependencies": [],
+      "round": 1,
+      "objective": "Converge requirement slice 3",
+      "acceptance": [
+        "Open questions closed or deferred",
+        "Acceptance criteria are testable"
+      ]
+    },
+    {
+      "id": "beta-research-3",
+      "teamId": "beta",
+      "subject": "research-slice-3",
+      "kind": "work",
+      "assignee": "beta-researcher-3",
+      "status": "pending",
+      "dependencies": []
+    },
+    {
+      "id": "alpha-impl",
+      "teamId": "alpha",
+      "subject": "implementation",
+      "kind": "implementation",
+      "assignee": "alpha-impl",
+      "status": "pending",
+      "dependencies": [
+        "alpha-req-1",
+        "alpha-req-2",
+        "alpha-req-3"
+      ],
+      "round": 1,
+      "objective": "Implement the approved Alpha requirements",
+      "acceptance": [
+        "Implementation matches the approved requirements"
+      ],
+      "inScope": [
+        "src/"
+      ],
+      "verify": [
+        "npm test"
+      ]
+    },
+    {
+      "id": "alpha-verify",
+      "teamId": "alpha",
+      "subject": "verification",
+      "kind": "verification",
+      "assignee": "alpha-tester",
+      "status": "pending",
+      "dependencies": [
+        "alpha-impl"
+      ],
+      "round": 1,
+      "objective": "Verify the Alpha implementation",
+      "acceptance": [
+        "Declared verification commands pass"
+      ],
+      "verify": [
+        "npm test"
+      ]
+    },
+    {
+      "id": "alpha-review",
+      "teamId": "alpha",
+      "subject": "review-round-1",
+      "kind": "review",
+      "assignee": "alpha-reviewer",
+      "status": "pending",
+      "dependencies": [
+        "alpha-verify"
+      ],
+      "round": 1,
+      "objective": "Review the latest Alpha implementation",
+      "acceptance": [
+        "Findings are evidence-backed"
+      ],
+      "reviewedTaskId": "alpha-impl"
+    },
+    {
+      "id": "alpha-repair",
+      "teamId": "alpha",
+      "subject": "repair-round-2",
+      "kind": "repair",
+      "assignee": "alpha-impl",
+      "status": "pending",
+      "dependencies": [
+        "alpha-impl"
+      ],
+      "round": 2,
+      "objective": "Fix Alpha review findings",
+      "acceptance": [
+        "Every finding has a fix"
+      ],
+      "inScope": [
+        "src/"
+      ],
+      "verify": [
+        "npm test"
+      ],
+      "sourceTaskId": "alpha-impl",
+      "findingSourceTaskIds": [
+        "alpha-review"
+      ]
+    },
+    {
+      "id": "alpha-review-2",
+      "teamId": "alpha",
+      "subject": "review-round-2",
+      "kind": "review",
+      "assignee": "alpha-reviewer",
+      "status": "pending",
+      "dependencies": [
+        "alpha-repair"
+      ],
+      "round": 2,
+      "objective": "Re-review the Alpha repair",
+      "acceptance": [
+        "Findings are evidence-backed"
+      ],
+      "reviewedTaskId": "alpha-repair"
+    },
+    {
+      "id": "alpha-integration",
+      "teamId": "alpha",
+      "subject": "integration",
+      "kind": "integration",
+      "assignee": "alpha-lead",
+      "status": "pending",
+      "dependencies": [
+        "alpha-review-2"
+      ],
+      "round": 2,
+      "objective": "Confirm Alpha delivery",
+      "acceptance": [
+        "All quality gates pass"
+      ],
+      "verify": [
+        "npm test"
+      ]
+    },
+    {
+      "id": "beta-impl",
+      "teamId": "beta",
+      "subject": "implementation",
+      "kind": "implementation",
+      "assignee": "beta-impl",
+      "status": "pending",
+      "dependencies": [
+        "beta-research-1",
+        "beta-research-2",
+        "beta-research-3"
+      ],
+      "round": 1,
+      "objective": "Implement the Beta research outcome",
+      "acceptance": [
+        "Implementation matches the approved research"
+      ],
+      "inScope": [
+        "docs/"
+      ],
+      "verify": [
+        "npm test"
+      ]
+    },
+    {
+      "id": "beta-review",
+      "teamId": "beta",
+      "subject": "review-round-1",
+      "kind": "review",
+      "assignee": "beta-reviewer",
+      "status": "pending",
+      "dependencies": [
+        "beta-impl"
+      ],
+      "round": 1,
+      "objective": "Review the latest Beta implementation",
+      "acceptance": [
+        "Findings are evidence-backed"
+      ],
+      "reviewedTaskId": "beta-impl"
+    }
+  ]
+}

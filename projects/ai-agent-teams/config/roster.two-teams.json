@@ -1,0 +1,200 @@
+{
+  "teams": {
+    "alpha": [
+      {
+        "name": "alpha-lead",
+        "role": "lead",
+        "model": null,
+        "tool_policy": null
+      },
+      {
+        "name": "alpha-analyst-1",
+        "role": "analyst",
+        "model": null,
+        "tool_policy": null
+      },
+      {
+        "name": "alpha-analyst-2",
+        "role": "analyst",
+        "model": null,
+        "tool_policy": null
+      },
+      {
+        "name": "alpha-analyst-3",
+        "role": "analyst",
+        "model": null,
+        "tool_policy": null
+      },
+      {
+        "name": "alpha-analyst-4",
+        "role": "analyst",
+        "model": null,
+        "tool_policy": null
+      },
+      {
+        "name": "alpha-impl",
+        "role": "implementer",
+        "model": null,
+        "tool_policy": null
+      },
+      {
+        "name": "alpha-impl-2",
+        "role": "implementer",
+        "model": null,
+        "tool_policy": null
+      },
+      {
+        "name": "alpha-impl-3",
+        "role": "implementer",
+        "model": null,
+        "tool_policy": null
+      },
+      {
+        "name": "alpha-tester",
+        "role": "tester",
+        "model": null,
+        "tool_policy": null
+      },
+      {
+        "name": "alpha-tester-2",
+        "role": "tester",
+        "model": null,
+        "tool_policy": null
+      },
+      {
+        "name": "alpha-reviewer",
+        "role": "reviewer",
+        "model": null,
+        "tool_policy": null
+      },
+      {
+        "name": "alpha-reviewer-2",
+        "role": "reviewer",
+        "model": null,
+        "tool_policy": null
+      },
+      {
+        "name": "alpha-integrator",
+        "role": "integrator",
+        "model": null,
+        "tool_policy": null
+      },
+      {
+        "name": "alpha-docs",
+        "role": "documentation",
+        "model": null,
+        "tool_policy": null
+      },
+      {
+        "name": "alpha-qa",
+        "role": "qa",
+        "model": null,
+        "tool_policy": null
+      },
+      {
+        "name": "alpha-ops",
+        "role": "operations",
+        "model": null,
+        "tool_policy": null
+      }
+    ],
+    "beta": [
+      {
+        "name": "beta-lead",
+        "role": "lead",
+        "model": null,
+        "tool_policy": null
+      },
+      {
+        "name": "beta-researcher-1",
+        "role": "researcher",
+        "model": null,
+        "tool_policy": null
+      },
+      {
+        "name": "beta-researcher-2",
+        "role": "researcher",
+        "model": null,
+        "tool_policy": null
+      },
+      {
+        "name": "beta-researcher-3",
+        "role": "researcher",
+        "model": null,
+        "tool_policy": null
+      },
+      {
+        "name": "beta-researcher-4",
+        "role": "researcher",
+        "model": null,
+        "tool_policy": null
+      },
+      {
+        "name": "beta-impl",
+        "role": "implementer",
+        "model": null,
+        "tool_policy": null
+      },
+      {
+        "name": "beta-impl-2",
+        "role": "implementer",
+        "model": null,
+        "tool_policy": null
+      },
+      {
+        "name": "beta-tester",
+        "role": "tester",
+        "model": null,
+        "tool_policy": null
+      },
+      {
+        "name": "beta-reviewer",
+        "role": "reviewer",
+        "model": null,
+        "tool_policy": null
+      },
+      {
+        "name": "beta-reviewer-2",
+        "role": "reviewer",
+        "model": null,
+        "tool_policy": null
+      },
+      {
+        "name": "beta-analyst",
+        "role": "analyst",
+        "model": null,
+        "tool_policy": null
+      },
+      {
+        "name": "beta-integrator",
+        "role": "integrator",
+        "model": null,
+        "tool_policy": null
+      },
+      {
+        "name": "beta-docs",
+        "role": "documentation",
+        "model": null,
+        "tool_policy": null
+      },
+      {
+        "name": "beta-qa",
+        "role": "qa",
+        "model": null,
+        "tool_policy": null
+      },
+      {
+        "name": "beta-ops",
+        "role": "operations",
+        "model": null,
+        "tool_policy": null
+      },
+      {
+        "name": "beta-security",
+        "role": "security",
+        "model": null,
+        "tool_policy": null
+      }
+    ]
+  }
+}

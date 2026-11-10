@@ -1,0 +1,22 @@
+{
+  "name": "ai-agent-teams",
+  "plugins": [
+    {
+      "name": "ai-agent-teams",
+      "source": "./",
+      "version": "0.2.2",
+      "description": "Team control plane for ZCode: captain, two teams, tasks, attempts, mailbox, quality gates.",
+      "displayName": "Ai-Agent-Teams-Zcode",
+      "displayName_i18n": {
+        "zh-CN": "AI 智能体团队"
+      },
+      "description_i18n": {
+        "en": "Team control plane for ZCode: captain, two teams, tasks, attempts, mailbox, quality gates.",
+        "zh-CN": "一个队长、两支队伍、任务/尝试/邮箱/质量门禁的 ZCode 团队控制平面。",
+        "ja-JP": "ZCode 向けチーム制御プレーン：captain、2チーム、タスク、試行、メールボックス、品質ゲート。",
+        "ko-KR": "ZCode용 팀 제어 플레인: captain, 2개 팀, 태스크, 시도, 메일박스, 품질 게이트."
+      },
+      "category": "developer-tools"
+    }
+  ]
+}

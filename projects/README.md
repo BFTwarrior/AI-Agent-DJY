@@ -3,6 +3,7 @@
 | Project | Description | Version | Status | Docs |
 |---|---|---|---|---|
 | [zcode-persistence](zcode-persistence/) | ZCode retry toolkit: hook suggestions, local retry proxy, optional error email reports | V0.2.12 | Active | [00-Overview](zcode-persistence/docs/00-overview.md) |
+| [ai-agent-teams](ai-agent-teams/) | Team control plane for ZCode: one captain, two teams, attempt-tokened task graph, leases, quality gates, layered isolation | 0.2.2 (unreleased) | Active | [Overview](ai-agent-teams/docs/overview.md) |
 
 ## Conventions
 
