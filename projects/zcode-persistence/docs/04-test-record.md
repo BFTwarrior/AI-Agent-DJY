@@ -403,10 +403,13 @@ client retries. The long-window exhaustion branch remains separately gated by
 
 Verification on 2026-11-11: `py_compile` passed; `selftest_stream.py` passed all 36 scenarios,
 including no-session early-tool anchor + RST, two repeated early-tool RSTs followed by a
-successful third tool call, anchor-write failure with transport reset, ten-round anchor
-reliability, second long-window exhaustion retaining its token behavior, and 0.000 s CPU
-increase in the 0.6-second post-RST probe. Full regression passed: hook 11, 429 12, watch 12,
-route 13, upstreams 8, and ensure serialization. `doctor.py`: 18 PASS / 0 WARN / 0 FAIL;
+successful third tool call, anchor-write failure with transport reset, second long-window
+exhaustion retaining its token behavior, and 0.000 s CPU increase in the 0.6-second post-RST
+probe. The ten-round long-window anchor check was timing-sensitive: the first run observed
+9/10 anchors, then the same full command after a three-minute wait observed 10/10 anchors
+and 10/10 resets. Treat this as a successful rerun with a recorded intermittent miss, not as
+proof of deterministic delivery. Full regression passed: hook 11, 429 12, watch 12, route 13,
+upstreams 8, and ensure serialization. `doctor.py`: 18 PASS / 0 WARN / 0 FAIL;
 `git diff --check` passed. The installed client bundle sets its stream-recovery budget to 10,
 but a real ZCode UI recovery run was not performed; UI completion state remains unverified.
 No release asset or GitHub release was created.
