@@ -3,14 +3,14 @@
 A ZCode failure-retry toolkit: **suggests a retry when a tool fails**, **automatically
 resends when a model request fails**, plus a default-off **email report of session errors**.
 
-- Version: V0.2.12 (local hotfix candidate; not published)
+- Version: V0.2.12 release candidate (prepared 2026-11-11; not published)
 - Build line: 0.4.0
 - Applies to: ZCode Desktop (Windows), Python 3.9+
 - Dependencies: Python standard library only; proxy mode prefers certifi (if installed)
 
 ## Version history
 
-### V0.2.12 local hotfix candidate (not published)
+### V0.2.12 release candidate: repeated early incomplete-tool recovery
 
 When an upstream ends a stream with a buffered incomplete tool call before any
 client-visible content, every `early_tool` outcome writes the zero-width anchor, waits
@@ -20,11 +20,10 @@ limits retries. This path does not use `PROXY_RETRY_ONCE_TTL`. Anchor-write fail
 logged and followed by best-effort transport reset. Complete tool calls and incomplete
 calls after visible content retain their existing handling.
 
-Validation: the 36-scenario streaming suite and full regression pass locally. The real ZCode
-UI recovery state was not exercised end to end; this remains an acceptance limitation.
-
-The public GitHub release remains V0.2.11. This V0.2.12 candidate is local-only and has
-not been packaged or published.
+Validation: the 36-scenario streaming suite and full regression pass locally. The ten-round
+long-window anchor check observed 9/10 anchors on its first run and 10/10 after a delayed
+rerun, so delivery is timing-sensitive. The real ZCode UI recovery state was not exercised
+end to end; client behavior remains an acceptance limitation.
 
 ### V0.2.10: longer retry window + one real client retry
 
@@ -139,6 +138,6 @@ email addresses.
 ## Distribution
 
 The distribution package lives in the repository Releases:
-`proj-zcode-persistence-v0.2.11`.
+`proj-zcode-persistence-v0.2.11`; V0.2.12 is prepared but has not been published.
 The archive contains build artifacts; this directory is authoritative for the source, and
 if the two disagree, this directory plus the tag wins.

@@ -2,7 +2,7 @@
 
 > 2026-11-01: migrated to the AI-Agent-DJY repository; documentation was translated to English and directories standardized to `docs/` and `diagrams/`. Historical entries keep paths as originally written.
 
-## V0.2.12 local hotfix candidate — 2026-11-11 (not published)
+## V0.2.12 release candidate — 2026-11-11 (not published)
 
 - **Fix repeated early incomplete-tool failures**: each early incomplete buffered tool call
   before client-visible content now writes the zero-width anchor, waits
@@ -16,11 +16,13 @@
   regression covers partial anchor output followed by a write exception.
 - `PROXY_RETRY_ONCE_TTL` remains limited to long-window exhaustion after heartbeat mode.
 - `selftest_stream.py`: 36 scenarios pass, including no-session early-tool RST, two repeated
-  early-tool failures followed by a successful third request, anchor-write failure, 10-round
-  anchor delivery, and no CPU spin after RST.
-- Full regression: hook 11, 429 12, watch 12, route 13, upstreams 8, ensure serialization;
-  compilation, `doctor.py` (18 PASS / 0 WARN / 0 FAIL), and `git diff --check` pass.
-- This is a local candidate only. No release asset or GitHub release was created.
+  early-tool failures followed by a successful third request, anchor-write failure, and no CPU
+  spin after RST. The ten-round long-window anchor check was timing-sensitive: the first run
+  observed 9/10 anchors; a delayed rerun observed 10/10 anchors and resets.
+- Full regression: hook 11, 429 12, watch 12, route 13, upstreams 8, ensure serialization,
+  compilation, and `git diff --check` pass. `doctor.py` showed 18 PASS / 0 WARN / 0 FAIL on the
+  existing V0.2.11 installation before upgrade. V0.2.12 has not been installed locally yet; its post-install health verification is not performed.
+- Release asset, tag, and checksum will be recorded here after publication; no public asset has been created yet.
 
 ## V0.2.11 — 2026-11-10 (historical release behavior)
 
