@@ -409,7 +409,6 @@ probe. The ten-round long-window anchor check was timing-sensitive: the first ru
 9/10 anchors, then the same full command after a three-minute wait observed 10/10 anchors
 and 10/10 resets. Treat this as a successful rerun with a recorded intermittent miss, not as
 proof of deterministic delivery. Full regression passed: hook 11, 429 12, watch 12, route 13,
-upstreams 8, and ensure serialization. `doctor.py`: 18 PASS / 0 WARN / 0 FAIL;
-`git diff --check` passed. The installed client bundle sets its stream-recovery budget to 10,
+upstreams 8, and ensure serialization. `doctor.py`: 18 PASS / 0 WARN / 0 FAIL on the existing V0.2.11 installation before upgrade; V0.2.12 is not installed locally, so its post-install health check has not been performed. `git diff --check` passed. The installed client bundle sets its stream-recovery budget to 10,
 but a real ZCode UI recovery run was not performed; UI completion state remains unverified.
 No release asset or GitHub release has been created yet.

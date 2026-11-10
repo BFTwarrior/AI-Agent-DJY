@@ -21,7 +21,7 @@
   observed 9/10 anchors; a delayed rerun observed 10/10 anchors and resets.
 - Full regression: hook 11, 429 12, watch 12, route 13, upstreams 8, ensure serialization,
   compilation, and `git diff --check` pass. `doctor.py` showed 18 PASS / 0 WARN / 0 FAIL on the
-  existing V0.2.11 installation before upgrade; installed V0.2.12 health verification is separate.
+  existing V0.2.11 installation before upgrade. V0.2.12 has not been installed locally yet; its post-install health verification is not performed.
 - Release asset, tag, and checksum will be recorded here after publication; no public asset has been created yet.
 
 ## V0.2.11 — 2026-11-10 (historical release behavior)

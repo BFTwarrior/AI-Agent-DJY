@@ -17,7 +17,7 @@
   delivery remains timing-sensitive.
 - Full regression: hook 11, 429 12, watch 12, route 13, upstreams 8, ensure serialization,
   `py_compile`, and `git diff --check` pass. `doctor.py` showed 18 PASS / 0 WARN / 0 FAIL on
-  the pre-upgrade V0.2.11 installation; V0.2.12 health is verified after installation.
+  the pre-upgrade V0.2.11 installation. V0.2.12 has not been installed locally; its post-install health verification has not been performed.
 - Public GitHub release remains V0.2.11; V0.2.12 has not been published, and real ZCode UI recovery remains unverified end to end.
 
 ## V0.2.11 — 2026-11-10 (historical release behavior)
