@@ -62,7 +62,7 @@ Changing these defaults equals changing the product spec; you **must** update `R
 
 ## Continuing development starts here (for the next AI / engineer)
 
-**First get the version numbers straight**: the public release is `0.2.12`; `0.4.0` is the build-line iteration number,
+**First get the version numbers straight**: the public release remains `0.2.11`; V0.2.12 is a local candidate and is not published; `0.4.0` is the build-line iteration number,
 and the two are not the same thing. `VERSION`, `tools/install.py`, `PROXY_VERSION` and `clientInfo.version` all carry the formal release number;
 the project `README.md` records the current build line.
 

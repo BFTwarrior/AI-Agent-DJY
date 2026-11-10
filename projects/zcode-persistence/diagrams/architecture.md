@@ -1,6 +1,6 @@
-# Architecture Diagram (V0.2.12; released 2026-11-11)
+# Architecture Diagram (V0.2.12 local release candidate; not published)
 
-> Public GitHub release: V0.2.12. Build line 0.4.0. Parameters and semantics follow the code
+> Public GitHub release: V0.2.11. Build line 0.4.0. Parameters and semantics follow the code
 > in this project's `src/`; this document sketches the relationships without repeating every detail.
 
 ## Three pathways
@@ -52,7 +52,7 @@ main loop (window started .. started+600s, one attempt every RETRY_INTERVAL=20s)
    │    ├─ no text/tool yet and the stream ends without finish_reason, or sends {"error":...}
    │    │    → discard and re-request into the same client response (V0.2.3/V0.2.4)
    │    ├─ no text and dies mid-tool-arguments → write anchor, wait, then RST on every occurrence;
-   │    │    no session token or unchanged-body replay (V0.2.12; tool deltas buffered)
+   │    │    no session token or unchanged-body replay (V0.2.12 candidate; tool deltas buffered)
    │    ├─ content + incomplete tool args or an SSE error, no complete call/finish
    │    │    → validate zero bytes, then RST the client (V0.2.7)
    │    ├─ stream breaks after a complete tool call / finish → stop; no terminator

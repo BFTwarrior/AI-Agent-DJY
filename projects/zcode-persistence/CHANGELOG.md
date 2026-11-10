@@ -2,7 +2,7 @@
 
 > 2026-11-01: migrated to the AI-Agent-DJY repository; documentation was translated to English and directories standardized to `docs/` and `diagrams/`. Historical entries keep paths as originally written.
 
-## V0.2.12 — 2026-11-11 (released)
+## V0.2.12 release candidate — 2026-11-11 (not published)
 
 - **Fix repeated early incomplete-tool failures**: each early incomplete buffered tool call
   before client-visible content now writes the zero-width anchor, waits
@@ -22,7 +22,7 @@
 - Full regression: hook 11, 429 12, watch 12, route 13, upstreams 8, ensure serialization,
   compilation, and `git diff --check` pass. `doctor.py` showed 18 PASS / 0 WARN / 0 FAIL on the
   existing V0.2.11 installation before upgrade; installed V0.2.12 health verification is separate.
-- Release tag: `proj-zcode-persistence-v0.2.12`; the sanitized archive is `Zcode-Persistence-V0.2.12-20261111.zip`.
+- Release asset, tag, and checksum will be recorded here after publication; no public asset has been created yet.
 
 ## V0.2.11 — 2026-11-10 (historical release behavior)
 

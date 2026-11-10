@@ -4,7 +4,7 @@
 
 It adds three things to ZCode: **automatically suggest a retry when a tool fails**, **automatically resend when a model request fails**, and (off by default) **email the reason when a session errors**.
 
-- Version: V0.2.12 (released 2026-11-11; build line 0.4.0)
+- Version: V0.2.12 release candidate (prepared 2026-11-11; not published; build line 0.4.0)
 - Early incomplete-tool handling now uses anchor + RST on every occurrence, including no-session and repeated-failure cases; anchor-write failure also gets a best-effort reset. See `docs/04-test-record.md` for verification, timing variance, and the remaining UI end-to-end limitation.
 - Applies to: ZCode Desktop (Windows), Python 3.9+
 - Dependencies: Python standard library only; in proxy mode, TLS verification prefers certifi when it is installed

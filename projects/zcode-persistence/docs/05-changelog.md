@@ -2,7 +2,7 @@
 
 > 2026-11-01: migrated to the AI-Agent-DJY repository; documentation was translated to English and directories standardized to `docs/` and `diagrams/`. Historical entries keep paths as originally written.
 
-## V0.2.12 — 2026-11-11 (released)
+## V0.2.12 release candidate — 2026-11-11 (not published)
 
 - Every early incomplete buffered tool call before client-visible content now writes the
   zero-width anchor, waits for settle, and resets the client, including without a session id
@@ -18,7 +18,7 @@
 - Full regression: hook 11, 429 12, watch 12, route 13, upstreams 8, ensure serialization,
   `py_compile`, and `git diff --check` pass. `doctor.py` showed 18 PASS / 0 WARN / 0 FAIL on
   the pre-upgrade V0.2.11 installation; V0.2.12 health is verified after installation.
-- Public GitHub release: V0.2.12; the real ZCode UI recovery path remains unverified end to end.
+- Public GitHub release remains V0.2.11; V0.2.12 has not been published, and real ZCode UI recovery remains unverified end to end.
 
 ## V0.2.11 — 2026-11-10 (historical release behavior)
 
