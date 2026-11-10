@@ -1,0 +1,51 @@
+{
+  "name": "ai-agent-teams",
+  "version": "0.2.2",
+  "private": true,
+  "type": "module",
+  "description": "Team control plane for ZCode: 1 captain, 2 teams, 16 members per team default (32 max), shared worker pool with dynamic split.",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22.5"
+  },
+  "scripts": {
+    "test": "node --import ./test/support/tmp-root.mjs --test test/*.test.mjs",
+    "test:coverage": "node --import ./test/support/tmp-root.mjs --experimental-test-coverage --test-coverage-lines=79 --test-coverage-branches=63 --test-coverage-functions=79 --test-coverage-include=\"src/**/*.mjs\" --test test/*.test.mjs",
+    "lint": "eslint src scripts test ui-src",
+    "audit:deps": "npm audit --audit-level=high",
+    "check:quality": "npm run lint && npm run check:assets && npm run check:i18n && npm run test:coverage && npm run audit:deps",
+    "check": "node scripts/check.mjs",
+    "check:i18n": "node scripts/i18n-coverage.mjs",
+    "validate": "node src/cli.mjs validate-config config/example.two-teams.json",
+    "plan": "node src/cli.mjs plan config/example.two-teams.json examples/tasks.sample.json",
+    "package": "node scripts/build-ui.mjs && node scripts/package.mjs",
+    "build:ui": "node scripts/build-ui.mjs",
+    "start": "node src/daemon.mjs",
+    "daemon": "node src/daemon.mjs",
+    "panel": "node src/cli.mjs panel",
+    "panel:open": "node src/cli.mjs panel --open",
+    "daemon:supervise": "node scripts/daemon-supervisor.mjs",
+    "setup": "node src/bootstrap.mjs",
+    "zcode:real": "node scripts/zcode-real.mjs",
+    "zcode:lifecycle": "node scripts/zcode-lifecycle.mjs",
+    "load": "node scripts/load-test.mjs",
+    "real:load": "node scripts/real-load.mjs",
+    "recommend": "node src/bootstrap.mjs --recommend",
+    "install:detect": "node src/installer.mjs",
+    "install:plan": "node src/installer.mjs --plan",
+    "install:inspect": "node src/install-wizard.mjs --inspect",
+    "install:choose": "node src/install-wizard.mjs --choose-isolation",
+    "install:verify": "node src/install-wizard.mjs --verify",
+    "install:presets": "node src/install-wizard.mjs --presets",
+    "install:apply": "node src/install-wizard.mjs --apply",
+    "panel:window": "node src/cli.mjs panel --window",
+    "check:assets": "node --check assets/team-view-app.js && node --check assets/team-view-live.js && node --check assets/team-view-stream.js && node --check assets/team-view-theme.js && node --check assets/team-view-theme-boot.js && node --check assets/team-view-patrol.js"
+  },
+  "devDependencies": {
+    "acorn": "^8.19.0",
+    "@modelcontextprotocol/ext-apps": "^2.0.4",
+    "esbuild": "^0.28.2",
+    "eslint": "^9.39.5",
+    "globals": "^15.15.0"
+  }
+}

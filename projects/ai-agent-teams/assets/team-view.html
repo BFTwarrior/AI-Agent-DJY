@@ -1,0 +1,386 @@
+<!doctype html>
+<html lang="zh-CN" data-ui-booting>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Establish the navigation canvas before external CSS or app scripts load. -->
+  <meta name="color-scheme" content="light">
+  <style id="theme-first-paint">
+    :root { color-scheme: light; --page-bg: #edf3fb; background: var(--page-bg); }
+    :root[data-theme="dark"] { color-scheme: dark; --page-bg: #171b22; }
+    html, body { margin: 0; background: var(--page-bg); }
+    /* Never interpolate native dark button surfaces into the saved light theme. */
+    html[data-ui-booting][data-theme="light"] #agent-teams-ui *,
+    html[data-ui-booting][data-theme="light"] #agent-teams-ui *::before,
+    html[data-ui-booting][data-theme="light"] #agent-teams-ui *::after { transition: none !important; }
+
+  </style>
+  <title>Ai-Agent-Teams-Zcode · 团队运行控制台</title>
+  <script src="./team-view-theme-boot.js"></script>
+  <link rel="stylesheet" href="./team-view.css">
+  <link rel="stylesheet" href="./team-view.light.css">
+  <link rel="stylesheet" href="./team-view.dark.css">
+</head>
+<body>
+<!--
+  Design notes for future edits/reviews:
+  - The source file is a standalone visual prototype. The packaged copy is served
+    at /ui with a read-only live snapshot from /api/v1/ui/snapshot and SSE refresh;
+    opening the source directly uses the built-in static example.
+  - The task graph's dagTasks/crossLinks arrays are the source of truth for graph
+    nodes, handoffs, and the task-related counters synchronized by updateTaskMeta.
+    Other operational panels are static illustrative prototype content.
+  - A-Tn belongs to A队 and B-Tn to B队. T numbers are team-local labels,
+    not a global cross-team sequence. For the user's
+    selected-line emphasis rule only, the smaller numeric T tier is drawn with
+    higher visual priority; that styling comparison never defines flow order.
+  - Cross-team arrow directions are explicit user-authored relationships. Keep
+    the declared direction even when it appears to run toward a smaller/equal T
+    number or toward the visually higher lane.
+  - Hover/focus highlights the complete upstream and downstream reachable routes.
+    Near-total highlighting in this intentionally cross-linked sample is expected.
+  - A dashed cross-team path denotes a handoff; an unfinished in-team path is
+    dashed by status. These are separate relationship/status cues, not a rule to
+    remove either style.
+  - Light and dark are explicit peer themes. The topbar toggle writes
+    html[data-theme] and `agent-teams-theme-v1:<pathname>`; each theme owns its
+    token values in team-view.light.css / team-view.dark.css, and the page
+    background mirrors the selected scheme so a forced theme never leaves a
+    mismatched body band.
+-->
+<div id="agent-teams-ui" class="edge-flow-booting">
+
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">AI</div>
+        <div><b>Ai-Agent-Teams-Zcode</b><span>ZCode 任务指挥台</span></div>
+      </div>
+      <div class="workspace">
+        <div class="ws-avatar" data-i18n-skip>AT</div>
+        <div><b>双队</b><span>A队 + B队</span></div>
+        <span class="icon ws-chevron" data-lucide="chevrons-up-down"></span>
+      </div>
+
+      <div class="nav-group">
+        <div class="nav-label">工作台</div>
+        <button class="nav-item active" type="button" data-nav="overview"><span class="icon" data-lucide="layout-dashboard"></span><span>总览</span></button>
+            <button class="nav-item" type="button" data-nav="dual"><span class="icon" data-lucide="columns-2"></span><span>双队</span></button>
+
+        <button class="nav-item" type="button" data-nav="tasks"><span class="icon" data-lucide="list-tree"></span><span>任务</span><span class="nav-badge" id="tasks-nav-badge">24</span></button>
+        <button class="nav-item" type="button" data-nav="members"><span class="icon" data-lucide="users"></span><span>成员</span><span class="nav-badge" id="members-nav-badge">5</span></button>
+        <button class="nav-item" type="button" data-nav="merge"><span class="icon" data-lucide="git-pull-request"></span><span>审核与合并</span><span class="nav-badge">3</span></button>
+      </div>
+      <div class="nav-group">
+        <div class="nav-label">运维</div>
+        <button class="nav-item" type="button" data-nav="patrol"><span class="icon" data-lucide="radar"></span><span>巡检</span></button>
+        <button class="nav-item" type="button" data-nav="audit"><span class="icon" data-lucide="history"></span><span>审计</span></button>
+      </div>
+      <div class="nav-group">
+        <div class="nav-label">设置</div>
+        <button class="nav-item" type="button" data-nav="settings"><span class="icon" data-lucide="settings-2"></span><span>设置</span></button>
+      </div>
+      <div class="sidebar-foot">
+        <div class="rail-status"><span class="dot" style="background:var(--mint)"></span><span class="label">本机 daemon</span></div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div class="crumb"><span>双队</span><span class="muted">/</span><span class="current" id="crumb-current">总览</span></div>
+        <div class="top-right">
+          <div class="topbar-status" role="group" aria-label="团队状态">
+            <span class="pill" id="live-pill">静态示例</span>
+            <span class="pill live" id="run-pill"><span class="dot"></span><span id="run-text">运行中</span></span>
+            <span class="pill amber" id="access-pill" hidden>完全访问</span>
+            <span class="pill hide-sm" id="team-pill">并发上限 6 · 外包总位 2</span>
+          </div>
+          <button class="icon-btn theme-toggle" type="button" id="theme-toggle" aria-label="切换到黑色模式" title="切换到黑色模式"><span class="icon" data-lucide="moon" aria-hidden="true"></span></button>
+          <div class="topbar-actions" role="group" aria-label="团队操作">
+            <button class="btn sm" type="button" id="top-patrol" title="立即巡检" aria-label="立即巡检"><span class="icon" data-lucide="radar"></span>巡检</button>
+            <button class="btn sm" type="button" id="pause-toggle" title="暂停或继续所有正在运行的会话"><span class="icon" data-lucide="pause"></span><span id="pause-text">暂停</span></button>
+            <button class="btn sm danger" type="button" id="hard-stop" aria-label="硬停所有会话（已锁定）" title="硬停已锁定，点击解锁"><svg class="lock-icon" viewBox="0 0 12 12" aria-hidden="true"><path d="M3.2 5.2V4a2.8 2.8 0 0 1 5.6 0v1.2"/><rect x="2.2" y="5.2" width="7.6" height="5.3" rx="1.3"/></svg><span id="hard-stop-text">硬停</span></button>
+          </div>
+        </div>
+      </header>
+
+      <div class="content">
+        <section class="page active" id="page-overview">
+          <div class="page-head">
+            <div><h1>总览</h1><p id="overview-page-sub">全局运行状态 · 当前工作、任务与租约信号</p></div>
+          </div>
+          <div class="stats">
+            <div class="stat"><div class="stat-label"><span>当前队员</span><span class="badge mint" id="overview-worker-badge">在岗 / 并发上限</span></div><div class="stat-value" id="overview-worker-current" data-i18n-skip>6 / 6</div><div class="stat-foot" id="overview-worker-foot">当前在岗 · A队 4 · B队 2</div><div class="stat-track"><i id="overview-worker-bar" style="width:100%"></i></div></div>
+            <div class="stat"><div class="stat-label"><span>当前外包</span><span class="badge mint">运行中 / 总位</span></div><div class="stat-value" id="overview-contractor-current" data-i18n-skip>2 / 2</div><div class="stat-foot" id="overview-contractor-foot">合并位 1/1 · 巡检位 1/1</div><div class="stat-track"><i id="overview-contractor-bar" style="width:100%"></i></div></div>
+            <div class="stat"><div class="stat-label"><span>进行中任务</span><span class="icon" data-lucide="activity"></span></div><div class="stat-value" id="overview-active" data-i18n-skip>1</div><div class="stat-foot" id="overview-active-foot"><span data-i18n-skip>A-T2 ·</span> 跨队输入汇总</div><div class="stat-track"><i id="overview-active-bar" style="width:8%"></i></div></div>
+            <div class="stat"><div class="stat-label"><span>等待依赖</span><span class="icon" data-lucide="git-pull-request"></span></div><div class="stat-value" id="overview-waiting" data-i18n-skip>16</div><div class="stat-foot" id="overview-waiting-foot">等待 16 · A-T3a · A-T3b · A-T4a · A-T4b · +12</div><div class="stat-track"><i id="overview-waiting-bar" style="width:67%"></i></div></div>
+          </div>
+
+          <div class="panel">
+              <div class="panel-head"><h2>当前在工作</h2><span class="badge mint" id="overview-workforce-badge">当前工作明细</span><span class="muted" id="overview-capacity-hint">总览唯一容量指标见上方</span></div>
+            <!-- These member-to-task assignments are illustrative prototype cards, not live owner data from dagTasks. -->
+            <div class="workforce-grid">
+              <div class="worker-card"><div class="avatar amber" data-i18n-skip>A</div><div class="worker-main"><b>A-01</b><span>A队 · 代码工程师</span><span class="worker-task"><span data-i18n-skip>A-T2</span> 跨队输入汇总</span></div><span class="dot" style="background:var(--mint)"></span></div>
+              <div class="worker-card"><div class="avatar mint" data-i18n-skip>A</div><div class="worker-main"><b>A-02</b><span>A队 · 验证</span><span class="worker-task"><span data-i18n-skip>A-T3a</span> 接口契约冻结</span></div><span class="dot" style="background:var(--mint)"></span></div>
+              <div class="worker-card"><div class="avatar violet" data-i18n-skip>A</div><div class="worker-main"><b>A-04</b><span>A队 · 审核</span><span class="worker-task"><span data-i18n-skip>A-T3b</span> 风险模型建立</span></div><span class="dot" style="background:var(--mint)"></span></div>
+              <div class="worker-card"><div class="avatar violet" data-i18n-skip>B</div><div class="worker-main"><b>B-01</b><span>B队 · 交付</span><span class="worker-task"><span data-i18n-skip>B-T3b</span> 基线交付包</span></div><span class="dot" style="background:var(--mint)"></span></div>
+              <div class="worker-card"><div class="avatar indigo" data-i18n-skip>B</div><div class="worker-main"><b>B-02</b><span>B队 · 工程师</span><span class="worker-task"><span data-i18n-skip>B-T4</span> 影子联调</span></div><span class="dot" style="background:var(--mint)"></span></div>
+              <div class="worker-card"><div class="avatar indigo" data-i18n-skip>A</div><div class="worker-main"><b>A-05</b><span>A队 · 工程师</span><span class="worker-task"><span data-i18n-skip>A-T1</span> 项目基线对齐</span></div><span class="dot" style="background:var(--mint)"></span></div>
+              <div class="worker-card contractor"><div class="avatar violet" data-i18n-skip>C</div><div class="worker-main"><b>外包 01 · 合并位</b><span>合并后审查 · 一次性</span><span class="worker-task">等待实时合并复核指令</span></div><span class="badge mint">外包</span></div>
+              <div class="worker-card contractor"><div class="avatar mint" data-i18n-skip>C</div><div class="worker-main"><b>外包 02 · 巡检位</b><span>巡检 / 调研 · 一次性</span><span class="worker-task">双队心跳与范围检查</span></div><span class="badge mint">外包</span></div>
+            </div>
+          </div>
+
+          <div class="overview-bottom">
+            <div class="panel">
+              <div class="panel-head"><h2>运行提醒</h2><span class="badge faint" id="approval-count">示例信号</span><span class="muted" id="approval-note">静态示例 · 只保留需要关注的运行信号</span></div>
+              <div class="action-list">
+                <div class="action-row" id="approval-empty-row"><div class="icon" style="color:var(--mint)"><span class="icon" data-lucide="check-circle-2"></span></div><div class="action-main"><b>当前无高风险阻断</b><span>任务依赖、队员容量与会话租约均在运行范围内。</span></div><span class="badge mint">正常</span></div>
+                <div class="action-row"><div class="icon" style="color:var(--indigo)"><span class="icon" data-lucide="activity"></span></div><div class="action-main"><b>工作区正在推进</b><span>总览只显示当前队员与任务信号，详细协作状态集中在双队菜单。</span></div><span class="badge indigo">监控中</span></div>
+              </div>
+            </div>
+            <div class="panel">
+              <div class="panel-head"><h2>队长动态</h2><span class="badge faint" id="captain-activity-badge">示例时间线</span><span class="muted">最近 4 条 · 快照未提供时保持示例</span></div>
+              <div class="timeline" id="captain-activity-list">
+                <div class="tl-row"><span class="tl-dot done"></span><div><b><span data-i18n-skip>T-099</span> 合并前检查通过</b><span><span data-i18n-skip>16:41 · A-04 · </span>独立审核</span></div><span class="badge mint">通过</span></div>
+                <div class="tl-row"><span class="tl-dot done"></span><div><b>B队 2 名队员就位</b><span><span data-i18n-skip>16:35 · </span>共享池自动分配</span></div><span class="badge">6+2</span></div>
+                <div class="tl-row"><span class="tl-dot active"></span><div><b>双队心跳检查</b><span><span data-i18n-skip>16:22 · C-02 · </span>无过期 lease</span></div><span class="badge indigo">进行中</span></div>
+                <div class="tl-row"><span class="tl-dot done"></span><div><b><span data-i18n-skip>A-01</span> 推进 <span data-i18n-skip>A-T2</span></b><span><span data-i18n-skip>16:10 · </span>等待输入冻结</span></div><span class="badge indigo">进行中</span></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="page" id="page-dual">
+          <div class="page-head"><div><h1>双队</h1><p id="dual-page-sub">双队任务、依赖与共享池分配 · 总览集中显示容量指标</p></div></div>
+          <div class="stats">
+            <div class="stat"><div class="stat-label"><span>双队任务</span><span class="icon" data-lucide="list-tree"></span></div><div class="stat-value" id="dual-total" data-i18n-skip>24</div><div class="stat-foot" id="dual-total-foot">A队 12 · B队 12</div><div class="stat-track"><i id="dual-total-bar" style="width:100%"></i></div></div>
+            <div class="stat"><div class="stat-label"><span>跨队依赖</span><span class="icon" data-lucide="arrow-left-right"></span></div><div class="stat-value" id="cross-team-link-count" data-i18n-skip>7</div><div class="stat-foot" id="cross-team-link-foot">A/B双向交付与回流连线</div><div class="stat-track"><i id="cross-team-link-bar" style="width:100%"></i></div></div>
+            <div class="stat"><div class="stat-label"><span>A队等待</span><span class="badge" id="dual-alpha-summary-badge">等待</span></div><div class="stat-value" id="dual-alpha-summary" data-i18n-skip>10</div><div class="stat-foot">尚未满足依赖的任务</div><div class="stat-track"><i id="dual-alpha-summary-bar" style="width:83%"></i></div></div>
+            <div class="stat"><div class="stat-label"><span>B队等待</span><span class="badge" id="dual-beta-summary-badge">等待</span></div><div class="stat-value" id="dual-beta-summary" data-i18n-skip>6</div><div class="stat-foot">尚未满足依赖的任务</div><div class="stat-track"><i id="dual-beta-summary-bar" style="width:50%"></i></div></div>
+          </div>
+
+          <div class="panel dual-captain">
+            <div class="panel-head"><h2>队长</h2><span class="badge indigo">C-01</span><span class="badge faint" id="captain-signal-badge">示例判断</span><span class="muted">只拆解、派发、汇总和巡检</span><div class="panel-actions"><span class="badge mint">同时指挥 2 队</span></div></div>
+            <div class="dual-captain-body">
+              <div class="dual-captain-main"><div class="avatar indigo"><span class="icon" data-lucide="crown"></span></div><div><b>当前判断</b><span id="dual-captain-judgment">A队在收尾，B队正在实现；共享池不需要扩容</span></div></div>
+              <div class="dual-captain-signal"><span>A队</span><b>收尾阶段</b></div>
+              <div class="dual-captain-signal"><span>B队</span><b>实现阶段</b></div>
+              <div class="dual-captain-signal"><span>共享池</span><b>无需扩容</b></div>
+            </div>
+          </div>
+
+          <div class="dual-grid">
+            <div class="panel team-summary">
+              <div class="team-title"><div class="team-mark">A</div><div><b>A队</b><span>支付 / 订单 · 按任务动态借调</span></div><span class="badge mint" style="margin-left:auto">运行中</span></div>
+              <div class="progress-mini"><span id="dual-alpha-progress">1/12</span><div class="track"><i id="dual-alpha-bar" style="width:8%"></i></div><span>已完成</span></div>
+              <div class="mini-task"><span class="dot tone-indigo"></span><div class="mini-task-main"><b><span data-i18n-skip>A-T2</span> 跨队输入汇总</b><span><span data-i18n-skip>A-01</span> · 进行中</span></div><span class="badge indigo">进行中</span></div>
+              <div class="mini-task"><span class="dot tone-muted"></span><div class="mini-task-main"><b><span data-i18n-skip>A-T3a</span> 接口契约冻结</b><span><span data-i18n-skip>A-02</span> · 验证</span></div><span class="badge">等待</span></div>
+              <div class="mini-task"><span class="dot tone-muted"></span><div class="mini-task-main"><b><span data-i18n-skip>A-T3b</span> 风险模型建立</b><span><span data-i18n-skip>A-04</span> · 审核</span></div><span class="badge">等待</span></div>
+            </div>
+
+            <div class="panel team-summary">
+              <div class="team-title"><div class="team-mark" style="background:var(--mint-soft);color:var(--mint)">B</div><div><b>B队</b><span>接口 / 交付 · 按任务动态借调</span></div><span class="badge mint" style="margin-left:auto">运行中</span></div>
+              <div class="progress-mini"><span id="dual-beta-progress">6/12</span><div class="track"><i id="dual-beta-bar" style="width:50%"></i></div><span>已完成</span></div>
+              <div class="mini-task"><span class="dot tone-mint"></span><div class="mini-task-main"><b><span data-i18n-skip>B-T3b</span> 基线交付包</b><span><span data-i18n-skip>B-01</span> · 交付</span></div><span class="badge mint">已完成</span></div>
+              <div class="mini-task"><span class="dot tone-muted"></span><div class="mini-task-main"><b><span data-i18n-skip>B-T4</span> 影子联调</b><span><span data-i18n-skip>B-02</span> · 工程师</span></div><span class="badge">等待</span></div>
+              <div class="mini-task"><span class="dot tone-muted"></span><div class="mini-task-main"><b><span data-i18n-skip>B-T5b</span> 回归证据复核</b><span><span data-i18n-skip>B-01</span> · 交付</span></div><span class="badge">等待</span></div>
+            </div>
+
+            <aside class="panel pool-panel">
+              <div class="panel-head"><h2>共享员工池</h2><span class="badge" id="pool-capacity-badge">按需借调</span><span class="muted">成员与外包位 · 总览看指标，双队做控制</span></div>
+              <div class="capacity-control"><label for="max-worker-slots">队员并发上限</label><input id="max-worker-slots" type="number" min="1" max="32" step="1" value="6" placeholder="待快照" aria-label="队员并发上限"><span class="capacity-current">按任务动态借调</span></div>
+              <div class="pool-list" id="dual-pool-list">
+                <div class="pool-row"><div class="avatar amber" data-i18n-skip>A</div><div class="pool-main"><b>A-01</b><span><span>A队 · 工程师</span> · <span data-i18n-skip>A-T2</span></span></div><span class="dot tone-mint"></span></div>
+                <div class="pool-row"><div class="avatar mint" data-i18n-skip>A</div><div class="pool-main"><b>A-02</b><span><span>A队 · 验证</span> · <span data-i18n-skip>A-T3a</span></span></div><span class="dot tone-mint"></span></div>
+                <div class="pool-row"><div class="avatar violet" data-i18n-skip>A</div><div class="pool-main"><b>A-04</b><span><span>A队 · 审核</span> · <span data-i18n-skip>A-T3b</span></span></div><span class="dot tone-mint"></span></div>
+                <div class="pool-row"><div class="avatar violet" data-i18n-skip>B</div><div class="pool-main"><b>B-01</b><span><span>B队 · 交付</span> · <span data-i18n-skip>B-T3b</span></span></div><span class="dot tone-mint"></span></div>
+                <div class="pool-row"><div class="avatar indigo" data-i18n-skip>B</div><div class="pool-main"><b>B-02</b><span><span>B队 · 工程师</span> · <span data-i18n-skip>B-T4</span></span></div><span class="dot tone-mint"></span></div>
+                <div class="pool-row"><div class="avatar indigo" data-i18n-skip>A</div><div class="pool-main"><b>A-05</b><span><span>A队 · 工程师</span> · <span data-i18n-skip>A-T1</span></span></div><span class="dot tone-mint"></span></div>
+                <div class="pool-row contractor"><div class="avatar violet" data-i18n-skip>C</div><div class="pool-main"><b>外包 01 · 合并位</b><span><span>合并后审查</span> · <span data-i18n-skip>T-099</span></span></div><span class="badge mint">外包</span></div>
+                <div class="pool-row contractor"><div class="avatar mint" data-i18n-skip>C</div><div class="pool-main"><b>外包 02 · 巡检位</b><span><span>巡检 / 调研</span> · <span>双队</span></span></div><span class="badge mint">外包</span></div>
+              </div>
+              <div class="pool-note">共享池保留成员与外包位；总览负责当前工作指标，双队负责队伍分配和并发控制。</div>
+            </aside>
+          </div>
+          <div class="dual-utility-grid">
+            <details class="panel mailbox-panel">
+              <summary><h2>跨队邮箱</h2><span class="badge faint" id="mailbox-mode-badge">低频审批</span><span class="mailbox-summary-note">有待批准消息时展开 · 未批准不可见</span><span class="badge amber" id="mail-pending-count">2 待批</span></summary>
+              <div class="mailbox-content">
+                <div class="action-list">
+                  <div class="action-row" data-mail-row="a2b"><div class="icon" style="color:var(--indigo)"><span data-lucide="message-square"></span></div><div class="action-main"><b><span data-i18n-skip>A → B ·</span> 接口契约变更说明</b><span>来自 A 队 · 等待队长批准；B 队当前看不到</span></div><span class="badge amber" data-mail-state="a2b">待批准</span><button class="btn sm" type="button" data-mail-approve="a2b">批准</button><button class="btn sm ghost" type="button" data-mail-reject="a2b">驳回</button></div>
+                  <div class="action-row" data-mail-row="b2a"><div class="icon" style="color:var(--mint)"><span data-lucide="message-square"></span></div><div class="action-main"><b><span data-i18n-skip>B → A ·</span> 回归测试结果</b><span>来自 B 队 · 等待队长批准；A 队当前看不到</span></div><span class="badge amber" data-mail-state="b2a">待批准</span><button class="btn sm" type="button" data-mail-approve="b2a">批准</button><button class="btn sm ghost" type="button" data-mail-reject="b2a">驳回</button></div>
+                </div>
+                <div class="hint" id="mail-mode-hint">规则：A/B 只能通过邮箱联系；未批准的消息不可见、不可用，不能绕过队长；消息经队长批准后才投递。</div>
+              </div>
+            </details>
+            <div class="panel dual-utility-note">
+              <div class="panel-head"><h2>协作重点</h2><span class="badge mint">队长视角</span></div>
+              <div class="action-list">
+                <div class="action-row"><div class="icon" style="color:var(--mint)"><span data-lucide="check-circle-2"></span></div><div class="action-main"><b>共享池正常</b><span>队员按任务难度动态借调，不固定切成 3+3。</span></div></div>
+                <div class="action-row"><div class="icon" style="color:var(--indigo)"><span data-lucide="arrow-left-right"></span></div><div class="action-main"><b>跨队依赖可追踪</b><span>只在确有消息时打开低频审批区。</span></div></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="page" id="page-tasks">
+              <div class="page-head"><div><h1>任务</h1><p id="task-page-sub">双队 · 24 个任务 · 1 进行中 · 16 等待 · 7 已完成 · 依赖树可拖动</p></div></div>
+          <div class="task-toolbar">
+
+            <span class="badge indigo" id="team-mode-badge">双队</span>
+            <span class="muted" id="task-dependency-legend">实线为已完成/进行中的队内依赖；虚线为跨队交付或队内等待依赖；拖动只调整布局，不改变任务关系</span>
+            <div class="task-toolbar-actions"><button class="btn sm ghost" type="button" data-task-overview-toggle data-overview-label="text" aria-expanded="true" aria-controls="task-overview-panel">收起任务总览</button><button class="btn sm ghost" type="button" data-dag-action="layout"><span class="icon" data-lucide="layout-grid" aria-hidden="true"></span>自动布局</button><button class="btn sm ghost" type="button" data-dag-action="reset-view"><span class="icon" data-lucide="maximize-2" aria-hidden="true"></span>复位视图</button></div>
+          </div>
+          <div class="task-workspace" id="task-workspace">
+            <div class="panel graph-panel dag-large" id="task-tree-view">
+              <div class="panel-head"><div class="panel-head-title"><h2>任务树</h2><span class="muted">点击任务块查看详情 · 拖动节点 · 线自动跟随</span></div><div class="panel-actions"><button class="flow-switch" id="edge-flow-toggle" type="button" role="switch" aria-checked="true" aria-label="流向动画"><span class="flow-track" aria-hidden="true"><i></i></span><span>流向</span></button><span class="line-legend" aria-label="连线说明"><span><i class="line"></i>实线：已完成 / 进行中队内依赖</span><span><i class="line dashed"></i>虚线：跨队交付或队内等待</span></span><span class="badge mint" id="task-panel-badge">7/24 已交付</span><button class="btn sm ghost task-dark-control" type="button" data-dag-action="layout" aria-label="自动布局" title="自动布局：重新排列任务节点"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></button><button class="btn sm ghost task-dark-control" type="button" data-dag-action="reset-view" aria-label="复位视图" title="复位视图：恢复任务树初始视角"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3H3v5M16 3h5v5M21 16v5h-5M8 21H3v-5M3 3l6 6M21 3l-6 6M21 21l-6-6M3 21l6-6"/></svg></button><button class="btn sm ghost task-dark-control task-overview-expand" type="button" data-task-overview-toggle data-overview-label="icon" aria-label="展开任务总览" title="展开任务总览" aria-expanded="true" aria-controls="task-overview-panel"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16M10 9l-3 3 3 3"/></svg></button></div></div>
+              <div class="graph-wrap" id="dag-canvas" data-i18n-skip></div>
+              <div class="graph-foot"><span class="legend"><span class="dot" style="background:var(--mint)"></span>已完成</span><span class="legend"><span class="dot" style="background:var(--run)"></span>进行中</span><span class="legend"><span class="dot" style="background:var(--faint)"></span>等待依赖</span><span class="legend"><span class="dot" style="background:var(--rose)"></span>失败</span><span class="legend"><span class="dot" style="background:var(--faint);opacity:.35"></span>焦点外变暗</span><span style="margin-left:auto">点击任务块打开详情 · Esc 关闭详情并清除高亮</span></div>
+              <div class="task-detail" id="task-detail-panel" role="dialog" aria-labelledby="task-detail-title" hidden aria-hidden="true">
+                <div class="task-detail-head"><div class="avatar indigo" id="task-detail-avatar" data-i18n-skip>T2</div><div><h2 id="task-detail-title" data-i18n-skip>A-T2 · A队 · 跨队输入汇总</h2><p id="task-detail-sub" data-i18n-skip>A队 · 接收B队基线包后冻结输入</p></div><span class="badge indigo" id="task-detail-status">进行中</span><button class="btn sm ghost task-detail-close" type="button" data-task-detail-close>关闭</button></div>
+                <div class="task-detail-tabs" role="tablist" aria-label="任务详情视图"><button class="task-detail-tab active" id="task-detail-tab-summary" type="button" role="tab" aria-selected="true" aria-controls="task-detail-view-summary" tabindex="0" data-task-detail-tab="summary">任务说明</button><button class="task-detail-tab" id="task-detail-tab-session" type="button" role="tab" aria-selected="false" aria-controls="task-detail-view-session" tabindex="-1" data-task-detail-tab="session">具体会话</button></div>
+                <div class="task-detail-view" id="task-detail-view-summary" role="tabpanel" aria-labelledby="task-detail-tab-summary" data-task-detail-view="summary">
+                  <div class="task-detail-desc" id="task-detail-desc" data-i18n-skip>—</div>
+                  <div class="kv-grid"><div>范围<b id="task-detail-scope" data-i18n-skip>A队 A-T2</b></div><div>验收<b id="task-detail-acceptance" data-i18n-skip>接收B队 B-T3b 基线包并冻结输入</b></div><div>交付物<b id="task-detail-deliverables" data-i18n-skip>—</b></div><div>风险<b id="task-detail-risks" data-i18n-skip>—</b></div><div>工作树<b id="task-detail-worktree" data-i18n-skip class="mono">—</b></div><div>合并<b id="task-detail-merge">等待输入冻结</b></div><div>上游<b id="task-detail-upstream" data-i18n-skip>A-T1 · B-T3b</b></div><div>下游<b id="task-detail-downstream" data-i18n-skip>A-T3a · A-T3b</b></div><div>已运行<b id="task-detail-runtime">—</b></div><div>进展<b id="task-detail-progress">等待会话数据</b></div><div>负责人<b id="task-detail-owner">A队</b></div><div>协作<b id="task-detail-collab">—</b></div></div>
+                </div>
+                <div class="task-detail-view session-panel" id="task-detail-view-session" role="tabpanel" aria-labelledby="task-detail-tab-session" data-task-detail-view="session" hidden>
+                  <div class="session-meta"><span class="badge indigo" id="task-session-state">未接入</span><span class="muted" id="task-session-owner">会话负责人 · —</span></div>
+                  <pre id="task-session-content" data-i18n-skip class="empty">等待接入实时会话。接入后由 daemon 把该任务的对话内容实时同步到这里。</pre>
+                </div>
+              </div>
+            </div>
+            <div class="panel task-list-panel" id="task-overview-panel">
+              <div class="panel-head"><button class="btn sm ghost task-dark-control task-overview-collapse" type="button" data-task-overview-toggle data-overview-label="icon" aria-label="收起任务总览" title="收起任务总览" aria-expanded="true" aria-controls="task-overview-panel"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16M8 9l3 3-3 3"/></svg></button><h2>任务总览</h2><span class="muted">负责人、状态与上游</span><div class="panel-actions"><span class="badge" id="task-list-count">0</span></div></div>
+              <div class="task-list" id="task-list"></div>
+            </div>
+          </div>
+</section>
+
+        <section class="page" id="page-members">
+          <div class="page-head"><div><h1>成员</h1><p id="members-page-sub">A队 · 4 在岗 / 1 冷存 · 共享池总计 6 队员 + 2 外包</p></div></div>
+          <div class="member-team-filter" role="group" aria-label="按队伍查看成员"><button class="btn sm ghost" type="button" data-member-team-filter="all" aria-pressed="true">全部队伍</button><button class="btn sm ghost" type="button" data-member-team-filter="alpha" aria-pressed="false">A队</button><button class="btn sm ghost" type="button" data-member-team-filter="beta" aria-pressed="false">B队</button></div>
+          <div class="stats">
+            <div class="stat"><div class="stat-label"><span>已创建成员</span><span class="icon" data-lucide="users"></span></div><div class="stat-value">5</div><div class="stat-foot">A队 · 4 在岗 / 1 冷存</div><div class="stat-track"><i style="width:100%"></i></div></div>
+            <div class="stat member-residency-card"><div class="stat-label"><span class="member-residency-light-label">在岗 / 未在岗</span><span class="member-residency-dark-label">成员状态</span><span class="icon" data-lucide="thermometer"></span></div><div class="stat-value">4 / 1</div><div class="member-residency-counts"><span><b data-member-active>4</b><small>人在岗</small></span><span><b data-member-cold>1</b><small>人未在岗</small></span></div><div class="stat-foot">A队当前状态</div><div class="stat-track"><i style="width:60%"></i></div></div>
+            <div class="stat"><div class="stat-label"><span>已结算</span><span class="icon" data-lucide="badge-check"></span></div><div class="stat-value">5</div><div class="stat-foot">可换号牌 / 复用</div><div class="stat-track"><i style="width:17%"></i></div></div>
+            <div class="stat"><div class="stat-label"><span>只读权限</span><span class="icon" data-lucide="lock"></span></div><div class="stat-value">3</div><div class="stat-foot">验证 / 审核 / 交付</div><div class="stat-track"><i style="width:60%"></i></div></div>
+          </div>
+          <div class="member-layout">
+            <div class="panel table-wrap">
+              <div class="panel-head"><h2>队员与名称代号</h2><span class="muted">名称与共享池一致 · 代号不可更改 · 内部 ID 不显示</span></div>
+              <table><thead><tr><th>名称代号</th><th>职责</th><th>状态</th><th>当前任务</th><th>进度</th></tr></thead><tbody>
+                <tr class="selected" data-member="order"><td><div class="member-cell"><div class="avatar amber" data-i18n-skip>A</div><div><b>A-01</b><span class="code">A-01</span></div></div></td><td><span class="badge indigo">工程师</span><div class="tiny muted">实现、修复</div></td><td><span class="dot" style="background:var(--member-warm-dot, var(--amber))"></span> 温</td><td data-i18n-skip>A-T2</td><td><div class="mini-track"><i style="width:100%"></i></div><div class="tiny muted" data-i18n-skip>2/2</div></td></tr>
+                <tr data-member="build"><td><div class="member-cell"><div class="avatar mint" data-i18n-skip>A</div><div><b>A-02</b><span class="code">A-02</span></div></div></td><td><span class="badge mint">验证</span><div class="tiny muted">只读 · 验证</div></td><td><span class="dot" style="background:var(--member-warm-dot, var(--amber))"></span> 温</td><td data-i18n-skip>A-T3a</td><td><div class="mini-track"><i style="width:100%"></i></div><div class="tiny muted" data-i18n-skip>2/2</div></td></tr>
+                <tr data-member="release"><td><div class="member-cell"><div class="avatar violet" data-i18n-skip>A</div><div><b>A-03</b><span class="code">A-03</span></div></div></td><td><span class="badge">交付</span><div class="tiny muted">只读 · 文档、归档</div></td><td><span class="dot" style="background:var(--faint)"></span> 冷</td><td data-i18n-skip>A-T7</td><td><div class="mini-track"><i style="width:100%"></i></div><div class="tiny muted" data-i18n-skip>2/2</div></td></tr>
+                <tr data-member="review"><td><div class="member-cell"><div class="avatar violet" data-i18n-skip>A</div><div><b>A-04</b><span class="code">A-04</span></div></div></td><td><span class="badge violet">审核</span><div class="tiny muted">只读 · 审核、需求</div></td><td><span class="dot" style="background:var(--member-warm-dot, var(--amber))"></span> 温</td><td data-i18n-skip>A-T6a</td><td><div class="mini-track"><i style="width:100%"></i></div><div class="tiny muted" data-i18n-skip>2/2</div></td></tr>
+                <tr data-member="refactor"><td><div class="member-cell"><div class="avatar indigo" data-i18n-skip>A</div><div><b>A-05</b><span class="code">A-05</span></div></div></td><td><span class="badge indigo">工程师</span><div class="tiny muted">实现</div></td><td><span class="dot" style="background:var(--member-warm-dot, var(--amber))"></span> 温</td><td data-i18n-skip>A-T1</td><td><div class="mini-track"><i style="width:100%"></i></div><div class="tiny muted" data-i18n-skip>1/1</div></td></tr>
+              </tbody></table>
+            </div>
+            <aside class="panel">
+              <div class="panel-head"><h2>成员详情</h2><span class="badge mint">已结算</span></div>
+              <div class="detail-body">
+                <div class="detail-top"><div class="avatar amber" id="detail-avatar" data-i18n-skip>A</div><div><b id="detail-name" data-i18n-skip>A-01</b><span id="detail-role" data-i18n-skip>A-01 · 工程师</span></div></div>
+                <div class="license"><b>身份与权限</b><span>号牌：<i id="detail-license-name" data-i18n-skip>A-01</i> · 系统自动更换</span><span>代号：<i id="detail-code" data-i18n-skip class="code">A-01</i> · 不可更改</span><span id="detail-scope">实现、修复 · src/v1.88-modular/**</span><span id="detail-tools">工具：可写工作区</span><span class="mono">内部 ID 已隐藏</span></div>
+                <dl class="kv"><dt>驻留</dt><dd id="detail-residency">温 · 已结算</dd><dt>任务</dt><dd id="detail-task" data-i18n-skip>A-T2 · A-T4b · 2/2</dd><dt>主目录</dt><dd><span class="mono" id="detail-home">不展示（隐私）</span></dd><dt>上下文</dt><dd id="detail-context">已归档 · 可复用</dd></dl>
+                <div class="action-grid"><button class="btn sm" type="button" data-toast="会话内容由系统提供，控制台只展示任务与事件数据" data-readonly><span class="icon" data-lucide="message-square"></span>查看会话</button><button class="btn sm" type="button" id="change-badge"><span class="icon" data-lucide="badge-check"></span>换号牌</button><button class="btn sm" type="button" data-toast="成员已冷存"><span class="icon" data-lucide="snowflake"></span>冷存</button><button class="btn sm ghost" type="button" data-toast="号牌历史由系统维护，控制台只读展示" data-readonly><span class="icon" data-lucide="history"></span>号牌历史</button></div>
+                <div class="hint">代号由系统生成，永远不变；号牌由系统按结算状态自动更换，控制台只读展示。</div>
+              </div>
+            </aside>
+          </div>
+        </section>
+
+        <section class="page" id="page-merge">
+          <div class="page-head"><div><h1>审核与合并</h1><p>审核员签合并单，合并执行员只执行，合并后由外包审查员复核</p></div></div>
+          <div class="merge-layout">
+            <div class="merge-side">
+              <div class="panel">
+                <div class="panel-head"><h2>合并队列</h2><span class="badge mint" id="merge-queue-count">0 待批准 · 共 0</span><span class="muted" style="margin-left:auto">串行</span></div>
+                <div id="merge-queue-list"></div>
+                <div class="queue-empty" id="merge-queue-empty" style="padding:24px 13px;text-align:center;color:var(--muted);font-size:11px">当前没有待处理的合并单</div>
+              </div>
+              <div class="panel merge-rules">
+                <div class="panel-head"><h2>合并规则</h2><span class="badge faint">只执行</span></div>
+                <div class="merge-rule-list">
+                  <div class="merge-rule"><span class="merge-rule-index">1</span><div><b>审核员签单</b><span>独立审核通过后才进入待执行队列。</span></div></div>
+                  <div class="merge-rule"><span class="merge-rule-index">2</span><div><b>合并员只执行</b><span>不改代码；冲突不强制解决，回滚并驳回。</span></div></div>
+                  <div class="merge-rule"><span class="merge-rule-index">3</span><div><b>合并后外包复核</b><span>一次性只读审查，结果写回审计。</span></div></div>
+                </div>
+              </div>
+            </div>
+            <div class="panel">
+              <div class="panel-head"><h2>合并执行单</h2><span class="badge amber" id="merge-panel-status">待你批准</span><span class="muted" style="margin-left:auto">合并员不改代码</span></div>
+              <div class="merge-detail">
+                <div class="merge-hero"><div class="icon-box"><span class="icon" data-lucide="git-pull-request"></span></div><div><h2 id="merge-hero-title"><span data-i18n-skip>T-099</span> 优惠券金额格式化</h2><p id="merge-hero-sub">A-04 → 合并执行员 → 外包审查员</p></div><span class="badge mint" id="merge-verdict" style="margin-left:auto">独立审核通过</span></div>
+                <dl class="kv"><dt>批准 commit</dt><dd><span class="mono" id="merge-commit" data-i18n-skip>7f3a2c1</span></dd><dt>集成分支</dt><dd><span class="mono" id="merge-branch" data-i18n-skip>integration/alpha/T-099/7f3a2c1</span></dd><dt>目标分支</dt><dd>main</dd><dt>合并后审查</dt><dd>外包审查员 · 一次性 · 只读</dd></dl>
+                <div><div class="merge-section-title">合并前检查 <span class="badge mint" id="merge-check-count">4/4 通过</span></div><div class="checklist" id="merge-checklist"></div></div>
+                <div class="merge-actions"><span class="merge-action-note">合并员不改代码 · 冲突时自动回滚</span><div class="merge-action-buttons"><button class="btn danger" type="button" id="merge-reject"><span class="icon" data-lucide="undo-2"></span>驳回并回滚</button><button class="btn primary" type="button" id="merge-approve"><span class="icon" data-lucide="git-merge"></span>通过并进主分支</button></div></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="page" id="page-patrol">
+          <div class="page-head"><div><h1>巡检</h1><p>队长空闲时自己巡检；队长忙时交给一次性巡检工，扫完即关</p></div></div>
+          <div class="two-col">
+            <div class="panel"><div class="patrol-hero"><div class="icon-box"><span class="icon" data-lucide="radar"></span></div><div><h2>队长巡检中</h2><p>上次 2 分钟前 · 下次 07:23 · 只读检查任务、diff、测试、消息</p></div><span class="badge mint" style="margin-left:auto" id="patrol-state">运行中</span></div>
+              <div class="timeline"><div class="tl-row"><span class="tl-dot done"></span><div><b>心跳与租约</b><span>6 名成员 · 无过期 lease</span></div><span class="badge mint">通过</span></div><div class="tl-row"><span class="tl-dot done"></span><div><b>工作区范围</b><span>24 个任务 · 无越界文件</span></div><span class="badge mint">通过</span></div><div class="tl-row"><span class="tl-dot active"></span><div><b>任务依赖</b><span>A-T2 进行中，A-T3a · A-T3b 等待</span></div><span class="badge indigo">检查中</span></div><div class="tl-row"><span class="tl-dot"></span><div><b>合并队列</b><span>等待 T-099 合并后复核</span></div><span class="badge">待办</span></div></div>
+            </div>
+            <aside class="panel"><div class="panel-head"><h2>发现</h2><span class="badge amber">2 条</span></div><div class="findings"><div class="finding"><b>A-T2 输入范围偏大</b><span>A-01 · 2 个文件 · 低风险</span><div style="margin-top:4px"><button class="btn sm ghost" type="button" data-toast="已提醒成员收敛范围">提醒</button><button class="btn sm ghost" type="button" data-toast="已暂停任务">暂停</button></div></div><div class="finding"><b>巡检预算</b><span>剩余 4 次 / 小时 · 仅异常时唤醒 AI</span></div></div></aside>
+          </div>
+        </section>
+
+        <section class="page" id="page-audit">
+          <div class="page-head"><div><h1>审计</h1><p>只追加，不可修改 · 任务、号牌、合并、巡检全部留痕</p></div></div>
+          <div class="panel">
+            <div class="panel-head"><h2>事件记录</h2><span class="muted">只追加 · 按时间倒序</span><span class="badge" id="audit-count">5 条</span></div>
+            <div class="table-scroll"><table class="event-table"><thead><tr><th>时间</th><th>事件</th><th>对象</th><th>结果</th></tr></thead><tbody id="audit-body"><tr><td data-i18n-skip>16:42:18</td><td>task.awaiting_approval</td><td><span data-i18n-skip>T-099 ·</span> 合并执行员</td><td><span class="badge amber">等待</span></td></tr><tr><td data-i18n-skip>16:41:55</td><td>merge.precheck_passed</td><td data-i18n-skip>T-099 · A-04</td><td><span class="badge mint">通过</span></td></tr><tr><td data-i18n-skip>16:38:12</td><td>member.relicensed</td><td><span data-i18n-skip>A-01 ·</span> 新号牌</td><td><span class="badge indigo">已结算</span></td></tr><tr><td data-i18n-skip>16:30:04</td><td>task.stalled</td><td data-i18n-skip>A-T2 · attempt 1</td><td><span class="badge amber">重试</span></td></tr><tr><td data-i18n-skip>16:22:37</td><td>patrol.finding</td><td><span data-i18n-skip>A-T2 ·</span> 范围偏大</td><td><span class="badge amber">提醒</span></td></tr></tbody></table></div></div>
+        </section>
+
+        <section class="page" id="page-settings">
+          <div class="page-head"><div><h1>设置</h1><p>系统当前策略；控制台只读，业务动作由 captain/daemon 自动判断</p></div></div>
+          <div class="settings-grid">
+            <div class="panel setting wide mode-panel">
+              <div class="setting-head"><h3>运行模式</h3><span class="badge indigo" id="mode-badge">标准</span></div>
+              <p>日常动作自动执行。高风险操作由 captain 判定；完全访问会关闭所有审批并锁定设置。</p>
+              <div class="mode-grid">
+                <button class="mode-card selected" type="button" data-run-mode="standard"><b>标准</b><span>高风险由 captain 判定</span><em>任务派发、换号牌、创建团队自动</em></button>
+                <button class="mode-card" type="button" data-run-mode="full"><b>完全访问</b><span>全部默认通过</span><em>设置锁定 · 审计/硬停保留</em></button>
+              </div>
+              <div class="setting-warning" id="full-access-warning" hidden>完全访问已开启：所有审批默认通过，设置不可修改。退出后才能调整。</div>
+            </div>
+            <div class="panel setting"><h3>界面语言</h3><p><span data-i18n="立即切换控制台语言；选择会保存在当前浏览器中。">立即切换控制台语言；选择会保存在当前浏览器中。</span></p><div class="setting-row"><label for="locale-select">界面语言</label><select id="locale-select" aria-label="界面语言"><option value="zh-CN">简体中文</option><option value="en-US">English</option><option value="ja-JP">日本語</option><option value="ko-KR">한국어</option></select></div></div>
+            <div class="panel setting"><h3>队员并发上限</h3><p>实时快照只读；容量由系统配置，双队按任务难度动态抽调。</p><div class="setting-row"><span>队员上限</span><span class="badge" id="settings-worker-capacity">6</span></div><div class="setting-row"><span>当前分配</span><span class="badge" id="settings-assignment">A队 4 · B队 2</span></div><div class="setting-row"><span>外包位</span><span class="badge" id="settings-contractor-capacity">合并 1 + 巡检 1</span></div></div>
+            <div class="panel setting"><h3>高风险审批</h3><p>只对这些操作由 captain 判定；普通派发、创建团队、换号牌默认自动。</p><div class="setting-row"><span>合并到主分支</span><span class="badge amber" id="risk-merge">需要确认</span></div><div class="setting-row" id="risk-mail-row"><span>跨队消息</span><span class="badge amber" id="risk-mail">队长审批</span></div></div>
+            <div class="panel setting wide"><details><summary>高级设置</summary><div class="setting-row"><span>连续自动操作上限</span><span class="badge">20 步</span></div><p class="hint">达到系统设置的任务回合上限后暂停一次，防止全自动跑飞；完全访问模式下忽略。它不是 token 上限。</p><div class="setting-row"><span>任务超时</span><span class="badge">120 分钟</span></div></details></div>
+          </div>
+        </section>
+
+
+      </div>
+    </main>
+  </div>
+
+  <div class="modal-backdrop" id="task-modal" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="task-modal-title">
+      <h2 id="task-modal-title">新建任务</h2>
+      <div class="field"><label for="task-subject">任务标题</label><input id="task-subject" placeholder="例如：登录页错误提示与重试按钮"></div>
+      <div class="field"><label for="task-role">执行角色</label><select id="task-role"><option>工程师</option><option>审核员</option><option>合并执行员</option><option>验证员</option></select></div>
+      <div class="field"><label for="task-scope">范围</label><input id="task-scope" placeholder="src/web/auth/**"></div>
+      <div class="field"><label for="task-acceptance">验收标准</label><input id="task-acceptance" placeholder="错误提示出现，重试可用，测试通过"></div>
+      <div class="modal-actions"><button class="btn ghost" type="button" id="task-cancel">取消</button><button class="btn primary" type="button" id="task-create">创建任务</button></div>
+    </div>
+  </div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <!-- AGENT_TEAMS_UI_BOOTSTRAP -->
+  <!-- BEGIN GENERATED I18N (scripts/build-i18n.mjs) -->
+<!-- END GENERATED I18N -->
+  <script src="./team-view-live.js"></script>
+  <script src="./team-view-app.js"></script>
+  <script src="./team-view-patrol.js"></script>
+  <script src="./team-view-stream.js"></script>
+  <script src="./team-view-theme.js"></script>
+</div>
+</body>
+</html>

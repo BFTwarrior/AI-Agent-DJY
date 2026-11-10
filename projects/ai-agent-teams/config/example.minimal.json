@@ -1,0 +1,94 @@
+{
+  "$schema": "./schema.json",
+  "version": 1,
+  "captain": {
+    "name": "captain",
+    "model": null,
+    "maxTeams": 2
+  },
+  "teams": [
+    {
+      "id": "alpha",
+      "name": "Alpha",
+      "lead": "alpha-lead",
+      "defaultMembers": 16,
+      "maxMembers": 32,
+      "baseBranch": "main"
+    },
+    {
+      "id": "beta",
+      "name": "Beta",
+      "lead": "beta-lead",
+      "defaultMembers": 16,
+      "maxMembers": 32,
+      "baseBranch": "main"
+    }
+  ],
+  "scheduler": {
+    "activeWorkerSlots": 2,
+    "maxActivePerTeam": 1,
+    "fairness": "equal",
+    "maxTurnsPerTask": 30,
+    "taskTimeoutMinutes": 120,
+    "idleSessionMinutes": 30
+  },
+  "isolation": {
+    "mode": "worktree",
+    "imagePullPolicy": "never",
+    "network": "none",
+    "readOnlyRoot": false,
+    "nonRoot": false,
+    "cpuLimit": 2,
+    "memoryMb": 2048,
+    "pidsLimit": 512
+  },
+  "interruption": {
+    "defaultDelivery": "queue",
+    "urgentDelivery": "guide",
+    "hardStop": "stop",
+    "cancelBackgroundTasks": true
+  },
+  "zcode": {
+    "cliPath": "auto",
+    "protocol": "app-server",
+    "mode": "build",
+    "locale": "auto",
+    "timezone": "auto",
+    "defaultModel": null,
+    "defaultReasoning": null,
+    "maxRequestsPerMinute": 0,
+    "maxConcurrentSessions": 6,
+    "memberMcpServers": "minimal",
+    "turnWatchIntervalMs": 2000,
+    "turnFailureRetry": {
+      "enabled": true,
+      "maxAttempts": 3,
+      "baseDelayMs": 3000,
+      "maxDelayMs": 60000
+    }
+  },
+  "storage": {
+    "database": ".ai-agent-teams/state.db",
+    "archiveDays": 30
+  },
+  "quality": {
+    "kinds": [
+      "requirements",
+      "implementation",
+      "verification",
+      "review",
+      "repair",
+      "integration"
+    ],
+    "requireIndependentReview": true,
+    "maxReviewRounds": 3,
+    "verifyCommands": [],
+    "reviewPolicy": {
+      "requirementsMinRounds": 1,
+      "requirementsMaxRounds": 2,
+      "codeMaxRounds": 3,
+      "maxRepairAttempts": 2,
+      "requiredReviewers": []
+    }
+  }
+}

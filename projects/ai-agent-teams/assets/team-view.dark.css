@@ -1,0 +1,695 @@
+/* Dark Soft UI: monochrome surfaces, gentle raised cards and recessed controls.
+   Presentation only. No task data, event handlers, IDs, or light styles change.
+   01 Tokens | 02 Type floor | 03 Shell | 04 Surfaces | 05 Controls
+   06 Data | 07 Graph states | 08 Existing controls | 09 Adaptation */
+html[data-theme="dark"] { color-scheme: dark; --page-bg: #171b22; }
+html[data-theme="dark"] body { background: #171b22; }
+  html[data-theme="dark"] #agent-teams-ui {
+    color-scheme: dark;
+    --font-caption: 13px;
+    --font-body: 15px;
+    --font-control: 14px;
+    --accent: #2867b0;
+    --r-lg: 18px;
+    --r-md: 12px;
+    --r-sm: 9px;
+    --glass-blur: 0px;
+    --soft-surface: #242a33;
+    --soft-card: #2a313a;
+    --soft-selected: #364350;
+    --soft-selected-shadow: -1px -1px 3px rgba(255,255,255,.035), 0 4px 9px rgba(0,0,0,.35);
+    --soft-hover: #2d3643;
+    --soft-inset-bg: #1c222a;
+    --soft-overlay: #2b333f;
+    --soft-edge: rgba(255,255,255,.035);
+    --soft-raised: -2px -2px 6px rgba(255,255,255,.025), 0 5px 12px rgba(0,0,0,.25);
+    --soft-control: -3px -3px 7px rgba(255,255,255,.04), 3px 4px 8px rgba(0,0,0,.32);
+    --soft-inset: inset 3px 3px 7px rgba(0,0,0,.34), inset -2px -2px 6px rgba(255,255,255,.035);
+    --soft-shallow: 0 2px 4px rgba(0,0,0,.14);
+    --shadow-raised: var(--soft-raised);
+    --shadow-control: var(--soft-control);
+    --shadow-pressed: var(--soft-inset);
+    --motion-fast: 150ms;
+    --motion-ease: cubic-bezier(.2,.7,.2,1);
+    --bg: #171b22;
+    --surface: #242a33;
+    --surface-2: #2a323e;
+    --surface-3: #303a48;
+    --surface-solid: #242a33;
+    --surface-solid-2: #2b333f;
+    --tree-canvas: rgba(8,10,14,.72);
+    --tree-node-base: #202630;
+    --tree-dot: rgba(255,255,255,.09);
+    --tree-alpha-bg: #142033;
+    --tree-alpha-bd: #60a5fa;
+    --tree-alpha-title: #f5f7fa;
+    --tree-alpha-meta: #b6c2d2;
+    --tree-alpha-focus-bg: #1b2c47;
+    --tree-alpha-focus-bd: #93c5fd;
+    --tree-alpha-selected-bg: #223a5c;
+    --tree-alpha-selected-bd: #93c5fd;
+    --tree-beta-bg: #10251c;
+    --tree-beta-bd: #4ade80;
+    --tree-beta-title: #f5f7fa;
+    --tree-beta-meta: #b6c2d2;
+    --tree-beta-focus-bg: #163327;
+    --tree-beta-focus-bd: #86efac;
+    --tree-beta-selected-bg: #1b4233;
+    --tree-beta-selected-bd: #86efac;
+    --tree-waiting-bg: #181b21;
+    --tree-waiting-bd: #94a3b8;
+    --tree-waiting-title: #f5f7fa;
+    --tree-waiting-meta: #aeb9c7;
+    --tree-waiting-focus-bg: #20242c;
+    --tree-waiting-focus-bd: #cbd5e1;
+    --tree-waiting-selected-bg: #272c35;
+    --tree-waiting-selected-bd: #cbd5e1;
+    --tree-failed-bg: #2a1418;
+    --tree-failed-bd: #f87171;
+    --tree-failed-title: #f5f7fa;
+    --tree-failed-meta: #e3b8be;
+    --tree-failed-focus-bg: #3a1b21;
+    --tree-failed-focus-bd: #fca5a5;
+    --tree-failed-selected-bg: #4a1f27;
+    --tree-failed-selected-bd: #fca5a5;
+    --tree-cancelled-bg: #171a20;
+    --tree-cancelled-bd: #7c8798;
+    --tree-cancelled-title: #d7dee8;
+    --tree-cancelled-meta: #9aa6b5;
+    --tree-cancelled-focus-bg: #1e222a;
+    --tree-cancelled-focus-bd: #94a3b8;
+    --tree-cancelled-selected-bg: #252a33;
+    --tree-cancelled-selected-bd: #94a3b8;
+    --tree-edge-alpha: #60a5fa;
+    --tree-edge-beta: #4ade80;
+    --tree-edge-waiting: #64748b;
+    --tree-edge-failed: #f87171;
+    --tree-edge-cancelled: #7c8798;
+    --tree-status-done: #34d399;
+    --tree-status-waiting: #94a3b8;
+    --tree-status-failed: #f87171;
+    --tree-status-cancelled: #7c8798;
+    --glass: #242a33;
+    --glass-strong: #2b333f;
+    --line: rgba(255,255,255,.065);
+    --line-strong: rgba(255,255,255,.18);
+    --rail-bg: #242a33;
+    --rail-text: #e8edf5;
+    --rail-muted: #b4bfce;
+    --rail-faint: #a5b2c3;
+    --rail-line: rgba(255,255,255,.05);
+    --rail-child: rgba(255,255,255,.04);
+    --rail-hover: rgba(255,255,255,.07);
+    --rail-active: rgba(96,165,250,.16);
+    --text: #e8edf5;
+    --muted: #b4bfce;
+    --faint: #a5b2c3;
+    --indigo: #9dbfe5;
+    --indigo-soft: rgba(96,165,250,.16);
+    --mint: #79c8ac;
+    --mint-soft: rgba(52,211,153,.14);
+    --amber: #ddb883;
+    --amber-soft: rgba(251,146,60,.14);
+    --run: #ffffff;
+    --rose: #e6a0a7;
+    --rose-soft: rgba(248,113,113,.14);
+    --violet: #b9acd8;
+    --violet-soft: rgba(148,163,184,.14);
+    --shadow-color: rgba(0,0,0,.42);
+    --glow-strong: rgba(255,255,255,.07);
+    --glow-soft: rgba(255,255,255,.06);
+    --code-text: #bac9db;
+    --topbar-bg: #242a33;
+    --inset-highlight-soft: rgba(255,255,255,.025);
+    --sidebar-fallback: #242a33;
+  }
+
+
+/* 02 Readability floor for the shared compact prototype. */
+html[data-theme="dark"] #agent-teams-ui .brand span,
+html[data-theme="dark"] #agent-teams-ui .workspace .ws-avatar,
+html[data-theme="dark"] #agent-teams-ui .workspace b,
+html[data-theme="dark"] #agent-teams-ui .workspace span,
+html[data-theme="dark"] #agent-teams-ui .nav-label,
+html[data-theme="dark"] #agent-teams-ui .nav-item,
+html[data-theme="dark"] #agent-teams-ui .nav-item .nav-badge,
+html[data-theme="dark"] #agent-teams-ui .rail-status,
+html[data-theme="dark"] #agent-teams-ui .rail-status .label,
+html[data-theme="dark"] #agent-teams-ui .rail-status .rail-status-tag,
+html[data-theme="dark"] #agent-teams-ui .crumb,
+html[data-theme="dark"] #agent-teams-ui .pill,
+html[data-theme="dark"] #agent-teams-ui .avatar,
+html[data-theme="dark"] #agent-teams-ui .btn,
+html[data-theme="dark"] #agent-teams-ui .btn.sm,
+html[data-theme="dark"] #agent-teams-ui .icon[data-lucide]::before,
+html[data-theme="dark"] #agent-teams-ui .icon[data-lucide="pause"]::before,
+html[data-theme="dark"] #agent-teams-ui .icon[data-lucide="bell"]::before,
+html[data-theme="dark"] #agent-teams-ui .page-head p,
+html[data-theme="dark"] #agent-teams-ui .small,
+html[data-theme="dark"] #agent-teams-ui .tiny,
+html[data-theme="dark"] #agent-teams-ui .mono,
+html[data-theme="dark"] #agent-teams-ui .badge,
+html[data-theme="dark"] #agent-teams-ui .stat-label,
+html[data-theme="dark"] #agent-teams-ui .stat-foot,
+html[data-theme="dark"] #agent-teams-ui .panel-head h2,
+html[data-theme="dark"] #agent-teams-ui .panel-head .muted,
+html[data-theme="dark"] #agent-teams-ui .captain-top b,
+html[data-theme="dark"] #agent-teams-ui .captain-top span,
+html[data-theme="dark"] #agent-teams-ui .captain-meta,
+html[data-theme="dark"] #agent-teams-ui .progress-mini,
+html[data-theme="dark"] #agent-teams-ui .roster-row .avatar,
+html[data-theme="dark"] #agent-teams-ui .roster-row b,
+html[data-theme="dark"] #agent-teams-ui .roster-row span,
+html[data-theme="dark"] #agent-teams-ui .gnode .gid,
+html[data-theme="dark"] #agent-teams-ui .gnode .grole,
+html[data-theme="dark"] #agent-teams-ui .gnode .gstatus,
+html[data-theme="dark"] #agent-teams-ui .grrot,
+html[data-theme="dark"] #agent-teams-ui .task-detail-tab,
+html[data-theme="dark"] #agent-teams-ui .task-detail-desc,
+html[data-theme="dark"] #agent-teams-ui .session-panel pre,
+html[data-theme="dark"] #agent-teams-ui .session-meta,
+html[data-theme="dark"] #agent-teams-ui .flow-switch,
+html[data-theme="dark"] #agent-teams-ui .graph-foot,
+html[data-theme="dark"] #agent-teams-ui .line-legend,
+html[data-theme="dark"] #agent-teams-ui .task-detail-head h2,
+html[data-theme="dark"] #agent-teams-ui .task-detail-head p,
+html[data-theme="dark"] #agent-teams-ui .kv-grid,
+html[data-theme="dark"] #agent-teams-ui .kv-grid b,
+html[data-theme="dark"] #agent-teams-ui .detail-top .avatar,
+html[data-theme="dark"] #agent-teams-ui .detail-top b,
+html[data-theme="dark"] #agent-teams-ui .detail-top span,
+html[data-theme="dark"] #agent-teams-ui .license b,
+html[data-theme="dark"] #agent-teams-ui .license span,
+html[data-theme="dark"] #agent-teams-ui .kv,
+html[data-theme="dark"] #agent-teams-ui .action-grid .btn,
+html[data-theme="dark"] #agent-teams-ui .hint,
+html[data-theme="dark"] #agent-teams-ui .column-head,
+html[data-theme="dark"] #agent-teams-ui .column-head b,
+html[data-theme="dark"] #agent-teams-ui .count,
+html[data-theme="dark"] #agent-teams-ui .task-id,
+html[data-theme="dark"] #agent-teams-ui .task-title,
+html[data-theme="dark"] #agent-teams-ui .task-meta,
+html[data-theme="dark"] #agent-teams-ui .task-detail-bar h2,
+html[data-theme="dark"] #agent-teams-ui .task-detail-bar p,
+html[data-theme="dark"] #agent-teams-ui table,
+html[data-theme="dark"] #agent-teams-ui th,
+html[data-theme="dark"] #agent-teams-ui .member-cell .avatar,
+html[data-theme="dark"] #agent-teams-ui .member-cell b,
+html[data-theme="dark"] #agent-teams-ui .member-cell span,
+html[data-theme="dark"] #agent-teams-ui .queue-row b,
+html[data-theme="dark"] #agent-teams-ui .queue-row .queue-main span,
+html[data-theme="dark"] #agent-teams-ui .queue-row > .badge,
+html[data-theme="dark"] #agent-teams-ui .merge-hero p,
+html[data-theme="dark"] #agent-teams-ui .merge-section-title,
+html[data-theme="dark"] #agent-teams-ui .check-row,
+html[data-theme="dark"] #agent-teams-ui .merge-action-note,
+html[data-theme="dark"] #agent-teams-ui .merge-rule-index,
+html[data-theme="dark"] #agent-teams-ui .merge-rule b,
+html[data-theme="dark"] #agent-teams-ui .merge-rule > div > span,
+html[data-theme="dark"] #agent-teams-ui #page-merge .panel-head .muted,
+html[data-theme="dark"] #agent-teams-ui #page-merge .badge,
+html[data-theme="dark"] #agent-teams-ui #page-merge .kv,
+html[data-theme="dark"] #agent-teams-ui #page-merge .kv dt,
+html[data-theme="dark"] #agent-teams-ui #page-merge .kv dd,
+html[data-theme="dark"] #agent-teams-ui #page-merge .kv .mono,
+html[data-theme="dark"] #agent-teams-ui #page-merge .btn,
+html[data-theme="dark"] #agent-teams-ui #page-merge .queue-empty,
+html[data-theme="dark"] #agent-teams-ui .patrol-hero p,
+html[data-theme="dark"] #agent-teams-ui .finding b,
+html[data-theme="dark"] #agent-teams-ui .finding span,
+html[data-theme="dark"] #agent-teams-ui .activity-empty,
+html[data-theme="dark"] #agent-teams-ui .tl-row,
+html[data-theme="dark"] #agent-teams-ui .tl-row > div > span,
+html[data-theme="dark"] #agent-teams-ui .event-table td,
+html[data-theme="dark"] #agent-teams-ui .filter,
+html[data-theme="dark"] #agent-teams-ui .setting h3,
+html[data-theme="dark"] #agent-teams-ui .setting p,
+html[data-theme="dark"] #agent-teams-ui .setting-row,
+html[data-theme="dark"] #agent-teams-ui #page-audit .panel-head .muted,
+html[data-theme="dark"] #agent-teams-ui #page-patrol .badge,
+html[data-theme="dark"] #agent-teams-ui #page-audit .badge,
+html[data-theme="dark"] #agent-teams-ui #page-settings .badge,
+html[data-theme="dark"] #agent-teams-ui #page-patrol .patrol-hero p,
+html[data-theme="dark"] #agent-teams-ui #page-patrol .tl-row,
+html[data-theme="dark"] #agent-teams-ui #page-patrol .tl-row > div > span,
+html[data-theme="dark"] #agent-teams-ui #page-patrol .finding b,
+html[data-theme="dark"] #agent-teams-ui #page-patrol .finding > span,
+html[data-theme="dark"] #agent-teams-ui #page-patrol .finding .btn.sm,
+html[data-theme="dark"] #agent-teams-ui #page-audit .event-table,
+html[data-theme="dark"] #agent-teams-ui #page-audit .event-table th,
+html[data-theme="dark"] #agent-teams-ui #page-audit .event-table td,
+html[data-theme="dark"] #agent-teams-ui #page-audit .event-table td:first-child,
+html[data-theme="dark"] #agent-teams-ui #page-audit .event-table td:nth-child(2),
+html[data-theme="dark"] #agent-teams-ui #page-settings .setting p,
+html[data-theme="dark"] #agent-teams-ui #page-settings .setting-row,
+html[data-theme="dark"] #agent-teams-ui #page-settings .mode-card span,
+html[data-theme="dark"] #agent-teams-ui #page-settings .mode-card em,
+html[data-theme="dark"] #agent-teams-ui #page-settings .setting summary,
+html[data-theme="dark"] #agent-teams-ui #page-settings .setting .hint,
+html[data-theme="dark"] #agent-teams-ui #page-settings .setting-warning,
+html[data-theme="dark"] #agent-teams-ui .worker-card .avatar,
+html[data-theme="dark"] #agent-teams-ui .worker-card span,
+html[data-theme="dark"] #agent-teams-ui .worker-card .worker-task,
+html[data-theme="dark"] #agent-teams-ui .action-row b,
+html[data-theme="dark"] #agent-teams-ui .action-row span,
+html[data-theme="dark"] #agent-teams-ui .dual-captain-main b,
+html[data-theme="dark"] #agent-teams-ui .dual-captain-main span,
+html[data-theme="dark"] #agent-teams-ui .dual-captain-signal span,
+html[data-theme="dark"] #agent-teams-ui .dual-captain-signal b,
+html[data-theme="dark"] #agent-teams-ui .team-title .team-mark,
+html[data-theme="dark"] #agent-teams-ui .team-title b,
+html[data-theme="dark"] #agent-teams-ui .team-title span,
+html[data-theme="dark"] #agent-teams-ui .mini-task b,
+html[data-theme="dark"] #agent-teams-ui .mini-task span,
+html[data-theme="dark"] #agent-teams-ui .pool-row .avatar,
+html[data-theme="dark"] #agent-teams-ui .pool-row b,
+html[data-theme="dark"] #agent-teams-ui .pool-row span,
+html[data-theme="dark"] #agent-teams-ui .pool-row .badge,
+html[data-theme="dark"] #agent-teams-ui .pool-note,
+html[data-theme="dark"] #agent-teams-ui #page-overview .overview-bottom .panel-head .muted,
+html[data-theme="dark"] #agent-teams-ui #page-dual .panel-head .muted,
+html[data-theme="dark"] #agent-teams-ui #page-overview .action-row b,
+html[data-theme="dark"] #agent-teams-ui #page-overview .action-row span,
+html[data-theme="dark"] #agent-teams-ui #page-overview .tl-row,
+html[data-theme="dark"] #agent-teams-ui #page-overview .tl-row > div > span,
+html[data-theme="dark"] #agent-teams-ui #page-overview .tl-row .badge,
+html[data-theme="dark"] #agent-teams-ui #page-overview .activity-empty,
+html[data-theme="dark"] #agent-teams-ui #page-dual .team-title span,
+html[data-theme="dark"] #agent-teams-ui #page-dual .mini-task b,
+html[data-theme="dark"] #agent-teams-ui #page-dual .mini-task span,
+html[data-theme="dark"] #agent-teams-ui #page-dual .dual-utility-note .action-row b,
+html[data-theme="dark"] #agent-teams-ui #page-dual .dual-utility-note .action-row span,
+html[data-theme="dark"] #agent-teams-ui #page-dual .pool-row .avatar,
+html[data-theme="dark"] #agent-teams-ui #page-dual .pool-row b,
+html[data-theme="dark"] #agent-teams-ui #page-dual .pool-row span,
+html[data-theme="dark"] #agent-teams-ui #page-dual .badge,
+html[data-theme="dark"] #agent-teams-ui #page-dual .capacity-control label,
+html[data-theme="dark"] #agent-teams-ui #page-dual .capacity-control .capacity-current,
+html[data-theme="dark"] #agent-teams-ui #page-dual .pool-note,
+html[data-theme="dark"] #agent-teams-ui #page-dual .mailbox-summary-note,
+html[data-theme="dark"] #agent-teams-ui #page-dual .mailbox-content .action-row b,
+html[data-theme="dark"] #agent-teams-ui #page-dual .mailbox-content .action-row span,
+html[data-theme="dark"] #agent-teams-ui #page-dual .mailbox-content .hint,
+html[data-theme="dark"] #agent-teams-ui #page-dual .mailbox-content .btn.sm,
+html[data-theme="dark"] #agent-teams-ui .capacity-control label,
+html[data-theme="dark"] #agent-teams-ui .capacity-control input,
+html[data-theme="dark"] #agent-teams-ui .capacity-control .capacity-current,
+html[data-theme="dark"] #agent-teams-ui #task-dependency-legend,
+html[data-theme="dark"] #agent-teams-ui .task-list-row b,
+html[data-theme="dark"] #agent-teams-ui .task-list-row small,
+html[data-theme="dark"] #agent-teams-ui .task-list-row .mono,
+html[data-theme="dark"] #agent-teams-ui .graph-wrap .live-empty,
+html[data-theme="dark"] #agent-teams-ui #task-tree-view > .panel-head > .panel-head-title > .muted,
+html[data-theme="dark"] #agent-teams-ui #task-tree-view .line-legend,
+html[data-theme="dark"] #agent-teams-ui .setting select,
+html[data-theme="dark"] #agent-teams-ui .mode-card b,
+html[data-theme="dark"] #agent-teams-ui .mode-card span,
+html[data-theme="dark"] #agent-teams-ui .mode-card em,
+html[data-theme="dark"] #agent-teams-ui .setting summary,
+html[data-theme="dark"] #agent-teams-ui .setting-warning,
+html[data-theme="dark"] #agent-teams-ui .field label,
+html[data-theme="dark"] #agent-teams-ui .field input,
+html[data-theme="dark"] #agent-teams-ui .field select,
+html[data-theme="dark"] #agent-teams-ui .toast,
+html[data-theme="dark"] #agent-teams-ui .task-list-empty { font-size: var(--font-caption); }
+html[data-theme="dark"] #agent-teams-ui .code { font-size: max(var(--font-caption), .92em); }
+
+/* 03 Calm monochrome shell, with soft light and shade instead of glass. */
+html[data-theme="dark"] #agent-teams-ui { font-size: var(--font-body); line-height: 1.55; font-synthesis: none; }
+html[data-theme="dark"] #agent-teams-ui .shell { grid-template-columns: 244px minmax(0, 1fr); background: var(--bg); }
+html[data-theme="dark"] #agent-teams-ui .sidebar,
+html[data-theme="dark"] #agent-teams-ui .topbar {
+  position: relative;
+  background: var(--soft-surface);
+  border: 1px solid var(--soft-edge);
+  box-shadow: var(--soft-raised);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+html[data-theme="dark"] #agent-teams-ui .sidebar { margin: 12px 0 12px 12px; min-height: 0; padding: 22px 12px 16px; gap: 20px; overflow-y: auto; border-radius: 24px; }
+html[data-theme="dark"] #agent-teams-ui .brand { align-items: flex-start; gap: 12px; }
+html[data-theme="dark"] #agent-teams-ui .brand b { font-size: 15px; line-height: 1.45; }
+html[data-theme="dark"] #agent-teams-ui .brand-mark { width: 38px; height: 38px; flex: 0 0 38px; border-radius: 12px; box-shadow: var(--shadow-control); }
+html[data-theme="dark"] #agent-teams-ui .workspace { padding: 12px; border-radius: 16px; background: var(--soft-surface); border-color: var(--soft-edge); box-shadow: var(--shadow-control); }
+html[data-theme="dark"] #agent-teams-ui .nav-group { gap: 5px; }
+html[data-theme="dark"] #agent-teams-ui .nav-label { letter-spacing: .06em; margin-bottom: 4px; }
+html[data-theme="dark"] #agent-teams-ui .nav-item { min-height: 44px; border-radius: 12px; font-size: 14px; padding: 10px 12px; }
+html[data-theme="dark"] #agent-teams-ui .nav-item .nav-badge { min-width: 24px; height: 23px; border-radius: 7px; background: var(--soft-inset-bg); color: var(--indigo); }
+html[data-theme="dark"] #agent-teams-ui .topbar { margin: 12px 18px 0; min-height: 72px; height: auto; padding: 14px 20px; gap: 12px; border-radius: 22px; }
+html[data-theme="dark"] #agent-teams-ui .top-right,
+html[data-theme="dark"] #agent-teams-ui .topbar-status,
+html[data-theme="dark"] #agent-teams-ui .topbar-actions { flex-wrap: wrap; gap: 8px; }
+html[data-theme="dark"] #agent-teams-ui .crumb { font-size: 13px; }
+html[data-theme="dark"] #agent-teams-ui .content { padding: 24px 26px 32px; scrollbar-gutter: stable; }
+html[data-theme="dark"] #agent-teams-ui .page-head { margin-bottom: 20px; }
+html[data-theme="dark"] #agent-teams-ui .page-head h1 { font-size: 28px; line-height: 1.3; letter-spacing: -.025em; }
+html[data-theme="dark"] #agent-teams-ui .page-head p { font-size: 13px; line-height: 1.6; margin-top: 6px; }
+
+/* 04 One Soft UI family: broad container shadows, shallow depth inside. */
+html[data-theme="dark"] #agent-teams-ui .panel,
+html[data-theme="dark"] #agent-teams-ui .stat {
+  background: var(--soft-surface);
+  border: 1px solid var(--soft-edge); border-radius: 20px;
+  box-shadow: var(--soft-raised); -webkit-backdrop-filter: none; backdrop-filter: none;
+}
+html[data-theme="dark"] #agent-teams-ui .stats { gap: 14px; margin-bottom: 22px; }
+html[data-theme="dark"] #agent-teams-ui .stat {
+  min-height: 118px; padding: 18px 20px;
+  background: var(--soft-surface);
+  border-color: var(--soft-edge); border-radius: 20px; box-shadow: var(--soft-raised);
+  -webkit-backdrop-filter: none; backdrop-filter: none;
+}
+html[data-theme="dark"] #agent-teams-ui .stat-label { font-size: 13px; line-height: 1.5; }
+html[data-theme="dark"] #agent-teams-ui .stat-value { font-size: 30px; line-height: 1.25; margin-top: 0; }
+html[data-theme="dark"] #agent-teams-ui .stat-foot { margin-top: 5px; line-height: 1.6; }
+html[data-theme="dark"] #agent-teams-ui .stat-track { margin-top: 12px; height: 4px; background: var(--surface-3); box-shadow: var(--shadow-pressed); }
+html[data-theme="dark"] #agent-teams-ui .panel-head { min-height: 52px; padding: 12px 16px; flex-wrap: wrap; gap: 10px; }
+html[data-theme="dark"] #agent-teams-ui .panel-head h2,
+html[data-theme="dark"] #agent-teams-ui #page-overview .panel-head h2,
+html[data-theme="dark"] #agent-teams-ui #page-dual .panel-head h2 { font-size: 15px; font-weight: 600; line-height: 1.5; }
+html[data-theme="dark"] #agent-teams-ui .worker-card,
+html[data-theme="dark"] #agent-teams-ui .action-row,
+html[data-theme="dark"] #agent-teams-ui .mini-task,
+html[data-theme="dark"] #agent-teams-ui .pool-row,
+html[data-theme="dark"] #agent-teams-ui .task-list-row,
+html[data-theme="dark"] #agent-teams-ui .setting,
+html[data-theme="dark"] #agent-teams-ui .mode-card,
+html[data-theme="dark"] #agent-teams-ui .finding {
+  border-radius: 13px; background: var(--soft-card);
+  border-width: 1px; border-style: solid; border-color: transparent;
+  box-shadow: var(--soft-shallow);
+}
+html[data-theme="dark"] #agent-teams-ui :is(.worker-card.contractor, .pool-row.contractor) { border-style: dashed; border-color: rgba(255,255,255,.14); }
+html[data-theme="dark"] #agent-teams-ui .tl-row { padding: 10px 12px; border: 1px solid transparent; border-radius: 13px; background: var(--soft-card); }
+html[data-theme="dark"] #agent-teams-ui .tl-row > div { min-width: 0; }
+html[data-theme="dark"] #agent-teams-ui .workforce-grid { gap: 12px; padding: 16px; }
+html[data-theme="dark"] #agent-teams-ui .worker-card { min-height: 90px; padding: 14px; }
+html[data-theme="dark"] #agent-teams-ui .worker-main b { font-size: 14px; }
+html[data-theme="dark"] #agent-teams-ui .overview-bottom,
+html[data-theme="dark"] #agent-teams-ui .dual-grid { gap: 18px; }
+html[data-theme="dark"] #agent-teams-ui .team-summary { padding: 16px; gap: 12px; }
+html[data-theme="dark"] #agent-teams-ui .pool-row { padding: 12px; gap: 10px; }
+html[data-theme="dark"] #agent-teams-ui .action-row { padding: 12px; }
+
+/* 05 Low-relief controls with explicit focus and pressed states. */
+html[data-theme="dark"] #agent-teams-ui .btn,
+html[data-theme="dark"] #agent-teams-ui .icon-btn {
+  min-height: 36px; height: auto; padding: 8px 12px; border-radius: 11px;
+  background: var(--soft-surface);
+  color: var(--text); border: 1px solid var(--soft-edge); box-shadow: var(--shadow-control);
+  font-size: var(--font-control); line-height: 1.4;
+  transition: background var(--motion-fast) var(--motion-ease), border-color var(--motion-fast) var(--motion-ease), box-shadow var(--motion-fast) var(--motion-ease);
+}
+html[data-theme="dark"] #agent-teams-ui .btn.sm { min-height: 32px; padding: 6px 10px; font-size: var(--font-caption); }
+html[data-theme="dark"] #agent-teams-ui .icon-btn { width: 36px; padding: 0; flex: 0 0 36px; }
+html[data-theme="dark"] #agent-teams-ui .btn.ghost { background: var(--soft-surface); color: var(--muted); border-color: var(--soft-edge); }
+html[data-theme="dark"] #agent-teams-ui .btn.primary { background: var(--accent); color: #fff; border-color: transparent; }
+html[data-theme="dark"] #agent-teams-ui .btn.danger { background: var(--rose-soft); color: var(--rose); }
+html[data-theme="dark"] #agent-teams-ui .btn.soft { background: var(--indigo-soft); color: var(--indigo); }
+html[data-theme="dark"] #agent-teams-ui .btn:hover,
+html[data-theme="dark"] #agent-teams-ui .icon-btn:hover { border-color: rgba(157,191,229,.22); box-shadow: var(--soft-control); }
+html[data-theme="dark"] #agent-teams-ui .btn:active,
+html[data-theme="dark"] #agent-teams-ui .icon-btn:active { transform: none; box-shadow: var(--shadow-pressed); }
+html[data-theme="dark"] #agent-teams-ui :is(button, input, select, summary, [tabindex]):focus-visible { outline: 2px solid var(--indigo); outline-offset: 3px; }
+html[data-theme="dark"] #agent-teams-ui .pill { min-height: 30px; height: auto; padding: 5px 10px; background: var(--soft-surface); border-color: var(--soft-edge); box-shadow: var(--soft-inset); }
+html[data-theme="dark"] #agent-teams-ui .badge { min-height: 24px; height: auto; padding: 4px 8px; border-radius: 7px; line-height: 1.25; }
+html[data-theme="dark"] #agent-teams-ui :is(input, select) { min-height: 36px; border-radius: 10px; }
+html[data-theme="dark"] #agent-teams-ui .icon { width: 16px; height: 16px; }
+html[data-theme="dark"] #agent-teams-ui .avatar { min-width: 30px; min-height: 30px; border-radius: 10px; }
+
+/* 06 Data views: comfortable rows, explicit counts, scrollable long content. */
+html[data-theme="dark"] #agent-teams-ui .member-layout { grid-template-columns: minmax(0, 1fr) 320px; gap: 18px; }
+html[data-theme="dark"] #agent-teams-ui .table-wrap { overflow-x: auto; }
+html[data-theme="dark"] #agent-teams-ui table { font-size: 14px; }
+html[data-theme="dark"] #agent-teams-ui th { font-size: 13px; padding: 13px 16px; line-height: 1.5; }
+html[data-theme="dark"] #agent-teams-ui td { padding: 14px 16px; line-height: 1.6; }
+html[data-theme="dark"] #agent-teams-ui tr.selected { background: var(--soft-selected); }
+html[data-theme="dark"] #agent-teams-ui .member-cell { gap: 10px; }
+html[data-theme="dark"] #agent-teams-ui .member-cell b { font-size: 14px; }
+html[data-theme="dark"] #agent-teams-ui .task-workspace { grid-template-columns: minmax(0, 1fr) 340px; gap: 16px; }
+html[data-theme="dark"] #agent-teams-ui .task-toolbar { padding: 10px 0 14px; flex-wrap: wrap; border-bottom: 0; gap: 8px; }
+html[data-theme="dark"] #agent-teams-ui .task-list { padding: 12px; gap: 8px; }
+html[data-theme="dark"] #agent-teams-ui .task-list-row { padding: 12px; }
+html[data-theme="dark"] #agent-teams-ui .task-list-row b { font-size: 13px; }
+html[data-theme="dark"] #agent-teams-ui .task-list-row .badge { padding: 3px 6px; }
+html[data-theme="dark"] #agent-teams-ui .graph-foot { padding: 12px 16px; line-height: 1.6; flex-wrap: wrap; gap: 8px; }
+html[data-theme="dark"] #agent-teams-ui .task-detail,
+html[data-theme="dark"] #agent-teams-ui .modal,
+html[data-theme="dark"] #agent-teams-ui .toast {
+  background: var(--glass-strong); border: 1px solid var(--soft-edge); border-radius: 20px;
+  -webkit-backdrop-filter: none; backdrop-filter: none;
+  box-shadow: -5px -5px 16px rgba(255,255,255,.025), 10px 14px 34px rgba(0,0,0,.42);
+}
+html[data-theme="dark"] #agent-teams-ui .task-detail { padding: 18px; }
+html[data-theme="dark"] #agent-teams-ui .task-detail-desc,
+html[data-theme="dark"] #agent-teams-ui .session-panel pre { line-height: 1.7; }
+html[data-theme="dark"] #agent-teams-ui .kv-grid { gap: 12px; }
+html[data-theme="dark"] #agent-teams-ui #merge-queue-empty { font-size: var(--font-caption) !important; }
+
+/* 07 Graph geometry and task semantics are retained. */
+    html[data-theme="dark"] #agent-teams-ui .gnode {
+      --node-bg: var(--tree-node-base);
+      --node-bd: var(--line-strong);
+      --node-title: var(--text);
+      --node-meta: var(--muted);
+      --node-stroke: 1;
+    }
+    html[data-theme="dark"] #agent-teams-ui .gnode rect.node-bg {
+      fill: var(--node-bg);
+      stroke: var(--node-bd);
+      stroke-width: var(--node-stroke);
+      filter: none;
+    }
+    html[data-theme="dark"] #agent-teams-ui .gnode.team-alpha {
+      --node-bg: color-mix(in srgb, var(--indigo) 16%, var(--tree-node-base));
+      --node-bd: var(--indigo);
+    }
+    html[data-theme="dark"] #agent-teams-ui .gnode.team-beta {
+      --node-bg: color-mix(in srgb, var(--mint) 16%, var(--tree-node-base));
+      --node-bd: var(--mint);
+    }
+    html[data-theme="dark"] #agent-teams-ui .gnode.failed {
+      --node-bg: color-mix(in srgb, var(--rose) 14%, var(--tree-node-base));
+      --node-bd: var(--rose);
+    }
+    html[data-theme="dark"] #agent-teams-ui .gnode.cancelled {
+      --node-bg: var(--tree-node-base);
+      --node-bd: var(--faint);
+      opacity: .65;
+    }
+    html[data-theme="dark"] #agent-teams-ui .gnode.waiting rect.node-bg,
+    html[data-theme="dark"] #agent-teams-ui .gnode.active rect.node-bg { stroke-dasharray: 5 3; }
+    html[data-theme="dark"] #agent-teams-ui .gnode.cancelled rect.node-bg { stroke-dasharray: 3 3; }
+    html[data-theme="dark"] #agent-teams-ui .gnode .gid,
+    html[data-theme="dark"] #agent-teams-ui .gnode .grole,
+    html[data-theme="dark"] #agent-teams-ui .gnode .gstatus {
+      fill: var(--muted);
+      font-size: 13px;
+      font-weight: 500;
+    }
+    html[data-theme="dark"] #agent-teams-ui .gnode .gtitle {
+      fill: var(--text);
+      font-size: 13px;
+      font-weight: 500;
+    }
+    html[data-theme="dark"] #agent-teams-ui .gnode .gdot { stroke: none; }
+    html[data-theme="dark"] #agent-teams-ui .gnode.dimmed { opacity: .28; }
+    html[data-theme="dark"] #agent-teams-ui .gnode.failed.dimmed { opacity: .55; }
+    html[data-theme="dark"] #agent-teams-ui .gnode.focused.team-alpha {
+      --node-bg: color-mix(in srgb, var(--indigo) 18%, var(--tree-node-base));
+      --node-stroke: 1.8;
+    }
+    html[data-theme="dark"] #agent-teams-ui .gnode.focused.team-beta {
+      --node-bg: color-mix(in srgb, var(--mint) 18%, var(--tree-node-base));
+      --node-stroke: 1.8;
+    }
+    html[data-theme="dark"] #agent-teams-ui .gnode.failed.focused {
+      --node-bg: color-mix(in srgb, var(--rose) 22%, var(--tree-node-base));
+      --node-stroke: 2.4;
+    }
+    html[data-theme="dark"] #agent-teams-ui .gnode.selected {
+      --node-stroke: 2.6;
+    }
+    html[data-theme="dark"] #agent-teams-ui .gnode.team-alpha.selected {
+      --node-bg: color-mix(in srgb, var(--indigo) 28%, var(--tree-node-base));
+      --node-stroke: 2.6;
+    }
+    html[data-theme="dark"] #agent-teams-ui .gnode.team-beta.selected {
+      --node-bg: color-mix(in srgb, var(--mint) 26%, var(--tree-node-base));
+      --node-stroke: 2.6;
+    }
+    html[data-theme="dark"] #agent-teams-ui .gnode.failed.selected {
+      --node-bg: color-mix(in srgb, var(--rose) 30%, var(--tree-node-base));
+      --node-stroke: 2.6;
+    }
+    html[data-theme="dark"] #agent-teams-ui .gnode.team-alpha.selected rect.node-bg {
+      filter: none;
+    }
+    html[data-theme="dark"] #agent-teams-ui .gnode.team-beta.selected rect.node-bg {
+      filter: none;
+    }
+    html[data-theme="dark"] #agent-teams-ui .gnode.failed.selected rect.node-bg {
+      filter: none;
+    }
+    html[data-theme="dark"] #agent-teams-ui .gedge { stroke: var(--line-strong); }
+    html[data-theme="dark"] #agent-teams-ui .gedge.team-alpha { stroke: var(--indigo); }
+    html[data-theme="dark"] #agent-teams-ui .gedge.team-beta { stroke: var(--mint); }
+    html[data-theme="dark"] #agent-teams-ui .gedge.waiting {
+      opacity: .58;
+      stroke-width: 1.5;
+      stroke-dasharray: 4 3;
+    }
+    html[data-theme="dark"] #agent-teams-ui .gedge.waiting.handoff-linked { opacity: .62; }
+    html[data-theme="dark"] #agent-teams-ui .gedge.handoff { opacity: .85; stroke-width: 1.5; stroke-dasharray: 5 4; }
+    html[data-theme="dark"] #agent-teams-ui .gedge.handoff.team-alpha { stroke: var(--indigo); }
+    html[data-theme="dark"] #agent-teams-ui .gedge.handoff.team-beta { stroke: var(--mint); }
+    html[data-theme="dark"] #agent-teams-ui .gedge.waiting.dimmed { opacity: .14; }
+    html[data-theme="dark"] #agent-teams-ui .gedge.handoff.dimmed { opacity: .22; }
+    html[data-theme="dark"] #agent-teams-ui .dag-large .graph-wrap { background-color: transparent; }
+
+
+/* 08 Existing task/member controls, kept in the same positions. */
+/* Compact task actions live beside the panels they control. */
+html[data-theme="dark"] #agent-teams-ui .task-toolbar-actions { display: none; }
+html[data-theme="dark"] #agent-teams-ui .task-dark-control {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 32px;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 6px;
+}
+html[data-theme="dark"] #agent-teams-ui .task-overview-expand { display: none; }
+html[data-theme="dark"] #agent-teams-ui .overview-collapsed .task-overview-expand { display: inline-flex; }
+html[data-theme="dark"] #agent-teams-ui #task-overview-panel > .panel-head { gap: 6px; }
+
+/* Warm residency changes only the status lamp, never the label text. */
+html[data-theme="dark"] #agent-teams-ui #page-members { --member-warm-dot: var(--mint); }
+
+/* Residency counts are two peer categories, not a fraction or progress bar. */
+html[data-theme="dark"] #agent-teams-ui .member-residency-card .member-residency-light-label,
+html[data-theme="dark"] #agent-teams-ui .member-residency-card > .stat-value,
+html[data-theme="dark"] #agent-teams-ui .member-residency-card > .stat-track { display: none; }
+html[data-theme="dark"] #agent-teams-ui .member-residency-dark-label { display: inline; }
+html[data-theme="dark"] #agent-teams-ui .member-residency-counts { display: flex; align-items: baseline; gap: 24px; margin-top: 5px; flex-wrap: wrap; }
+html[data-theme="dark"] #agent-teams-ui .member-residency-counts > span { display: inline-flex; align-items: baseline; gap: 6px; white-space: nowrap; }
+html[data-theme="dark"] #agent-teams-ui .member-residency-counts b { font-size: 28px; line-height: 1.2; font-weight: 650; font-variant-numeric: tabular-nums; }
+html[data-theme="dark"] #agent-teams-ui .member-residency-counts small { font-size: 13px; color: var(--muted); }
+
+
+html[data-theme="dark"] #agent-teams-ui .member-team-filter { display: flex; align-items: center; margin-bottom: 16px; width: fit-content; max-width: 100%; flex-wrap: wrap; gap: 6px; padding: 5px; border: 1px solid var(--soft-edge); border-radius: 16px; background: var(--soft-surface); box-shadow: var(--soft-raised); -webkit-backdrop-filter: none; backdrop-filter: none; }
+html[data-theme="dark"] #agent-teams-ui .member-team-filter .btn { box-shadow: none; border-color: transparent; }
+
+html[data-theme="dark"] #agent-teams-ui .task-workspace.overview-collapsed { grid-template-columns: minmax(0, 1fr); }
+html[data-theme="dark"] #agent-teams-ui .btn.task-dark-control { padding: 0; min-width: 32px; border-radius: 10px; }
+
+
+/* Outer panels retain container depth even when they also carry a role. */
+html[data-theme="dark"] #agent-teams-ui .panel.setting {
+  background: var(--soft-surface);
+  border-radius: 20px; box-shadow: var(--soft-raised);
+}
+html[data-theme="dark"] #agent-teams-ui #page-settings .mode-card,
+html[data-theme="dark"] #agent-teams-ui #page-patrol .finding { border-radius: 13px; }
+
+html[data-theme="dark"] #agent-teams-ui .modal-backdrop { -webkit-backdrop-filter: none; backdrop-filter: none; }
+
+/* Soft inset fields and explicit pressed/selected state; no optical overlays. */
+html[data-theme="dark"] #agent-teams-ui :is(input, select, .task-detail-desc, .session-panel pre) { background: var(--soft-inset-bg); border-color: var(--soft-edge); box-shadow: var(--soft-inset); }
+html[data-theme="dark"] #agent-teams-ui :is(.stat-track, .mini-track, .track) { background: var(--soft-inset-bg); box-shadow: inset 1px 1px 3px rgba(0,0,0,.30); }
+html[data-theme="dark"] #agent-teams-ui .btn.primary { box-shadow: 3px 3px 8px rgba(0,0,0,.3); }
+html[data-theme="dark"] #agent-teams-ui .btn.primary:active { box-shadow: inset 2px 2px 5px rgba(0,0,0,.24); }
+
+/* Elevation ladder: canvas < container < inner card < selected item. */
+html[data-theme="dark"] #agent-teams-ui .dual-captain-signal { background: var(--soft-card); box-shadow: var(--soft-shallow); }
+html[data-theme="dark"] #agent-teams-ui :is(.nav-item, .mode-card, .task-list-row, .task-detail-tab, .filter, .queue-row) {
+  transition: background 160ms var(--motion-ease), border-color 160ms var(--motion-ease), box-shadow 180ms var(--motion-ease), transform 180ms var(--motion-ease);
+}
+html[data-theme="dark"] #agent-teams-ui :is(.nav-item.active, .mode-card.selected, .task-list-row.selected, .roster-row.selected, .task-detail-tab.active, .filter.active, .queue-row.selected),
+html[data-theme="dark"] #agent-teams-ui .member-team-filter [aria-pressed="true"] {
+  background: var(--soft-selected); color: var(--text);
+  border-color: rgba(157,191,229,.30); box-shadow: var(--soft-selected-shadow);
+}
+html[data-theme="dark"] #agent-teams-ui :is(.nav-item.active, .mode-card.selected, .task-detail-tab.active, .filter.active),
+html[data-theme="dark"] #agent-teams-ui .member-team-filter [aria-pressed="true"] { transform: translateY(-1px); }
+html[data-theme="dark"] #agent-teams-ui .nav-item.active { font-weight: 600; }
+html[data-theme="dark"] #agent-teams-ui :is(.nav-item:not(.active), .mode-card:not(.selected), .task-list-row:not(.selected)):hover:not(:active) {
+  background: var(--soft-hover); box-shadow: var(--soft-control);
+}
+html[data-theme="dark"] #agent-teams-ui tbody tr.selected td { background: var(--soft-selected); }
+html[data-theme="dark"] #agent-teams-ui :is(.nav-item, .mode-card, .task-list-row, .task-detail-tab, .filter):active,
+html[data-theme="dark"] #agent-teams-ui .member-team-filter .btn:active {
+  transform: translateY(0); box-shadow: var(--soft-inset);
+}
+
+/* Quiet hierarchy: use space and type, not another outline around every row. */
+html[data-theme="dark"] #agent-teams-ui :is(#page-overview, #page-dual, #page-members, #page-merge, #page-patrol, #page-audit, #page-settings) :is(.worker-card b, .mini-task b, .pool-row b, .team-title b, .action-row b, .setting h3, .finding b, .task-list-row b, .member-cell b, .dual-captain-main b, .dual-captain-signal b) {
+  font-size: 15px; line-height: 1.55;
+}
+html[data-theme="dark"] #agent-teams-ui :is(#page-overview, #page-dual, #page-members, #page-merge, #page-patrol, #page-audit, #page-settings) .panel-head h2 { font-size: 16px; }
+html[data-theme="dark"] #agent-teams-ui :is(.worker-main, .mini-task-main, .pool-main, .action-main) { min-width: 0; }
+html[data-theme="dark"] #agent-teams-ui :is(.worker-card, .mini-task, .pool-row, .action-row, .task-list-row) { line-height: 1.6; }
+html[data-theme="dark"] #agent-teams-ui .panel-head { min-height: 56px; padding: 14px 18px; }
+html[data-theme="dark"] #agent-teams-ui .workforce-grid { padding: 18px; gap: 14px; }
+html[data-theme="dark"] #agent-teams-ui .team-summary { gap: 14px; }
+html[data-theme="dark"] #agent-teams-ui .task-detail-desc { font-size: 15px; line-height: 1.75; }
+html[data-theme="dark"] #agent-teams-ui table { font-size: 15px; }
+html[data-theme="dark"] #agent-teams-ui #page-audit .event-table td { font-size: 14px; line-height: 1.65; }
+
+/* 09 Adaptation: keep controls and readable type, reduce material effects. */
+@media (max-width: 1240px) {
+  html[data-theme="dark"] #agent-teams-ui .workforce-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  html[data-theme="dark"] #agent-teams-ui .member-layout { grid-template-columns: 1fr; }
+}
+@media (max-width: 1080px) {
+  html[data-theme="dark"] #agent-teams-ui .shell { grid-template-columns: 68px minmax(0, 1fr); }
+  html[data-theme="dark"] #agent-teams-ui .sidebar { margin: 10px 0 10px 6px; padding: 18px 6px; border-radius: 20px; }
+  html[data-theme="dark"] #agent-teams-ui .nav-item { padding: 10px; }
+  html[data-theme="dark"] #agent-teams-ui .brand { padding: 0; }
+  html[data-theme="dark"] #agent-teams-ui .topbar { padding: 12px 18px; flex-wrap: wrap; }
+  html[data-theme="dark"] #agent-teams-ui .top-right { gap: 8px; }
+  html[data-theme="dark"] #agent-teams-ui .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 840px) {
+  html[data-theme="dark"] #agent-teams-ui #page-tasks.active { height: auto; min-height: 100%; }
+  html[data-theme="dark"] #agent-teams-ui .task-workspace { grid-template-columns: minmax(0, 1fr); height: auto; }
+  html[data-theme="dark"] #agent-teams-ui .task-workspace .graph-panel,
+  html[data-theme="dark"] #agent-teams-ui .task-workspace .task-list-panel { grid-column: 1; grid-row: auto; }
+  html[data-theme="dark"] #agent-teams-ui .task-workspace .graph-panel { min-height: 560px; }
+  html[data-theme="dark"] #agent-teams-ui .task-workspace .task-list-panel { max-height: 480px; }
+  html[data-theme="dark"] #agent-teams-ui .overview-bottom,
+  html[data-theme="dark"] #agent-teams-ui .dual-grid { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 720px) {
+  html[data-theme="dark"] #agent-teams-ui .content { padding: 18px 14px 28px; }
+  html[data-theme="dark"] #agent-teams-ui .topbar { margin: 10px 10px 0; padding: 10px 14px; gap: 8px; border-radius: 18px; }
+  html[data-theme="dark"] #agent-teams-ui .top-right { margin-left: 0; width: 100%; }
+  html[data-theme="dark"] #agent-teams-ui .topbar-actions { padding-left: 0; border-left: 0; }
+  html[data-theme="dark"] #agent-teams-ui .panel-head .panel-actions { flex-wrap: wrap; }
+  html[data-theme="dark"] #agent-teams-ui .workforce-grid,
+  html[data-theme="dark"] #agent-teams-ui .dual-captain-body { grid-template-columns: 1fr; }
+  html[data-theme="dark"] #agent-teams-ui .dual-captain-main { border-right: 0; padding: 0; }
+  html[data-theme="dark"] #agent-teams-ui .stat { padding: 16px; }
+  html[data-theme="dark"] #agent-teams-ui .member-residency-counts { gap: 10px; }
+  html[data-theme="dark"] #agent-teams-ui .member-residency-counts > span { gap: 4px; }
+  html[data-theme="dark"] #agent-teams-ui .member-residency-counts b { font-size: 24px; }
+}
+@media (max-width: 480px) {
+  html[data-theme="dark"] #agent-teams-ui .stats { grid-template-columns: minmax(0, 1fr); }
+  html[data-theme="dark"] #agent-teams-ui .task-detail { padding: 14px; }
+}
+@media (pointer: coarse) {
+  html[data-theme="dark"] #agent-teams-ui :is(.btn, .icon-btn, .task-dark-control) { min-height: 44px; min-width: 44px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html[data-theme="dark"] #agent-teams-ui *,
+  html[data-theme="dark"] #agent-teams-ui *::before,
+  html[data-theme="dark"] #agent-teams-ui *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}
+@media (forced-colors: active) {
+  html[data-theme="dark"] #agent-teams-ui { --text: CanvasText; --muted: CanvasText; --faint: CanvasText; --indigo: LinkText; --bg: Canvas; --surface-solid: Canvas; --surface: Canvas; --surface-2: Canvas; --surface-3: Canvas; --soft-surface: Canvas; --soft-inset-bg: Canvas; --soft-overlay: Canvas; --soft-card: Canvas; --soft-selected: Canvas; --soft-hover: Canvas; --soft-selected-shadow: none; --soft-raised: none; --soft-control: none; --soft-inset: none; --soft-shallow: none; --line: CanvasText; --line-strong: CanvasText; }
+  html[data-theme="dark"] #agent-teams-ui :is(.sidebar, .topbar, .panel, .stat, .member-team-filter, .workspace, .task-detail, .modal, .toast, .worker-card, .action-row, .mini-task, .pool-row, .task-list-row, .setting, .mode-card, .finding, .btn, .icon-btn, .pill, .shell, .nav-item.active, .mode-card.selected, .task-list-row.selected, .panel.setting) { box-shadow: none; background: Canvas; border-color: CanvasText; }
+  html[data-theme="dark"] #agent-teams-ui :is(button, input, select, summary, [tabindex]):focus-visible { outline-color: Highlight; }
+}

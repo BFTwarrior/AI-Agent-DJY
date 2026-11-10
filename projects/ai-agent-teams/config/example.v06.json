@@ -1,0 +1,162 @@
+{
+  "$schema": "./schema.json",
+  "version": 1,
+  "captain": {
+    "name": "captain",
+    "model": null,
+    "maxTeams": 2
+  },
+  "teams": [
+    {
+      "id": "alpha",
+      "name": "Alpha",
+      "lead": "alpha-lead",
+      "defaultMembers": 16,
+      "maxMembers": 32,
+      "baseBranch": "main"
+    },
+    {
+      "id": "beta",
+      "name": "Beta",
+      "lead": "beta-lead",
+      "defaultMembers": 16,
+      "maxMembers": 32,
+      "baseBranch": "main"
+    }
+  ],
+  "automation": {
+    "mode": "standard"
+  },
+  "shadow": {
+    "enabled": true,
+    "idleStopMinutes": 30
+  },
+  "features": {
+    "lazyMembers": true,
+    "licenses": true,
+    "compression": true,
+    "contractors": true,
+    "patrol": true,
+    "postMergeReview": true
+  },
+  "scheduler": {
+    "preset": "balanced",
+    "memoryGb": 32,
+    "dynamicTeams": true,
+    "activeWorkerSlots": 6,
+    "maxActivePerTeam": 6,
+    "minActivePerTeam": 1,
+    "fairness": "equal",
+    "maxTurnsPerTask": 30,
+    "taskTimeoutMinutes": 120,
+    "idleSessionMinutes": 30,
+    "maxControlSessions": 5,
+    "maxTotalSessions": 26,
+    "allowAboveDesignCap": false
+  },
+  "contractors": {
+    "enabled": true,
+    "maxConcurrent": 2,
+    "maxLifetimeMinutes": 15,
+    "defaultPermission": "read-only",
+    "allowBorrow": false,
+    "slots": {
+      "merge": {
+        "cap": 1,
+        "kinds": [
+          "post_merge_review",
+          "merge_verify",
+          "merge_review",
+          "merge"
+        ]
+      },
+      "main": {
+        "cap": 1,
+        "kinds": [
+          "*"
+        ]
+      }
+    }
+  },
+  "patrol": {
+    "enabled": true,
+    "captainSelfWake": true,
+    "intervalMinutes": 10,
+    "whenCaptainBusy": "one-shot-contractor",
+    "maxContractorPerCycle": 1
+  },
+  "memory": {
+    "enabled": true,
+    "highWatermarkPercent": 80,
+    "lowWatermarkPercent": 65,
+    "budgetMb": 24576,
+    "availableIdleMinutes": 10,
+    "waitingWarmMinutes": 3,
+    "waitingColdMinutes": 10
+  },
+  "isolation": {
+    "mode": "worktree",
+    "containerRuntime": "docker",
+    "imagePullPolicy": "never",
+    "network": "gateway-only",
+    "readOnlyRoot": true,
+    "nonRoot": true,
+    "cpuLimit": 2,
+    "memoryMb": 2048,
+    "pidsLimit": 512
+  },
+  "interruption": {
+    "defaultDelivery": "queue",
+    "urgentDelivery": "guide",
+    "hardStop": "stop",
+    "cancelBackgroundTasks": true
+  },
+  "zcode": {
+    "cliPath": "auto",
+    "protocol": "app-server",
+    "mode": "build",
+    "locale": "auto",
+    "timezone": "auto",
+    "defaultModel": null,
+    "defaultReasoning": null,
+    "maxRequestsPerMinute": 0,
+    "maxConcurrentSessions": 24,
+    "memberMcpServers": "minimal",
+    "turnWatchIntervalMs": 2000,
+    "turnFailureRetry": {
+      "enabled": true,
+      "maxAttempts": 3,
+      "capacityMaxAttempts": 3,
+      "baseDelayMs": 3000,
+      "maxDelayMs": 60000,
+      "capacityRecoveryMs": 60000,
+      "capacityRecoverySuccesses": 3
+    }
+  },
+  "storage": {
+    "database": ".ai-agent-teams/state.db",
+    "archiveDays": 30
+  },
+  "quality": {
+    "kinds": [
+      "requirements",
+      "implementation",
+      "verification",
+      "review",
+      "repair",
+      "integration"
+    ],
+    "requireIndependentReview": true,
+    "maxReviewRounds": 3,
+    "verifyCommands": [],
+    "reviewPolicy": {
+      "requirementsMinRounds": 1,
+      "requirementsMaxRounds": 2,
+      "codeMaxRounds": 3,
+      "maxRepairAttempts": 2,
+      "requiredReviewers": []
+    },
+    "postMergeReview": "contractor",
+    "mergeBranch": "integration"
+  }
+}

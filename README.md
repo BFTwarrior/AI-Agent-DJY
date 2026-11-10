@@ -28,6 +28,7 @@ Skills, MCP servers and projects for AI agents — one repository, one source of
 | Project | Description | Latest release | Docs | Release |
 |---|---|---|---|---|
 | [zcode-persistence](projects/zcode-persistence/) | ZCode retry toolkit: hook suggestions, local retry proxy, optional error email reports | V0.2.12 | [Docs](projects/zcode-persistence/docs/00-overview.md) (English) | [Release](https://github.com/BFTwarrior/AI-Agent-DJY/releases/tag/proj-zcode-persistence-v0.2.12) |
+| [ai-agent-teams](projects/ai-agent-teams/) | Team control plane for ZCode: one captain, two teams, attempt-tokened task graph, leases, quality gates, layered isolation | Source 0.2.2 (unreleased) | [Docs](projects/ai-agent-teams/docs/overview.md) (English) | — |
 
 ## How to use
 

@@ -1,0 +1,1134 @@
+    html, body { margin: 0; background: var(--page-bg, #f2f2f7); }
+
+    #agent-teams-ui {
+      --glass-blur: 30px;
+      --accent: #0066d6;
+      --shadow: 0 20px 50px var(--shadow-color);
+      --r-lg: 14px;
+      --r-md: 10px;
+      --r-sm: 8px;
+      font-family: "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei", system-ui, sans-serif;
+      color: var(--text);
+      background: var(--bg);
+      border-radius: 0;
+      overflow: hidden;
+      height: 100vh;
+      min-height: 100vh;
+      line-height: 1.5;
+      position: relative;
+    }
+    #agent-teams-ui * { box-sizing: border-box; }
+    #agent-teams-ui [hidden] { display: none !important; }
+    #agent-teams-ui button, #agent-teams-ui input, #agent-teams-ui select { font: inherit; color: inherit; }
+    #agent-teams-ui button { cursor: pointer; }
+    #agent-teams-ui .shell {
+      height: 100vh;
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: 232px minmax(0, 1fr);
+      position: relative;
+      background:
+        radial-gradient(1200px 760px at 50% -14%, var(--glow-strong), transparent 62%),
+        var(--bg);
+    }
+    #agent-teams-ui .sidebar {
+      padding: 18px 12px 14px;
+      background:
+        radial-gradient(140% 70% at 50% 0%, var(--glow-soft), transparent 58%),
+        var(--rail-bg);
+      -webkit-backdrop-filter: blur(30px) saturate(180%);
+      backdrop-filter: blur(30px) saturate(180%);
+      color: var(--rail-text);
+      border-right: 1px solid var(--rail-line);
+      box-shadow: inset 0 1px 0 var(--glow-strong);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      min-width: 0;
+      align-self: stretch;
+    }
+    #agent-teams-ui .brand { display: flex; align-items: center; gap: 10px; padding: 2px 8px 8px; }
+    #agent-teams-ui .brand-mark {
+      width: 34px; height: 34px; border-radius: 10px;
+      display: grid; place-items: center;
+      background: var(--accent);
+      color: #ffffff; font-weight: 800; font-size: 16px;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.22);
+      position: relative;
+    }
+    #agent-teams-ui .brand-mark::after {
+      content: ""; position: absolute; inset: 5px; border-radius: 6px;
+      border: 1px solid rgba(255,255,255,.32);
+    }
+    #agent-teams-ui .brand b { display: block; font-size: 13.5px; font-weight: 650; letter-spacing: .1px; color: var(--rail-text); }
+    #agent-teams-ui .brand span { display: block; font-size: 10px; color: var(--rail-muted); margin-top: 1px; }
+    #agent-teams-ui .workspace {
+      margin: 0 2px; padding: 10px 11px; border-radius: 11px;
+      background: var(--rail-child); border: 1px solid var(--rail-line);
+      display: flex; align-items: center; gap: 9px;
+    }
+    #agent-teams-ui .workspace .ws-avatar {
+      width: 25px; height: 25px; border-radius: 8px; display: grid; place-items: center;
+      background: var(--indigo-soft); color: var(--indigo); font-size: 10px; font-weight: 700;
+    }
+    #agent-teams-ui .workspace b { display: block; font-size: 11px; font-weight: 550; color: var(--rail-text); }
+    #agent-teams-ui .workspace span { display: block; font-size: 9px; color: var(--rail-muted); margin-top: 1px; }
+    #agent-teams-ui .workspace .ws-chevron { margin-left: auto; color: var(--rail-muted); }
+    #agent-teams-ui .nav-group { display: grid; gap: 3px; }
+    #agent-teams-ui .nav-label { padding: 0 10px; margin-bottom: 2px; font-size: 9.5px; letter-spacing: .13em; text-transform: uppercase; color: var(--rail-muted); }
+    #agent-teams-ui .nav-item {
+      width: 100%; display: flex; align-items: center; gap: 9px;
+      border: 1px solid transparent; background: transparent; color: var(--rail-muted);
+      padding: 8px 10px; border-radius: 9px; text-align: left; font-size: 12px;
+      position: relative; transition: background .15s ease, color .15s ease, transform .15s ease;
+    }
+    #agent-teams-ui .nav-item:hover { background: var(--rail-hover); color: var(--rail-text); }
+    #agent-teams-ui .nav-item.active { background: var(--rail-active); color: var(--rail-text); border-color: color-mix(in srgb, var(--indigo) 22%, transparent); }
+    #agent-teams-ui .nav-item.active::before {
+      content: ""; position: absolute; left: -12px; top: 7px; bottom: 7px; width: 3px;
+      border-radius: 0 4px 4px 0; background: var(--indigo);
+    }
+    #agent-teams-ui .nav-item .at-icon { color: currentColor; opacity: .9; }
+    #agent-teams-ui .nav-item .nav-badge {
+      margin-left: auto; min-width: 18px; height: 17px; padding: 0 5px; border-radius: 5px;
+      display: inline-grid; place-items: center; font-size: 9px;
+      background: var(--indigo-soft); color: var(--indigo);
+    }
+    #agent-teams-ui .sidebar-foot { margin-top: auto; display: grid; gap: 10px; }
+    #agent-teams-ui .rail-status { display: flex; align-items: center; gap: 7px; padding: 8px 9px; border-radius: 9px; background: var(--rail-child); border: 1px solid var(--rail-line); font-size: 10.5px; color: var(--rail-muted); }
+    #agent-teams-ui .rail-status .label { color: var(--rail-text); font-size: 10.5px; font-weight: 500; }
+    #agent-teams-ui .rail-status .rail-status-tag { margin-left: auto; padding: 2px 6px; border-radius: 4px; background: var(--mint-soft); color: var(--mint); font-size: 10px; }
+    #agent-teams-ui .code { font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace; font-style: normal; font-size: .92em; letter-spacing: .02em; color: var(--code-text); background: var(--surface-2); border-radius: 3px; padding: 1px 4px; }
+    #agent-teams-ui .license i { font-style: normal; color: var(--text); }
+    #agent-teams-ui .main { min-width: 0; min-height: 0; display: flex; flex-direction: column; position: relative; overflow: hidden; }
+    #agent-teams-ui .topbar {
+      height: 64px; flex: 0 0 auto; display: flex; align-items: center; gap: 14px;
+      padding: 0 26px; border-bottom: 1px solid var(--line);
+      background:
+        radial-gradient(140% 80% at 50% 0%, var(--glow-soft), transparent 64%),
+        var(--topbar-bg);
+      -webkit-backdrop-filter: blur(30px) saturate(180%);
+      backdrop-filter: blur(30px) saturate(180%);
+      box-shadow: inset 0 1px 0 var(--glow-strong);
+    }
+    #agent-teams-ui .crumb { display: flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 550; min-width: 0; }
+    #agent-teams-ui .crumb .muted { color: var(--muted); font-weight: 400; }
+    #agent-teams-ui .crumb .current { color: var(--text); }
+    #agent-teams-ui .top-right { margin-left: auto; display: flex; align-items: center; gap: 12px; min-width: 0; }
+    #agent-teams-ui .topbar-status,
+    #agent-teams-ui .topbar-actions { display: flex; align-items: center; gap: 6px; min-width: 0; }
+    #agent-teams-ui .topbar-actions { padding-left: 12px; border-left: 1px solid var(--line); }
+    #agent-teams-ui .topbar-actions .btn { min-width: 58px; }
+    #agent-teams-ui .topbar-actions .btn.danger { min-width: 48px; }
+    #agent-teams-ui #hard-stop { min-width: 78px; }
+    #agent-teams-ui #hard-stop .lock-icon { width: 10px; height: 10px; flex: 0 0 auto; overflow: visible; }
+    #agent-teams-ui #hard-stop .lock-icon path,
+    #agent-teams-ui #hard-stop .lock-icon rect { fill: none; stroke: currentColor; stroke-width: 1.3; stroke-linecap: round; stroke-linejoin: round; }
+    #agent-teams-ui #hard-stop .lock-icon path { transform-box: view-box; transform-origin: 4px 5px; transition: transform .16s ease; }
+    #agent-teams-ui #hard-stop.armed .lock-icon path { transform: translate(1.2px, -0.8px) rotate(22deg); }
+    #agent-teams-ui .pill {
+      height: 27px; display: inline-flex; align-items: center; gap: 6px;
+      padding: 0 9px; border-radius: 999px; font-size: 10.5px; color: var(--muted);
+      background: var(--surface); border: 1px solid var(--line); white-space: nowrap;
+    }
+    #agent-teams-ui .pill.live { color: var(--mint); background: var(--mint-soft); border-color: transparent; }
+    #agent-teams-ui .pill.live .dot { background: var(--mint); box-shadow: 0 0 0 3px var(--mint-soft); }
+    #agent-teams-ui .pill.indigo { color: var(--indigo); background: var(--indigo-soft); border-color: transparent; }
+    #agent-teams-ui .pill.amber { color: var(--amber); background: var(--amber-soft); border-color: transparent; }
+    #agent-teams-ui .dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; background: var(--muted); }
+    #agent-teams-ui .rail-status .dot,
+    #agent-teams-ui .pill.live .dot,
+    #agent-teams-ui #page-overview .worker-card .dot { width: 8px; height: 8px; box-shadow: 0 0 0 3px var(--mint-soft); }
+    #agent-teams-ui #page-dual .mini-task .dot,
+    #agent-teams-ui #page-dual .pool-row .dot { width: 8px; height: 8px; flex: 0 0 auto; box-shadow: 0 0 0 3px var(--lamp-glow, var(--mint-soft)); }
+    #agent-teams-ui #page-dual .dot.tone-mint,
+    #agent-teams-ui #page-merge .dot.tone-mint { background: var(--mint); --lamp-glow: var(--mint-soft); }
+    #agent-teams-ui #page-dual .dot.tone-indigo,
+    #agent-teams-ui #page-merge .dot.tone-indigo { background: var(--indigo); --lamp-glow: var(--indigo-soft); }
+    #agent-teams-ui #page-dual .dot.tone-muted,
+    #agent-teams-ui #page-merge .dot.tone-muted { background: var(--muted); --lamp-glow: color-mix(in srgb, var(--muted) 18%, transparent); }
+    #agent-teams-ui #page-merge .dot.tone-amber { background: var(--amber); --lamp-glow: var(--amber-soft); }
+    #agent-teams-ui #page-merge .dot.tone-rose { background: var(--rose); --lamp-glow: var(--rose-soft); }
+    #agent-teams-ui .avatar { width: 27px; height: 27px; border-radius: 8px; display: inline-grid; place-items: center; background: var(--surface-2); color: var(--muted); font-size: 10px; font-weight: 650; }
+    #agent-teams-ui .avatar.indigo { background: var(--indigo-soft); color: var(--indigo); }
+    #agent-teams-ui .avatar.mint { background: var(--mint-soft); color: var(--mint); }
+    #agent-teams-ui .avatar.amber { background: var(--amber-soft); color: var(--amber); }
+    #agent-teams-ui .avatar.violet { background: var(--violet-soft); color: var(--violet); }
+    #agent-teams-ui .icon-btn {
+      width: 28px; height: 28px; border-radius: 8px; border: 1px solid transparent;
+      background: transparent; color: var(--muted); display: grid; place-items: center;
+    }
+    #agent-teams-ui .icon-btn:hover { background: var(--surface-2); color: var(--text); }
+    #agent-teams-ui .theme-toggle { margin-left: 2px; border-color: var(--line); background: var(--surface-2); }
+    #agent-teams-ui .theme-toggle:hover { background: var(--surface-3); border-color: var(--line-strong); }
+    #agent-teams-ui .btn {
+      height: 33px; padding: 0 12px; border-radius: 9px; border: 1px solid var(--line-strong);
+      background: var(--surface); color: var(--text); display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+      font-size: 11.5px; font-weight: 550; white-space: nowrap; transition: background .15s ease, border-color .15s ease, transform .15s ease;
+    }
+    #agent-teams-ui .btn:hover { background: var(--surface-2); border-color: var(--line-strong); }
+    #agent-teams-ui .btn:active { transform: translateY(1px); }
+    #agent-teams-ui .btn.primary { background: var(--accent); color: #fff; border-color: transparent; box-shadow: none; }
+    #agent-teams-ui .btn.primary:hover { background: #0b74e8; filter: none; }
+    #agent-teams-ui .btn.soft { background: var(--indigo-soft); color: var(--indigo); border-color: transparent; }
+    #agent-teams-ui .btn.ghost { background: transparent; color: var(--muted); border-color: transparent; }
+    #agent-teams-ui .btn.ghost:hover { color: var(--text); background: var(--surface-2); }
+    #agent-teams-ui .btn.sm { height: 27px; padding: 0 9px; font-size: 10.5px; border-radius: 8px; }
+    #agent-teams-ui .btn.danger { color: var(--rose); background: var(--rose-soft); border-color: transparent; }
+    #agent-teams-ui .btn:disabled { opacity: .45; cursor: not-allowed; }
+    #agent-teams-ui .btn:focus-visible { outline: 2px solid var(--indigo); outline-offset: 2px; }
+    #agent-teams-ui .icon { width: 15px; height: 15px; display: inline-grid; place-items: center; flex: 0 0 auto; }
+    #agent-teams-ui .icon[data-lucide]::before { content: "•"; font-family: "Segoe UI Symbol", "Segoe UI", sans-serif; font-size: 11px; font-weight: 600; line-height: 1; }
+    #agent-teams-ui .icon[data-lucide="check"]::before, #agent-teams-ui .icon[data-lucide="check-circle-2"]::before, #agent-teams-ui .icon[data-lucide="badge-check"]::before, #agent-teams-ui .icon[data-lucide="shield-check"]::before { content: "✓"; }
+    #agent-teams-ui .icon[data-lucide="plus"]::before { content: "+"; }
+    #agent-teams-ui .icon[data-lucide="more-horizontal"]::before { content: "⋯"; }
+    #agent-teams-ui .icon[data-lucide="pause"]::before { content: "Ⅱ"; font-size: 9px; }
+    #agent-teams-ui .icon[data-lucide="git-pull-request"]::before, #agent-teams-ui .icon[data-lucide="arrow-left-right"]::before { content: "⇄"; }
+    #agent-teams-ui .icon[data-lucide="arrow-right"]::before { content: "→"; }
+    #agent-teams-ui .icon[data-lucide="refresh-cw"]::before { content: "↻"; }
+    #agent-teams-ui .icon[data-lucide="history"]::before { content: "↺"; }
+    #agent-teams-ui .icon[data-lucide="undo-2"]::before { content: "↶"; }
+    #agent-teams-ui .icon[data-lucide="alert-triangle"]::before { content: "!"; }
+    #agent-teams-ui .icon[data-lucide="radar"]::before, #agent-teams-ui .icon[data-lucide="activity"]::before { content: "◎"; }
+    #agent-teams-ui .icon[data-lucide="users"]::before, #agent-teams-ui .icon[data-lucide="bot"]::before { content: "●"; }
+    #agent-teams-ui .icon[data-lucide="folder-git-2"]::before, #agent-teams-ui .icon[data-lucide="hard-drive"]::before, #agent-teams-ui .icon[data-lucide="memory-stick"]::before, #agent-teams-ui .icon[data-lucide="container"]::before, #agent-teams-ui .icon[data-lucide="lock"]::before { content: "▣"; }
+    #agent-teams-ui .icon[data-lucide="list-tree"]::before, #agent-teams-ui .icon[data-lucide="layers"]::before { content: "☰"; }
+    #agent-teams-ui .icon[data-lucide="wallet"]::before { content: "◫"; }
+    #agent-teams-ui .icon[data-lucide="file-diff"]::before { content: "≢"; }
+    #agent-teams-ui .icon[data-lucide="columns-2"]::before { content: "▥"; }
+    #agent-teams-ui .icon[data-lucide="chevron-right"]::before { content: "›"; }
+    #agent-teams-ui .icon[data-lucide="chevron-left"]::before { content: "‹"; }
+    #agent-teams-ui .icon[data-lucide="thermometer"]::before { content: "t"; }
+    #agent-teams-ui .icon[data-lucide="terminal"]::before { content: ">"; }
+    #agent-teams-ui .icon[data-lucide="sparkles"]::before { content: "✦"; }
+    #agent-teams-ui .icon[data-lucide="snowflake"]::before { content: "❄"; }
+    #agent-teams-ui .icon[data-lucide="settings-2"]::before { content: "⚙"; }
+    #agent-teams-ui .icon[data-lucide="search"]::before { content: "⌕"; }
+    #agent-teams-ui .icon[data-lucide="message-square"]::before { content: "▭"; }
+    #agent-teams-ui .icon[data-lucide="maximize-2"]::before { content: "⤢"; }
+    #agent-teams-ui .icon[data-lucide="layout-grid"]::before, #agent-teams-ui .icon[data-lucide="layout-dashboard"]::before { content: "▦"; }
+    #agent-teams-ui .icon[data-lucide="git-merge"]::before { content: "⋔"; }
+    #agent-teams-ui .icon[data-lucide="filter"]::before { content: "▽"; }
+    #agent-teams-ui .icon[data-lucide="download"]::before { content: "↓"; }
+    #agent-teams-ui .icon[data-lucide="crown"]::before { content: "♛"; }
+    #agent-teams-ui .icon[data-lucide="clock-3"]::before { content: "◷"; }
+    #agent-teams-ui .icon[data-lucide="sun"]::before { content: "☼"; }
+    #agent-teams-ui .icon[data-lucide="moon"]::before { content: "☾"; }
+    #agent-teams-ui .icon[data-lucide="chevrons-up-down"]::before { content: "⇅"; }
+    #agent-teams-ui .icon[data-lucide="box"]::before { content: "□"; }
+    #agent-teams-ui .icon[data-lucide="bell"]::before { content: "◍"; font-size: 9px; filter: grayscale(1); }
+    #agent-teams-ui .icon svg { width: 100%; height: 100%; }
+    #agent-teams-ui .content { padding: 24px 26px 30px; min-width: 0; flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+    #agent-teams-ui .page { display: none; }
+    #agent-teams-ui .page.active { display: block; }
+    #agent-teams-ui .page-head { display: flex; align-items: flex-start; gap: 14px; margin-bottom: 18px; }
+    #agent-teams-ui .page-head h1 { margin: 0; font-size: 25px; line-height: 1.2; letter-spacing: -.025em; font-weight: 650; }
+    #agent-teams-ui .page-head p { margin: 5px 0 0; color: var(--muted); font-size: 11.5px; }
+    #agent-teams-ui .muted { color: var(--muted); }
+    #agent-teams-ui .small { font-size: 10.5px; }
+    #agent-teams-ui .tiny { font-size: 9.5px; }
+    #agent-teams-ui .mono { font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace; font-size: 9.5px; color: var(--muted); background: var(--surface-2); padding: 2px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+    #agent-teams-ui .badge {
+      display: inline-flex; align-items: center; justify-content: center; gap: 4px; height: 20px; padding: 0 6px;
+      border-radius: 5px; font-size: 9.5px; font-weight: 500; white-space: nowrap; line-height: 1;
+      background: var(--surface-2); color: var(--muted); border: 1px solid var(--line);
+    }
+    #agent-teams-ui .badge.mint { color: var(--mint); background: var(--mint-soft); border-color: transparent; }
+    #agent-teams-ui .badge.amber { color: var(--amber); background: var(--amber-soft); border-color: transparent; }
+    #agent-teams-ui .badge.indigo { color: var(--indigo); background: var(--indigo-soft); border-color: transparent; }
+    #agent-teams-ui .badge.violet { color: var(--violet); background: var(--violet-soft); border-color: transparent; }
+    #agent-teams-ui .badge.rose { color: var(--rose); background: var(--rose-soft); border-color: transparent; }
+    #agent-teams-ui .badge.faint { color: var(--muted); background: var(--surface-3); border-color: var(--line); }
+    #agent-teams-ui .stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 9px; margin-bottom: 16px; }
+    #agent-teams-ui .stat {
+      padding: 13px 14px 12px; border-radius: 11px;
+      background: var(--glass);
+      border: 1px solid var(--line);
+      -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+      backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+      box-shadow: inset 0 1px 0 var(--inset-highlight-soft);
+      /* Column flex so `.stat-value` can sink to a shared baseline even when a
+         card's label row wraps onto two rows. */
+      display: flex; flex-direction: column;
+    }
+    /* Both halves of the label used to share one line. At 1280x720 the four
+       stat cards are only ~190px wide inside, while the English/Japanese/Korean
+       badge alone needs ~150px, so keeping one line was possible only by cutting
+       the label (which once left `현재 멤버` as `현재 `). Wrapping is the honest
+       fix: the badge drops to its own row instead of the label losing words.
+       The row reserves a two-line height in every card and locale, so a wrapped
+       card is exactly as tall as an unwrapped one and the numbers below stay on
+       a single baseline (measured 0px spread at all six viewports). 50px is the
+       measured natural two-line height: an independent 48-combination sweep
+       (4 locales x 6 widths x 2 themes) found 0px baseline spread from 50px up
+       and 0.75px spread at 49px, so 50 is the smallest value that holds. */
+    #agent-teams-ui .stat-label {
+      display: flex; align-items: flex-start; justify-content: space-between;
+      flex-wrap: wrap; gap: 4px 8px; min-height: 50px;
+      font-size: 11px; color: var(--muted); min-width: 0;
+    }
+    /* Any text child of the label may shrink and ellipsize, not just the first:
+       the member-residency card ships two label spans and swaps which one is
+       visible per theme, so `:first-child` protected only the hidden one. */
+    #agent-teams-ui .stat-label > span:not(.badge):not(.icon),
+    #agent-teams-ui .stat-label > :first-child:not(.badge):not(.icon) {
+      min-width: 0; max-width: 100%;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    /* `.badge` is an inline-flex pill, so `text-overflow` on it is inert; this
+       shrink rule only stops it pushing past the card edge. */
+    #agent-teams-ui .stat-label > .badge { min-width: 0; max-width: 100%; flex: 0 1 auto; margin-left: auto; overflow: hidden; }
+    /* Top-aligned, not bottom-aligned: the label row already reserves a fixed
+       height, so anchoring the number directly under it puts all four cards on
+       one baseline regardless of how tall each footnote turns out. Bottom
+       alignment via `margin-top:auto` failed here because the footnotes differ
+       in line count between cards. */
+    #agent-teams-ui .stat-value { font-size: 22px; line-height: 1.2; font-weight: 650; letter-spacing: -.03em; margin-top: 0; padding-top: 5px; font-variant-numeric: tabular-nums; }
+    /* The footnotes differ in line count between cards ("A team 4 · B team 2"
+       is one line, "Merge slot 1/1 · patrol slot 1/1" is two). The foot absorbs
+       the leftover height so the progress track stays pinned to the card floor
+       without dragging the number with it. */
+    #agent-teams-ui .stat-foot { font-size: 11px; color: var(--muted); margin-top: 2px; flex: 1 1 auto; }
+    #agent-teams-ui .stat-track { height: 4px; margin-top: 9px; border-radius: 99px; background: var(--surface-3); overflow: hidden; }
+    #agent-teams-ui .stat-track i { display: block; height: 100%; border-radius: inherit; background: var(--indigo); }
+    #agent-teams-ui .panel {
+      background: var(--glass);
+      border: 1px solid var(--line);
+      -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+      backdrop-filter: blur(var(--glass-blur)) saturate(180%);
+      box-shadow: inset 0 1px 0 var(--inset-highlight-soft);
+      border-radius: 12px;
+      min-width: 0;
+    }
+    #agent-teams-ui .panel-head { min-height: 43px; display: flex; align-items: center; gap: 8px; padding: 10px 13px; border-bottom: 1px solid var(--line); }
+    #agent-teams-ui .panel-head h2 { margin: 0; font-size: 11.5px; font-weight: 600; letter-spacing: -.01em; white-space: nowrap; flex: 0 0 auto; }
+    #agent-teams-ui .panel-head > .muted { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #agent-teams-ui .panel-head .muted { font-size: 9.5px; }
+    #agent-teams-ui .panel-icon-btn {
+      width: 26px; height: 26px; padding: 0; flex: 0 0 auto;
+      display: inline-grid; place-items: center;
+      border: 1px solid var(--line); border-radius: 7px;
+      background: var(--surface-2); color: var(--muted);
+      transition: color .15s ease, background .15s ease, border-color .15s ease;
+    }
+    #agent-teams-ui .panel-icon-btn:hover { color: var(--text); background: var(--surface-3); border-color: var(--line-strong); }
+    #agent-teams-ui .panel-icon-btn:focus-visible { outline: 2px solid var(--indigo); outline-offset: 2px; }
+    #agent-teams-ui .panel-actions { margin-left: auto; display: flex; align-items: center; gap: 4px; }
+    #agent-teams-ui .workbench { display: grid; grid-template-columns: 196px minmax(0, 1fr); gap: 11px; align-items: start; }
+    #agent-teams-ui .roster-body { padding: 10px; display: grid; gap: 10px; }
+    #agent-teams-ui .captain {
+      display: grid; gap: 7px; padding: 10px; border-radius: 10px;
+      background: var(--surface-2);
+      border: 1px solid var(--line);
+    }
+    #agent-teams-ui .captain-top { display: flex; align-items: center; gap: 8px; }
+    #agent-teams-ui .captain-top .avatar { width: 30px; height: 30px; border-radius: 9px; }
+    #agent-teams-ui .captain-top b { display: block; font-size: 11px; font-weight: 600; }
+    #agent-teams-ui .captain-top span { display: block; font-size: 9px; color: var(--muted); }
+    #agent-teams-ui .captain-meta { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; font-size: 9px; color: var(--muted); }
+    #agent-teams-ui .progress-mini { display: flex; align-items: center; gap: 7px; font-size: 11px; color: var(--muted); }
+    #agent-teams-ui .progress-mini .track { flex: 1; height: 5px; border-radius: 99px; background: var(--surface-3); overflow: hidden; }
+    #agent-teams-ui .progress-mini .track i { display: block; height: 100%; border-radius: inherit; background: var(--mint); }
+    #agent-teams-ui .roster-list { display: grid; gap: 2px; }
+    #agent-teams-ui .roster-row {
+      display: grid; grid-template-columns: 24px minmax(0,1fr) auto; gap: 7px; align-items: center;
+      border: 1px solid transparent; background: transparent; border-radius: 8px; padding: 6px;
+      text-align: left; transition: background .15s ease, border-color .15s ease;
+    }
+    #agent-teams-ui .roster-row:hover { background: var(--surface-2); }
+    #agent-teams-ui .roster-row.selected { background: var(--indigo-soft); border-color: color-mix(in srgb, var(--indigo) 24%, transparent); }
+    #agent-teams-ui .roster-row .avatar { width: 24px; height: 24px; border-radius: 7px; font-size: 9px; }
+    #agent-teams-ui .roster-row b { display: block; color: var(--text); font-size: 9.5px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #agent-teams-ui .roster-row span { display: block; font-size: 8.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #agent-teams-ui .graph-wrap { position: relative; padding: 12px 13px 4px; min-height: 180px; }
+    #agent-teams-ui .graph-wrap svg { width: 100%; height: auto; display: block; }
+    /* Task-tree palette: state first, team identity second. Every node starts
+       from the waiting palette, then team / status / focus / selection layers
+       override only through inherited custom properties. Selection never
+       erases the status colour, and light mode gets its own contrast set. */
+    #agent-teams-ui .gnode {
+      --node-bg: var(--tree-waiting-bg);
+      --node-bd: var(--tree-waiting-bd);
+      --node-title: var(--tree-waiting-title);
+      --node-meta: var(--tree-waiting-meta);
+      --node-stroke: 1.4;
+      transition: opacity .18s ease;
+    }
+    #agent-teams-ui .gnode rect.node-bg {
+      fill: var(--node-bg);
+      stroke: var(--node-bd);
+      stroke-width: var(--node-stroke);
+      filter: drop-shadow(0 1px 2px rgba(15, 23, 42, .16));
+      transition: fill .18s ease, stroke .18s ease, stroke-width .18s ease, filter .18s ease;
+    }
+    #agent-teams-ui .gnode text { font-family: inherit; }
+    #agent-teams-ui .gnode .gid,
+    #agent-teams-ui .gnode .grole,
+    #agent-teams-ui .gnode .gstatus {
+      fill: var(--node-meta);
+      font-size: 11.5px;
+      font-weight: 500;
+    }
+    #agent-teams-ui .gnode .gtitle {
+      fill: var(--node-title);
+      font-size: 13px;
+      font-weight: 500;
+    }
+    #agent-teams-ui .gnode .gdot {
+      fill: var(--tree-status-done);
+      stroke: var(--node-bg);
+      stroke-width: 1.2;
+      filter: drop-shadow(0 0 3px color-mix(in srgb, var(--tree-status-done) 50%, transparent));
+    }
+    #agent-teams-ui .gnode.dimmed { opacity: .4; }
+    #agent-teams-ui .gnode.failed.dimmed { opacity: .55; }
+    #agent-teams-ui .gnode.is-hidden, #agent-teams-ui .gedge.is-hidden { display: none; }
+    #agent-teams-ui .gnode.team-alpha {
+      --node-bg: var(--tree-alpha-bg);
+      --node-bd: var(--tree-alpha-bd);
+      --node-title: var(--tree-alpha-title);
+      --node-meta: var(--tree-alpha-meta);
+    }
+    #agent-teams-ui .gnode.team-beta {
+      --node-bg: var(--tree-beta-bg);
+      --node-bd: var(--tree-beta-bd);
+      --node-title: var(--tree-beta-title);
+      --node-meta: var(--tree-beta-meta);
+    }
+    #agent-teams-ui .gnode.waiting {
+      --node-bg: var(--tree-waiting-bg);
+      --node-bd: var(--tree-waiting-bd);
+      --node-title: var(--tree-waiting-title);
+      --node-meta: var(--tree-waiting-meta);
+    }
+    #agent-teams-ui .gnode.queued {
+      --node-bg: var(--tree-waiting-bg);
+      --node-bd: var(--tree-waiting-bd);
+      --node-title: var(--tree-waiting-title);
+      --node-meta: var(--tree-waiting-meta);
+    }
+    #agent-teams-ui .gnode.cancelled {
+      --node-bg: var(--tree-cancelled-bg);
+      --node-bd: var(--tree-cancelled-bd);
+      --node-title: var(--tree-cancelled-title);
+      --node-meta: var(--tree-cancelled-meta);
+      opacity: 1;
+    }
+    #agent-teams-ui .gnode.failed {
+      --node-bg: var(--tree-failed-bg);
+      --node-bd: var(--tree-failed-bd);
+      --node-title: var(--tree-failed-title);
+      --node-meta: var(--tree-failed-meta);
+    }
+    #agent-teams-ui .gnode.waiting rect.node-bg,
+    #agent-teams-ui .gnode.queued rect.node-bg,
+    #agent-teams-ui .gnode.active rect.node-bg { stroke-dasharray: 5 3; }
+    #agent-teams-ui .gnode.cancelled rect.node-bg { stroke-dasharray: 4 3; }
+    #agent-teams-ui .gnode.waiting .gdot { fill: var(--tree-status-waiting); filter: drop-shadow(0 0 3px color-mix(in srgb, var(--tree-status-waiting) 50%, transparent)); }
+    #agent-teams-ui .gnode.queued .gdot { fill: var(--tree-status-waiting); filter: drop-shadow(0 0 3px color-mix(in srgb, var(--tree-status-waiting) 50%, transparent)); }
+    #agent-teams-ui .gnode.active .gdot { display: none; }
+    #agent-teams-ui .gnode.failed .gdot { fill: var(--tree-status-failed); filter: drop-shadow(0 0 3px color-mix(in srgb, var(--tree-status-failed) 50%, transparent)); }
+    #agent-teams-ui .gnode.cancelled .gdot { fill: var(--tree-status-cancelled); filter: drop-shadow(0 0 3px color-mix(in srgb, var(--tree-status-cancelled) 50%, transparent)); }
+    #agent-teams-ui .gnode.team-alpha.focused {
+      --node-bg: var(--tree-alpha-focus-bg);
+      --node-bd: var(--tree-alpha-focus-bd);
+      --node-stroke: 2.2;
+    }
+    #agent-teams-ui .gnode.team-beta.focused {
+      --node-bg: var(--tree-beta-focus-bg);
+      --node-bd: var(--tree-beta-focus-bd);
+      --node-stroke: 2.2;
+    }
+    #agent-teams-ui .gnode.waiting.focused {
+      --node-bg: var(--tree-waiting-focus-bg);
+      --node-bd: var(--tree-waiting-focus-bd);
+      --node-stroke: 2.2;
+    }
+    #agent-teams-ui .gnode.cancelled.focused {
+      --node-bg: var(--tree-cancelled-focus-bg);
+      --node-bd: var(--tree-cancelled-focus-bd);
+      --node-stroke: 2.2;
+    }
+    #agent-teams-ui .gnode.failed.focused {
+      --node-bg: var(--tree-failed-focus-bg);
+      --node-bd: var(--tree-failed-focus-bd);
+      --node-stroke: 2.4;
+    }
+    #agent-teams-ui .gnode.team-alpha.selected {
+      --node-bg: var(--tree-alpha-selected-bg);
+      --node-bd: var(--tree-alpha-selected-bd);
+      --node-stroke: 2.6;
+    }
+    #agent-teams-ui .gnode.team-beta.selected {
+      --node-bg: var(--tree-beta-selected-bg);
+      --node-bd: var(--tree-beta-selected-bd);
+      --node-stroke: 2.6;
+    }
+    #agent-teams-ui .gnode.failed.selected {
+      --node-bg: var(--tree-failed-selected-bg);
+      --node-bd: var(--tree-failed-selected-bd);
+      --node-stroke: 2.6;
+    }
+    #agent-teams-ui .gnode.selected { opacity: 1; }
+    #agent-teams-ui .gnode:focus-visible rect.node-bg { stroke-width: 3; }
+    #agent-teams-ui .grrot { fill: var(--muted); font-size: 9px; letter-spacing: .07em; }
+    #agent-teams-ui .dag-large .graph-wrap svg { cursor: grab; }
+    #agent-teams-ui .dag-large .graph-wrap svg:active { cursor: grabbing; }
+    #agent-teams-ui .task-detail-tabs { display: flex; gap: 5px; border-bottom: 1px solid var(--line); padding-bottom: 7px; }
+    #agent-teams-ui .task-detail-tab { border: 1px solid var(--line); background: var(--surface-2); color: var(--muted); border-radius: 6px; padding: 5px 8px; font: inherit; font-size: 11px; cursor: pointer; }
+    #agent-teams-ui .task-detail-tab.active { color: var(--indigo); background: var(--indigo-soft); border-color: color-mix(in srgb, var(--indigo) 35%, var(--line)); }
+    #agent-teams-ui .task-detail-desc { margin: 0; padding: 9px 10px; border-radius: 8px; background: var(--surface-2); border: 1px solid var(--line); color: var(--text); font-size: 11px; line-height: 1.6; }
+    #agent-teams-ui .session-panel { display: grid; gap: 8px; }
+    #agent-teams-ui .session-panel pre.empty { color: var(--muted); }
+    #agent-teams-ui .session-panel pre { margin: 0; max-height: 220px; overflow: auto; padding: 9px; border-radius: 8px; background: var(--surface-2); border: 1px solid var(--line); color: var(--text); font: 11px/1.55 ui-monospace, SFMono-Regular, Consolas, monospace; white-space: pre-wrap; }
+    #agent-teams-ui .session-meta { display: flex; flex-wrap: wrap; gap: 5px; font-size: 11px; }
+    /* Eight dots ring an empty centre; one bright point travels clockwise.
+       Dark uses white dots, light uses black dots. */
+    #agent-teams-ui .gnode .run-dot {
+      fill: var(--run);
+      opacity: .3;
+      filter: drop-shadow(0 0 2px color-mix(in srgb, var(--run) 45%, transparent));
+      animation: tree-run-dot 1.12s linear infinite;
+      animation-delay: calc(var(--i, 0) * 140ms - 1120ms);
+    }
+    @keyframes tree-run-dot {
+      0%, 10% { opacity: 1; }
+      20%, 100% { opacity: .3; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      #agent-teams-ui .gnode .run-dot { animation: none !important; opacity: .9; }
+      #agent-teams-ui .gnode,
+      #agent-teams-ui .gnode rect.node-bg,
+      #agent-teams-ui .gedge,
+      #agent-teams-ui .toast { transition: none !important; }
+    }
+    /* Dashed styling has two independent causes: a cross-team handoff is dashed
+       by relationship type, while an unfinished in-team dependency is dashed
+       by status. The node border uses the same status cue; do not infer team
+       direction or task-stage order from a node's vertical screen position. */
+    #agent-teams-ui .gnode { cursor: pointer; }
+    #agent-teams-ui .gedge { fill: none; stroke: var(--line-strong); stroke-width: 1.5; }
+    #agent-teams-ui .gedge.team-alpha { stroke: var(--tree-edge-alpha); }
+    #agent-teams-ui .gedge.team-beta { stroke: var(--tree-edge-beta); }
+    #agent-teams-ui .gedge.waiting {
+      opacity: .58;
+      stroke-width: 1.5;
+      stroke-dasharray: 4 3;
+    }
+    #agent-teams-ui .gedge.waiting.handoff-linked { opacity: .85; }
+    /* The cross-team bridge is the one dashed line allowed to stay prominent:
+       it is the message being handed over, not an ordinary pending dependency. */
+    #agent-teams-ui .gedge.handoff { opacity: .85; stroke-width: 1.5; stroke-dasharray: 5 4; }
+    #agent-teams-ui .gedge.failed { opacity: .95; }
+    #agent-teams-ui .gedge.cancelled {
+      opacity: .45;
+      stroke-dasharray: 3 4;
+    }
+    /* Dimming must win over the waiting/handoff opacity rules. */
+    #agent-teams-ui .gedge.dimmed { opacity: .16; }
+    #agent-teams-ui .gedge.waiting.dimmed { opacity: .18; }
+    #agent-teams-ui .gedge.handoff.dimmed { opacity: .22; }
+    /* An active edge keeps its dash rule but is raised to full opacity, so it
+       reads as part of the selected chain. */
+    #agent-teams-ui .gedge.active { opacity: 1; stroke-width: 1.5; }
+    /* A short bright segment travels from source to target on top of every
+       connection. The base line keeps its solid/dashed status meaning. */
+    #agent-teams-ui .gedge-flow {
+      fill: none;
+      stroke: var(--tree-edge-alpha);
+      stroke-width: 2.1;
+      stroke-linecap: round;
+      stroke-dasharray: 12 220;
+      stroke-dashoffset: 0;
+      opacity: 0;
+      pointer-events: none;
+      stroke-dasharray: 14 1000;
+      stroke-dashoffset: 0;
+    }
+    #agent-teams-ui .gedge-flow.team-beta { stroke: var(--tree-edge-beta); }
+    #agent-teams-ui .gedge-flow.dimmed { opacity: 0 !important; }
+    #agent-teams-ui.edge-flow-booting .gedge-flow { opacity: 0; }
+    #agent-teams-ui .flow-switch { height: 24px; display: inline-flex; align-items: center; gap: 6px; padding: 0 8px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface-2); color: var(--muted); font: inherit; font-size: 10.5px; cursor: pointer; white-space: nowrap; }
+    #agent-teams-ui .flow-switch:hover { color: var(--text); border-color: var(--line-strong); background: var(--surface-3); }
+    #agent-teams-ui .flow-track { width: 26px; height: 15px; border-radius: 99px; background: var(--surface-3); position: relative; transition: background .15s ease; }
+    #agent-teams-ui .flow-track i { position: absolute; top: 2px; left: 2px; width: 11px; height: 11px; border-radius: 50%; background: var(--muted); transition: transform .15s ease, background .15s ease; }
+    #agent-teams-ui .flow-switch[aria-checked="true"] .flow-track { background: var(--accent); }
+    #agent-teams-ui .flow-switch[aria-checked="true"] .flow-track i { transform: translateX(11px); background: #fff; }
+    @media (prefers-reduced-motion: reduce) {
+      #agent-teams-ui .gedge-flow { display: none; }
+    }
+
+    #agent-teams-ui .graph-foot { display: flex; align-items: center; gap: 10px; padding: 0 13px 10px; font-size: 10px; color: var(--muted); }
+    #agent-teams-ui .legend { display: inline-flex; align-items: center; gap: 4px; }
+    #agent-teams-ui .legend .dot { width: 5px; height: 5px; }
+    #agent-teams-ui .line-legend {
+      display: inline-flex; align-items: center; gap: 8px; padding: 4px 7px;
+      border: 1px solid var(--line); border-radius: 7px;
+      background: var(--surface-2); font-size: 10px; color: var(--muted); white-space: nowrap;
+    }
+    #agent-teams-ui .line-legend span { display: inline-flex; align-items: center; gap: 4px; }
+    #agent-teams-ui .line-legend .line { display: inline-block; width: 17px; height: 0; border-top: 1.8px solid var(--indigo); }
+    #agent-teams-ui .line-legend .line.dashed { border-top-style: dashed; opacity: .85; }
+    #agent-teams-ui .task-detail { position: absolute; top: 58px; right: 12px; z-index: 6; width: min(360px, calc(100% - 24px)); max-height: calc(100% - 72px); overflow: auto; padding: 12px 13px; display: grid; gap: 9px; background: var(--glass-strong); -webkit-backdrop-filter: blur(26px) saturate(140%); backdrop-filter: blur(26px) saturate(140%); border: 1px solid var(--line-strong); border-radius: 12px; box-shadow: var(--shadow); }
+    #agent-teams-ui .task-detail[data-side="left"] { left: 12px; right: auto; }
+    #agent-teams-ui .task-detail-head { display: flex; align-items: flex-start; gap: 8px; }
+    #agent-teams-ui .task-detail-head > div:nth-child(2) { min-width: 0; }
+    #agent-teams-ui .task-detail-head h2 { margin: 0; font-size: 12px; font-weight: 600; overflow-wrap: anywhere; }
+    #agent-teams-ui .task-detail-head p { margin: 2px 0 0; font-size: 11px; color: var(--muted); }
+    #agent-teams-ui #task-detail-status { margin-left: auto; flex: 0 0 auto; }
+    #agent-teams-ui .task-detail-close { flex: 0 0 auto; }
+    #agent-teams-ui .kv-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px 14px; font-size: 11px; color: var(--muted); }
+    #agent-teams-ui .kv-grid b { display: block; color: var(--text); font-weight: 500; font-size: 11px; margin-top: 1px; }
+    #agent-teams-ui .detail-body { padding: 12px; display: grid; gap: 11px; }
+    #agent-teams-ui .detail-top { display: flex; align-items: center; gap: 9px; }
+    #agent-teams-ui .detail-top .avatar { width: 36px; height: 36px; border-radius: 10px; font-size: 11px; }
+    #agent-teams-ui .detail-top b { display: block; font-size: 11.5px; font-weight: 600; }
+    #agent-teams-ui .detail-top span { display: block; font-size: 9px; color: var(--muted); margin-top: 1px; }
+    #agent-teams-ui .license {
+      display: grid; gap: 4px; padding: 9px; border-radius: 8px;
+      background: var(--surface-2); border: 1px solid var(--line);
+    }
+    #agent-teams-ui .license b { font-size: 9.5px; font-weight: 550; }
+    #agent-teams-ui .license span { font-size: 8.5px; color: var(--muted); }
+    #agent-teams-ui .kv { display: grid; grid-template-columns: 58px 1fr; gap: 5px 7px; font-size: 9.5px; }
+    #agent-teams-ui .kv dt { color: var(--muted); }
+    #agent-teams-ui .kv dd { margin: 0; color: var(--text); min-width: 0; }
+    #agent-teams-ui .action-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+    #agent-teams-ui .action-grid .btn { height: 28px; font-size: 9.5px; }
+    #agent-teams-ui .hint { font-size: 8.5px; color: var(--muted); line-height: 1.45; }
+
+    /* Tasks */
+    #agent-teams-ui .kanban { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 9px; }
+    #agent-teams-ui .column { padding: 10px; }
+    #agent-teams-ui .column-head { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; font-size: 9.5px; color: var(--muted); }
+    #agent-teams-ui .column-head b { color: var(--text); font-size: 10px; font-weight: 600; }
+    #agent-teams-ui .count { margin-left: auto; font-size: 8.5px; color: var(--faint); }
+    #agent-teams-ui .task {
+      padding: 9px; border-radius: 9px; background: var(--surface-2); border: 1px solid var(--line);
+      display: grid; gap: 6px; margin-bottom: 6px; cursor: pointer; transition: border-color .15s ease, transform .15s ease;
+    }
+    #agent-teams-ui .task:hover { border-color: var(--line-strong); }
+    #agent-teams-ui .task.selected { border-color: color-mix(in srgb, var(--indigo) 55%, transparent); background: var(--indigo-soft); }
+    #agent-teams-ui .task-id { font-size: 8.5px; color: var(--faint); letter-spacing: .02em; }
+    #agent-teams-ui .task-title { font-size: 10px; font-weight: 500; line-height: 1.4; }
+    #agent-teams-ui .task-meta { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; font-size: 8px; color: var(--muted); }
+    #agent-teams-ui .task-meta > span:not(.badge):not(.mono) { color: var(--text); }
+    #agent-teams-ui .task-bar { height: 3px; border-radius: 99px; background: var(--surface-3); overflow: hidden; }
+    #agent-teams-ui .task-bar i { display: block; height: 100%; background: var(--indigo); border-radius: inherit; }
+    #agent-teams-ui .task-detail-bar { margin-top: 12px; padding: 12px 13px; display: flex; align-items: center; gap: 12px; }
+    #agent-teams-ui .task-detail-bar h2 { margin: 0; font-size: 11.5px; font-weight: 600; }
+    #agent-teams-ui .task-detail-bar p { margin: 2px 0 0; font-size: 9px; color: var(--muted); }
+
+    /* Members */
+    #agent-teams-ui .member-layout { display: grid; grid-template-columns: minmax(0, 1fr) 294px; gap: 11px; align-items: start; }
+    #agent-teams-ui .table-wrap { overflow: hidden; }
+    #agent-teams-ui table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 10.5px; color: var(--text); }
+    #agent-teams-ui th { text-align: left; padding: 9px 11px; font-size: 8.5px; font-weight: 500; color: var(--muted); border-bottom: 1px solid var(--line); white-space: nowrap; }
+    #agent-teams-ui th:nth-child(1) { width: 24%; }
+    #agent-teams-ui th:nth-child(2) { width: 25%; }
+    #agent-teams-ui th:nth-child(3) { width: 8%; }
+    #agent-teams-ui th:nth-child(4) { width: 12%; }
+    #agent-teams-ui th:nth-child(5) { width: 18%; }
+    #agent-teams-ui th:nth-child(6) { width: 4%; }
+    /* The member table has five columns; the generic six-column widths leave
+       the status cell too narrow for "On duty" / localized equivalents. */
+    #agent-teams-ui #page-members table th:nth-child(1) { width: 24%; }
+    #agent-teams-ui #page-members table th:nth-child(2) { width: 24%; }
+    #agent-teams-ui #page-members table th:nth-child(3) { width: 12%; }
+    #agent-teams-ui #page-members table th:nth-child(4) { width: 18%; }
+    #agent-teams-ui #page-members table th:nth-child(5) { width: 22%; }
+    #agent-teams-ui #page-members table td:nth-child(3) { white-space: nowrap; }
+    #agent-teams-ui td { padding: 10px 11px; border-bottom: 1px solid var(--line); vertical-align: middle; overflow: hidden; }
+    #agent-teams-ui tr:last-child td { border-bottom: 0; }
+    #agent-teams-ui tbody tr { cursor: pointer; }
+    #agent-teams-ui tbody tr:hover td { background: var(--surface-2); }
+    #agent-teams-ui tbody tr.selected td { background: var(--indigo-soft); }
+    #agent-teams-ui .member-cell { display: flex; align-items: center; gap: 7px; min-width: 0; }
+    #agent-teams-ui .member-cell > div:last-child { min-width: 0; }
+    #agent-teams-ui .member-cell .avatar { width: 25px; height: 25px; border-radius: 7px; font-size: 9px; }
+    #agent-teams-ui .member-cell b { display: block; color: var(--text); font-size: 10.5px; font-weight: 550; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #agent-teams-ui .member-cell span { display: block; font-size: 8.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #agent-teams-ui .mini-track { width: 65px; height: 4px; border-radius: 99px; background: var(--surface-3); overflow: hidden; margin-bottom: 3px; }
+    #agent-teams-ui .mini-track i { display: block; height: 100%; background: var(--indigo); border-radius: inherit; }
+
+    /* Merge */
+    #agent-teams-ui .merge-layout { display: grid; grid-template-columns: 380px minmax(0, 1fr); gap: 14px; align-items: start; }
+    #agent-teams-ui .merge-side { display: grid; gap: 12px; align-content: start; }
+    #agent-teams-ui .queue-row { width: 100%; appearance: none; text-align: left; font: inherit; color: inherit; background: transparent; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; padding: 13px 15px; display: grid; grid-template-columns: 10px minmax(0, 1fr) auto; align-items: center; gap: 10px; cursor: pointer; }
+    #agent-teams-ui .queue-row:last-child { border-bottom: 0; }
+    #agent-teams-ui .queue-row:hover { background: var(--surface-2); }
+    #agent-teams-ui .queue-row.selected { background: var(--indigo-soft); box-shadow: inset 2px 0 0 var(--indigo); }
+    #agent-teams-ui .queue-row .dot { width: 8px; height: 8px; flex: 0 0 auto; box-shadow: 0 0 0 3px var(--lamp-glow, var(--mint-soft)); }
+    #agent-teams-ui .queue-main { min-width: 0; display: grid; gap: 3px; }
+    #agent-teams-ui .queue-row b { font-size: 12.5px; font-weight: 600; line-height: 1.35; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #agent-teams-ui .queue-row .queue-main span { font-size: 11px; line-height: 1.4; color: var(--muted); white-space: normal; }
+    #agent-teams-ui .queue-row > .badge { justify-self: end; align-self: center; font-size: 10.5px; }
+    #agent-teams-ui .merge-detail { padding: 18px; display: grid; gap: 16px; }
+    #agent-teams-ui .merge-hero { display: flex; align-items: center; gap: 12px; }
+    #agent-teams-ui .merge-hero .icon-box { width: 42px; height: 42px; border-radius: 11px; display: grid; place-items: center; background: var(--indigo-soft); color: var(--indigo); }
+    #agent-teams-ui .merge-hero h2 { margin: 0; font-size: 17px; font-weight: 600; line-height: 1.3; }
+    #agent-teams-ui .merge-hero p { margin: 3px 0 0; font-size: 12px; line-height: 1.45; color: var(--muted); }
+    #agent-teams-ui .merge-hero > .badge { align-self: flex-start; }
+    #agent-teams-ui .merge-section-title { display: flex; align-items: center; gap: 8px; margin-bottom: 9px; font-size: 12.5px; font-weight: 600; }
+    #agent-teams-ui .checklist { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+    #agent-teams-ui .check-row { display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2); font-size: 11.5px; line-height: 1.4; }
+    #agent-teams-ui .check-row .icon { width: 15px; height: 15px; color: var(--mint); }
+    #agent-teams-ui .check-row.pending .icon { color: var(--amber); }
+    #agent-teams-ui .merge-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 14px; border-top: 1px solid var(--line); }
+    #agent-teams-ui .merge-action-note { font-size: 11px; color: var(--muted); }
+    #agent-teams-ui .merge-action-buttons { display: flex; gap: 8px; }
+    #agent-teams-ui .merge-rule-list { padding: 4px 0; }
+    #agent-teams-ui .merge-rule { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 10px; padding: 10px 14px; }
+    #agent-teams-ui .merge-rule + .merge-rule { border-top: 1px solid var(--line); }
+    #agent-teams-ui .merge-rule-index { width: 22px; height: 22px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 7px; background: var(--surface-2); color: var(--muted); font-size: 10.5px; font-weight: 600; }
+    #agent-teams-ui .merge-rule b { display: block; font-size: 12px; font-weight: 600; line-height: 1.35; }
+    #agent-teams-ui .merge-rule > div > span { display: block; margin-top: 2px; font-size: 11px; line-height: 1.45; color: var(--muted); }
+    #agent-teams-ui #page-merge .panel-head h2 { font-size: 13px; }
+    #agent-teams-ui #page-merge .panel-head .muted { font-size: 11px; }
+    #agent-teams-ui #page-merge .badge { height: 22px; padding: 0 7px; font-size: 10.5px; }
+    #agent-teams-ui #page-merge .kv { grid-template-columns: 92px minmax(0, 1fr); gap: 10px 14px; padding: 13px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2); font-size: 11.5px; }
+    #agent-teams-ui #page-merge .kv dt { font-size: 11.5px; }
+    #agent-teams-ui #page-merge .kv dd { font-size: 12px; }
+    #agent-teams-ui #page-merge .kv .mono { font-size: 11.5px; }
+    #agent-teams-ui #page-merge .btn { min-height: 34px; padding: 0 12px; font-size: 11.5px; }
+    #agent-teams-ui #page-merge .queue-empty { font-size: 11px; }
+
+    /* Patrol / audit / settings */
+    #agent-teams-ui .two-col { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 11px; align-items: start; }
+    #agent-teams-ui .patrol-hero { padding: 15px; display: flex; align-items: center; gap: 12px; }
+    #agent-teams-ui .patrol-hero .icon-box { width: 40px; height: 40px; border-radius: 11px; background: var(--mint-soft); color: var(--mint); display: grid; place-items: center; }
+    #agent-teams-ui .patrol-hero h2 { margin: 0; font-size: 14px; font-weight: 600; }
+    #agent-teams-ui .patrol-hero p { margin: 2px 0 0; font-size: 10px; color: var(--muted); }
+    #agent-teams-ui .findings { display: grid; gap: 7px; padding: 11px; }
+    #agent-teams-ui .finding { padding: 9px; border-radius: 8px; background: var(--surface-2); border: 1px solid var(--line); display: grid; gap: 3px; }
+    #agent-teams-ui .finding b { font-size: 10px; font-weight: 550; }
+    #agent-teams-ui .finding span { font-size: 9px; color: var(--muted); }
+    #agent-teams-ui .timeline { display: grid; gap: 9px; padding: 11px; }
+    #agent-teams-ui .activity-empty { padding: 18px 8px; color: var(--muted); font-size: 10px; text-align: center; }
+    #agent-teams-ui .tl-row { display: grid; grid-template-columns: 16px 1fr auto; gap: 7px; font-size: 9.5px; }
+    #agent-teams-ui .tl-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--line-strong); margin-top: 4px; box-shadow: 0 0 0 3px color-mix(in srgb, var(--line-strong) 28%, transparent); }
+    #agent-teams-ui .tl-dot.done { background: var(--mint); box-shadow: 0 0 0 3px var(--mint-soft); }
+    #agent-teams-ui #page-overview .tl-dot.active { background: var(--mint); box-shadow: 0 0 0 3px var(--mint-soft); }
+    #agent-teams-ui .tl-row b { display: block; font-weight: 550; }
+    #agent-teams-ui .tl-row > div > span { display: block; font-size: 8.5px; color: var(--muted); }
+    #agent-teams-ui .event-table td { font-size: 9.5px; }
+    #agent-teams-ui .filter-row { display: flex; gap: 5px; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+    #agent-teams-ui .filter { height: 25px; padding: 0 8px; border-radius: 6px; border: 1px solid var(--line); background: var(--surface-2); color: var(--muted); font-size: 9px; }
+    #agent-teams-ui .filter.active { color: var(--indigo); background: var(--indigo-soft); border-color: transparent; }
+    #agent-teams-ui .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 11px; }
+    #agent-teams-ui .setting { padding: 14px; display: grid; gap: 9px; }
+    #agent-teams-ui .setting h3 { margin: 0; font-size: 11.5px; font-weight: 600; }
+    #agent-teams-ui .setting p { margin: 0; font-size: 9px; color: var(--muted); }
+    #agent-teams-ui .setting-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-top: 8px; border-top: 1px solid var(--line); font-size: 9.5px; }
+    #agent-teams-ui .toggle { width: 32px; height: 18px; border-radius: 99px; border: 0; background: var(--surface-3); position: relative; transition: background .15s ease; }
+    #agent-teams-ui .toggle::after { content: ""; position: absolute; width: 12px; height: 12px; border-radius: 50%; background: var(--muted); top: 3px; left: 3px; transition: transform .15s ease, background .15s ease; }
+    #agent-teams-ui .toggle[aria-checked="true"] { background: var(--accent); }
+    #agent-teams-ui .toggle[aria-checked="true"]::after { transform: translateX(14px); background: white; }
+
+    /* Patrol / audit / settings readability */
+    #agent-teams-ui #page-patrol .two-col { gap: 12px; }
+    #agent-teams-ui #page-patrol .panel-head h2,
+    #agent-teams-ui #page-audit .panel-head h2 { font-size: 13px; }
+    #agent-teams-ui #page-audit .panel-head .muted { font-size: 11px; }
+    #agent-teams-ui #page-patrol .badge,
+    #agent-teams-ui #page-audit .badge,
+    #agent-teams-ui #page-settings .badge { height: 22px; padding: 0 7px; font-size: 10.5px; }
+
+    #agent-teams-ui #page-patrol .patrol-hero { padding: 18px; gap: 13px; }
+    #agent-teams-ui #page-patrol .patrol-hero .icon-box { width: 42px; height: 42px; border-radius: 11px; }
+    #agent-teams-ui #page-patrol .patrol-hero h2 { font-size: 16px; line-height: 1.3; }
+    #agent-teams-ui #page-patrol .patrol-hero p { margin-top: 3px; font-size: 11.5px; line-height: 1.45; }
+    #agent-teams-ui #page-patrol .timeline { padding: 13px 15px 15px; gap: 11px; }
+    #agent-teams-ui #page-patrol .tl-row { grid-template-columns: 16px minmax(0, 1fr) auto; gap: 9px; font-size: 12px; line-height: 1.4; }
+    #agent-teams-ui #page-patrol .tl-row > div > span { margin-top: 2px; font-size: 11px; line-height: 1.4; }
+    #agent-teams-ui #page-patrol .tl-row .badge { align-self: center; }
+    #agent-teams-ui #page-patrol .tl-dot.active { background: var(--indigo); box-shadow: 0 0 0 3px var(--indigo-soft); }
+    #agent-teams-ui #page-patrol .findings { padding: 13px; gap: 9px; }
+    #agent-teams-ui #page-patrol .finding { padding: 11px; gap: 4px; border-radius: 9px; }
+    #agent-teams-ui #page-patrol .finding b { font-size: 12.5px; line-height: 1.4; }
+    #agent-teams-ui #page-patrol .finding > span { font-size: 11px; line-height: 1.4; }
+    #agent-teams-ui #page-patrol .finding .btn.sm { height: 30px; min-height: 30px; padding: 0 10px; font-size: 11px; border-radius: 7px; }
+    #agent-teams-ui #page-patrol .finding .btn + .btn { margin-left: 6px; }
+
+    #agent-teams-ui #page-audit .panel-head .badge { margin-left: auto; }
+    #agent-teams-ui #page-audit .table-scroll { overflow: hidden; border-radius: 0 0 12px 12px; }
+    #agent-teams-ui #page-audit .event-table { font-size: 12px; }
+    #agent-teams-ui #page-audit .event-table th { padding: 11px 14px; font-size: 11.5px; }
+    #agent-teams-ui #page-audit .event-table th:nth-child(1) { width: 15%; }
+    #agent-teams-ui #page-audit .event-table th:nth-child(2) { width: 36%; }
+    #agent-teams-ui #page-audit .event-table th:nth-child(3) { width: 32%; }
+    #agent-teams-ui #page-audit .event-table th:nth-child(4) { width: 17%; }
+    #agent-teams-ui #page-audit .event-table td { padding: 12px 14px; font-size: 12px; line-height: 1.4; }
+    #agent-teams-ui #page-audit .event-table td:first-child { color: var(--muted); font-size: 11.5px; font-variant-numeric: tabular-nums; }
+    #agent-teams-ui #page-audit .event-table td:nth-child(2) { font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace; font-size: 11.5px; }
+
+    #agent-teams-ui #page-settings .settings-grid { gap: 12px; }
+    #agent-teams-ui #page-settings .setting { padding: 16px; gap: 11px; }
+    #agent-teams-ui #page-settings .setting h3 { font-size: 13px; line-height: 1.35; }
+    #agent-teams-ui #page-settings .setting p { font-size: 11.5px; line-height: 1.5; }
+    #agent-teams-ui #page-settings .setting-row { min-height: 35px; padding-top: 10px; font-size: 12px; line-height: 1.4; }
+    #agent-teams-ui #page-settings .setting-head { gap: 9px; }
+    #agent-teams-ui #page-settings .setting-head .badge { margin-left: auto; }
+    #agent-teams-ui #page-settings .mode-grid { gap: 9px; }
+    #agent-teams-ui #page-settings .mode-card { padding: 12px; gap: 4px; border-radius: 10px; }
+    #agent-teams-ui #page-settings .mode-card b { font-size: 13px; line-height: 1.35; }
+    #agent-teams-ui #page-settings .mode-card span { font-size: 11.5px; line-height: 1.4; }
+    #agent-teams-ui #page-settings .mode-card em { font-size: 11px; line-height: 1.45; }
+    #agent-teams-ui #page-settings .setting details { gap: 9px; }
+    #agent-teams-ui #page-settings .setting summary { font-size: 11.5px; line-height: 1.4; }
+    #agent-teams-ui #page-settings .setting .hint { font-size: 11px; line-height: 1.5; }
+    #agent-teams-ui #page-settings .setting-warning { padding: 10px 11px; border-radius: 8px; font-size: 11px; line-height: 1.5; }
+
+    @media (max-width: 720px) {
+      #agent-teams-ui #page-settings .mode-grid { grid-template-columns: 1fr; }
+      #agent-teams-ui #page-audit .table-scroll { overflow-x: auto; }
+      #agent-teams-ui #page-audit .event-table { min-width: 640px; }
+    }
+
+    /* Workforce and dual-team */
+    #agent-teams-ui .workforce-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 9px; padding: 13px; }
+    #agent-teams-ui .worker-card { display: flex; align-items: center; gap: 10px; min-width: 0; min-height: 66px; padding: 11px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2); }
+    #agent-teams-ui .worker-card .avatar { width: 32px; height: 32px; border-radius: 9px; flex: 0 0 auto; font-size: 12px; }
+    #agent-teams-ui .worker-main { min-width: 0; flex: 1; }
+    #agent-teams-ui .worker-card b { display: block; font-size: 13px; line-height: 1.35; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #agent-teams-ui .worker-card span { display: block; font-size: 11px; line-height: 1.4; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #agent-teams-ui .worker-card .worker-task { color: var(--text); font-size: 12px; line-height: 1.4; }
+    #agent-teams-ui .worker-card .dot { flex: 0 0 auto; }
+    #agent-teams-ui .worker-card.contractor { border-style: dashed; background: color-mix(in srgb, var(--violet-soft) 30%, var(--surface-2)); }
+    /* Contractor labels carry a slot name as well as a role; let them wrap
+       instead of losing the slot number to an ellipsis in en/ja/ko. */
+    #agent-teams-ui .worker-card.contractor { align-items: flex-start; }
+    #agent-teams-ui .worker-card.contractor .badge { display: none; }
+    #agent-teams-ui .worker-card.contractor b,
+    #agent-teams-ui .worker-card.contractor span {
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      white-space: normal;
+      overflow: hidden;
+      word-break: keep-all;
+      overflow-wrap: break-word;
+    }
+    #agent-teams-ui .overview-bottom { display: grid; grid-template-columns: 1.15fr .85fr; gap: 12px; margin-top: 12px; }
+    #agent-teams-ui .action-list { display: grid; gap: 6px; padding: 10px 12px; }
+    #agent-teams-ui .action-row { display: flex; align-items: center; gap: 8px; padding: 8px 9px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2); }
+    #agent-teams-ui .action-row .action-main { min-width: 0; flex: 1; }
+    #agent-teams-ui .action-row b { display: block; font-size: 9.5px; font-weight: 550; }
+    #agent-teams-ui .action-row span { display: block; font-size: 8.5px; color: var(--muted); }
+    #agent-teams-ui .dual-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-items: stretch; }
+    #agent-teams-ui .dual-grid .pool-panel { grid-column: 1 / -1; }
+    #agent-teams-ui .dual-grid.single-team-grid { grid-template-columns: 1fr; }
+    #agent-teams-ui .team-summary { padding: 12px; display: grid; gap: 10px; }
+    #agent-teams-ui .dual-captain { margin-bottom: 10px !important; }
+    #agent-teams-ui .dual-captain-body { display: grid; grid-template-columns: minmax(250px, 1.35fr) repeat(3, minmax(110px, 1fr)); gap: 9px; align-items: stretch; padding: 10px 12px; }
+    #agent-teams-ui .dual-captain-main { display: flex; align-items: center; gap: 9px; min-width: 0; padding-right: 10px; border-right: 1px solid var(--line); }
+    #agent-teams-ui .dual-captain-main .avatar { width: 32px; height: 32px; border-radius: 9px; flex: 0 0 auto; }
+    #agent-teams-ui .dual-captain-main b { display: block; font-size: 12px; line-height: 1.35; }
+    #agent-teams-ui .dual-captain-main span { display: block; margin-top: 2px; font-size: 10.5px; line-height: 1.4; color: var(--muted); }
+    #agent-teams-ui .dual-captain-signal { display: grid; align-content: center; gap: 3px; min-width: 0; padding: 7px 9px; border-radius: 8px; background: var(--surface-2); border: 1px solid var(--line); }
+    #agent-teams-ui .dual-captain-signal span { color: var(--muted); font-size: 11px; line-height: 1.25; }
+    #agent-teams-ui .dual-captain-signal b { font-size: 11.5px; line-height: 1.3; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #agent-teams-ui .team-title { display: flex; align-items: center; gap: 8px; min-width: 0; }
+    #agent-teams-ui .team-title .team-mark { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; font-weight: 700; font-size: 12px; background: var(--indigo-soft); color: var(--indigo); flex: 0 0 auto; }
+    #agent-teams-ui .team-title > div:nth-child(2) { min-width: 0; flex: 1 1 auto; }
+    #agent-teams-ui .team-title > div:nth-child(2) > b { display: block; font-size: 12px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #agent-teams-ui .team-title > div:nth-child(2) > span { display: block; font-size: 8.5px; color: var(--muted); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #agent-teams-ui .setting-row > label { min-width: 0; }
+    #agent-teams-ui .setting-row > select { max-width: 100%; min-width: 0; }
+    #agent-teams-ui .team-summary .mini-task { display: flex; align-items: center; gap: 7px; padding: 7px 8px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface-2); }
+    #agent-teams-ui .mini-task .mini-task-main { min-width: 0; flex: 1; }
+    #agent-teams-ui .mini-task b { display: block; font-size: 9px; font-weight: 550; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #agent-teams-ui .mini-task span { display: block; font-size: 8px; color: var(--muted); }
+    #agent-teams-ui .pool-list { display: grid; gap: 5px; padding: 10px 12px; }
+    #agent-teams-ui .pool-row { display: flex; align-items: center; gap: 7px; padding: 6px 7px; border-radius: 7px; background: var(--surface-2); border: 1px solid var(--line); }
+    #agent-teams-ui .pool-row .avatar { width: 23px; height: 23px; border-radius: 7px; flex: 0 0 auto; font-size: 8px; }
+    #agent-teams-ui .pool-row .pool-main { min-width: 0; flex: 1; }
+    #agent-teams-ui .pool-row b { display: block; font-size: 9px; font-weight: 550; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #agent-teams-ui .pool-row span { display: block; font-size: 8px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #agent-teams-ui .pool-row .badge { font-size: 8px; }
+    #agent-teams-ui .pool-row.contractor { border-style: dashed; background: color-mix(in srgb, var(--violet-soft) 24%, var(--surface-2)); }
+    #agent-teams-ui .pool-note { padding: 10px 12px 12px; color: var(--muted); font-size: 10px; line-height: 1.45; }
+    #agent-teams-ui #page-overview .overview-bottom { margin-top: 10px; }
+    #agent-teams-ui #page-overview .panel-head h2,
+    #agent-teams-ui #page-dual .panel-head h2,
+    #agent-teams-ui #page-dual .mailbox-panel > summary h2 { font-size: 13px; font-weight: 600; line-height: 1.3; letter-spacing: -.01em; }
+    #agent-teams-ui #page-overview .overview-bottom .panel-head .muted,
+    #agent-teams-ui #page-dual .panel-head .muted { font-size: 11px; }
+    #agent-teams-ui #page-overview .action-list { gap: 6px; padding: 9px 12px 11px; }
+    #agent-teams-ui #page-overview .action-row { min-height: 54px; padding: 9px 10px; }
+    #agent-teams-ui #page-overview .action-row b { font-size: 12px; line-height: 1.35; }
+    #agent-teams-ui #page-overview .action-row span { font-size: 11px; line-height: 1.4; }
+    #agent-teams-ui #page-overview .timeline { gap: 8px; padding: 9px 12px 11px; }
+    #agent-teams-ui #page-overview .tl-row { grid-template-columns: 16px minmax(0, 1fr) auto; gap: 8px; font-size: 12px; line-height: 1.35; }
+    #agent-teams-ui #page-overview .tl-row > div > span { font-size: 11px; line-height: 1.35; }
+    #agent-teams-ui #page-overview .tl-row .badge { align-self: center; font-size: 11px; }
+    #agent-teams-ui #page-overview .activity-empty { padding: 14px 8px; font-size: 11px; }
+    #agent-teams-ui #page-dual .page-head { margin-bottom: 14px; }
+    #agent-teams-ui #page-dual .stats { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-bottom: 12px; }
+    #agent-teams-ui[data-team-mode="single"] #page-dual .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    #agent-teams-ui[data-team-mode="single"] #page-dual .dual-captain-body { grid-template-columns: minmax(250px, 1.35fr) repeat(2, minmax(110px, 1fr)); }
+    #agent-teams-ui[data-team-mode="single"] #page-dual .mailbox-panel { display: none; }
+    #agent-teams-ui[data-team-mode="single"] #page-dual .dual-utility-grid { grid-template-columns: 1fr; }
+    #agent-teams-ui #page-dual .team-summary { padding: 13px; gap: 9px; }
+    #agent-teams-ui #page-dual .team-title b { font-size: 13px; }
+    #agent-teams-ui #page-dual .team-title span { font-size: 11px; line-height: 1.35; }
+    #agent-teams-ui #page-dual .mini-task { min-height: 50px; padding: 8px 9px; }
+    #agent-teams-ui #page-dual .mini-task b { font-size: 11px; line-height: 1.35; }
+    #agent-teams-ui #page-dual .mini-task span { font-size: 10.5px; line-height: 1.35; }
+    #agent-teams-ui #page-dual .dual-utility-grid { display: grid; grid-template-columns: 1fr; gap: 10px; margin-top: 10px; align-items: start; }
+    #agent-teams-ui #page-dual .pool-panel { min-width: 0; }
+    #agent-teams-ui #page-dual .dual-utility-note .action-row { min-height: 46px; padding: 8px 9px; }
+    #agent-teams-ui #page-dual .dual-utility-note .action-row b { font-size: 11px; line-height: 1.3; }
+    #agent-teams-ui #page-dual .dual-utility-note .action-row span { font-size: 11px; line-height: 1.35; }
+    #agent-teams-ui #page-dual .pool-list { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 7px; padding: 10px 12px 12px; }
+    #agent-teams-ui #page-dual .pool-row { min-height: 46px; padding: 8px; gap: 8px; }
+    #agent-teams-ui #page-dual .pool-row .avatar { width: 28px; height: 28px; font-size: 10px; }
+    #agent-teams-ui #page-dual .pool-row b { font-size: 11px; line-height: 1.3; }
+    #agent-teams-ui #page-dual .pool-row span { font-size: 11px; line-height: 1.35; }
+    #agent-teams-ui #page-dual .pool-row .pool-main { min-width: 0; }
+    #agent-teams-ui #page-dual .dual-utility-note .action-list { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+    #agent-teams-ui #page-dual .badge { font-size: 11px; }
+    #agent-teams-ui #page-dual .capacity-control { padding: 10px 12px; }
+    #agent-teams-ui #page-dual .capacity-control label,
+    #agent-teams-ui #page-dual .capacity-control .capacity-current { font-size: 11px; }
+    #agent-teams-ui #page-dual .pool-note { padding: 8px 12px 11px; font-size: 11px; }
+    #agent-teams-ui #page-dual .mailbox-panel > summary { display: flex; align-items: center; gap: 8px; min-height: 48px; padding: 10px 13px; cursor: pointer; list-style: none; }
+    #agent-teams-ui #page-dual .mailbox-panel > summary::-webkit-details-marker { display: none; }
+    #agent-teams-ui #page-dual .mailbox-panel > summary::after { content: '›'; margin-left: auto; color: var(--muted); font-size: 20px; line-height: 1; transform: rotate(0deg); transition: transform .15s ease; }
+    #agent-teams-ui #page-dual .mailbox-panel[open] > summary { border-bottom: 1px solid var(--line); }
+    #agent-teams-ui #page-dual .mailbox-panel[open] > summary::after { transform: rotate(90deg); }
+    #agent-teams-ui #page-dual .mailbox-panel > summary h2 { margin: 0; }
+    #agent-teams-ui #page-dual .mailbox-summary-note { color: var(--muted); font-size: 11px; }
+    #agent-teams-ui #page-dual .mailbox-content .action-list { padding: 10px 12px; }
+    #agent-teams-ui #page-dual .mailbox-content .action-row { min-height: 58px; padding: 9px 10px; }
+    #agent-teams-ui #page-dual .mailbox-content .action-row b { font-size: 11px; line-height: 1.35; }
+    #agent-teams-ui #page-dual .mailbox-content .action-row span { font-size: 10.5px; line-height: 1.35; }
+    #agent-teams-ui #page-dual .mailbox-content .hint { padding: 0 12px 11px !important; font-size: 10.5px; line-height: 1.45; }
+    #agent-teams-ui #page-dual .mailbox-content .btn.sm { min-height: 30px; font-size: 11px; }
+    #agent-teams-ui[data-team-mode="single"] #page-dual .dual-captain-signal:nth-of-type(3) { display: none; }
+    #agent-teams-ui[data-team-mode="single"] #page-dual .dual-utility-note .action-row:nth-child(2) { display: none; }
+    #agent-teams-ui[data-team-mode="single"] #page-dual .dual-utility-note .action-list { grid-template-columns: 1fr; }
+    #agent-teams-ui .capacity-control { display: flex; align-items: center; gap: 7px; padding: 9px 12px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+    #agent-teams-ui .capacity-control label { font-size: 9px; color: var(--muted); }
+    #agent-teams-ui .capacity-control input { width: 48px; height: 27px; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--surface-2); color: var(--text); text-align: center; font-size: 11px; }
+    #agent-teams-ui .capacity-control input:focus { outline: none; border-color: var(--indigo); box-shadow: 0 0 0 3px var(--indigo-soft); }
+    #agent-teams-ui .capacity-control .capacity-current { margin-left: auto; font-size: 9px; color: var(--muted); }
+    #agent-teams-ui #page-tasks.active { display: flex; flex-direction: column; height: 100%; }
+    #agent-teams-ui #page-tasks > .page-head,
+    #agent-teams-ui #page-tasks > .task-toolbar { flex: 0 0 auto; }
+    #agent-teams-ui #page-tasks .task-workspace { flex: 1 1 auto; height: auto; min-height: 0; }
+    #agent-teams-ui .task-workspace { display: grid; grid-template-columns: minmax(0, 1fr) minmax(260px, 300px); gap: 12px; align-items: stretch; height: calc(100vh - 210px); min-height: 620px; }
+    #agent-teams-ui .task-workspace .task-list-panel { grid-column: 2; grid-row: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+    #agent-teams-ui .task-workspace .graph-panel { grid-column: 1; grid-row: 1; min-width: 0; min-height: 0; position: relative; display: flex; flex-direction: column; overflow: hidden; }
+    #agent-teams-ui .task-workspace.overview-collapsed { grid-template-columns: minmax(0, 1fr); }
+    #agent-teams-ui .task-workspace.overview-collapsed .graph-panel { grid-column: 1; }
+    #agent-teams-ui .task-workspace.overview-collapsed .task-list-panel { display: none; }
+    #agent-teams-ui .member-status-warm { color: var(--mint); }
+
+    /* Large draggable task tree */
+    #agent-teams-ui .task-toolbar { display: flex; align-items: center; gap: 6px; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+    #agent-teams-ui .task-toolbar-actions { margin-left: auto; display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
+    #agent-teams-ui .dag-large .graph-wrap { flex: 1 1 auto; min-height: 0; padding: 18px; overflow: auto; scrollbar-width: none; -ms-overflow-style: none; background-image: radial-gradient(var(--tree-dot) 1px, transparent 1px); background-size: 18px 18px; }
+    #agent-teams-ui .dag-large .graph-wrap::-webkit-scrollbar { width: 0; height: 0; display: none; }
+    #agent-teams-ui .dag-large .graph-wrap svg { min-width: 1200px; min-height: 650px; }
+    #agent-teams-ui #task-dependency-legend { min-width: 0; font-size: 11px; line-height: 1.35; }
+    #agent-teams-ui .task-list-row b { font-size: 11px; }
+    #agent-teams-ui .task-list-row small { font-size: 10px; }
+    #agent-teams-ui .task-list-row .mono { font-size: 10px; }
+    #agent-teams-ui .graph-wrap .live-empty { position: absolute; inset: 0; z-index: 2; display: grid !important; place-items: center; min-height: 0 !important; pointer-events: none; font-size: 12px !important; }
+    #agent-teams-ui #task-tree-view .line-legend { font-size: 10.5px; line-height: 1.35; }
+
+    /* Task-tree header: the title/description block keeps one row with the
+       action block. The panel is a size container, so the legend and the flow
+       switch degrade on the panel's own width instead of the viewport width:
+       the graph column is ~400px narrower than the window, so a viewport media
+       query cannot know whether the actions actually fit. Nothing in the header
+       may wrap to a second row, because every extra row is taken from the graph. */
+    #agent-teams-ui #task-tree-view { container: task-tree / inline-size; }
+    #agent-teams-ui #task-tree-view > .panel-head { flex-wrap: nowrap; align-items: center; gap: 10px; min-width: 0; }
+    #agent-teams-ui #task-tree-view > .panel-head > .panel-head-title { display: flex; align-items: baseline; gap: 8px; flex: 1 1 auto; min-width: 0; }
+    #agent-teams-ui #task-tree-view > .panel-head > .panel-head-title > h2 { flex: 0 0 auto; white-space: nowrap; }
+    #agent-teams-ui #task-tree-view > .panel-head > .panel-head-title > .muted { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; line-height: 1.35; }
+    #agent-teams-ui #task-tree-view > .panel-head > .panel-actions { flex: 0 1 auto; flex-wrap: nowrap; justify-content: flex-end; margin-left: auto; min-width: 0; }
+    #agent-teams-ui #task-tree-view > .panel-head > .panel-actions > * { flex: 0 0 auto; }
+    /* The legend is the only action `flex-shrink: 1`, so when a browser lacks
+       container queries it collapses first instead of pushing the row out. */
+    #agent-teams-ui #task-tree-view > .panel-head .line-legend { flex: 0 1 auto; min-width: 0; flex-wrap: nowrap; white-space: nowrap; overflow: hidden; }
+    #agent-teams-ui #task-tree-view > .panel-head .line-legend > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+    #agent-teams-ui #task-tree-view > .panel-head .line-legend .line { flex: 0 0 auto; }
+
+    /* The graph footer stays one row: the trailing hint truncates. Below this
+       panel width the hint alone is wider than the panel, so it is dropped and
+       the status chips keep a single row. */
+    #agent-teams-ui #task-tree-view > .graph-foot { min-width: 0; }
+    #agent-teams-ui #task-tree-view > .graph-foot > .legend { flex: 0 0 auto; white-space: nowrap; }
+    #agent-teams-ui #task-tree-view > .graph-foot > span:last-child { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    /* The page toolbar above the workspace must not wrap either: a wrapped
+       legend row pushes the whole task tree down by a full line. */
+    #agent-teams-ui #page-tasks > .task-toolbar { flex-wrap: nowrap; min-width: 0; }
+    #agent-teams-ui #page-tasks > .task-toolbar > .badge { flex: 0 0 auto; }
+    #agent-teams-ui #page-tasks > .task-toolbar > .task-toolbar-actions { flex: 0 0 auto; }
+    #agent-teams-ui #task-dependency-legend { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    /* 1500px is the smallest panel width where h2 + the widest locale subtitle
+       + the widest action block still fit without truncating either side. */
+    @container task-tree (max-width: 1500px) {
+      #agent-teams-ui #task-tree-view > .panel-head .line-legend { display: none; }
+    }
+    @container task-tree (max-width: 420px) {
+      #agent-teams-ui #task-tree-view > .panel-head .flow-switch > span:last-child { display: none; }
+    }
+    /* Below this width the footer hint alone is wider than the whole panel, so
+       dropping it keeps the status chips on a single row. */
+    @container task-tree (max-width: 900px) {
+      #agent-teams-ui #task-tree-view > .graph-foot > span:last-child { display: none; }
+    }
+    /* No container queries: the legend cannot be measured, so hide the two
+       optional labels outright. The shrinkable legend is the safety net below
+       this, and keeps the row inside the panel even if these rules are missed. */
+    @supports not (container-type: inline-size) {
+      #agent-teams-ui #task-tree-view > .panel-head .line-legend { display: none; }
+      #agent-teams-ui #task-tree-view > .graph-foot > span:last-child { display: none; }
+    }    #agent-teams-ui .dag-large .gnode { cursor: grab; }
+    #agent-teams-ui .dag-large .gnode:active { cursor: grabbing; }
+    #agent-teams-ui .dag-large .gedge { stroke-linejoin: round; stroke-linecap: round; }
+    #agent-teams-ui .gedge.active.team-alpha { stroke: var(--indigo); }
+    #agent-teams-ui .gedge.active.team-beta { stroke: var(--mint); }
+
+    /* Settings automation and approvals */
+    #agent-teams-ui .setting.wide { grid-column: 1 / -1; }
+    #agent-teams-ui .setting-head { display: flex; align-items: center; gap: 8px; }
+    #agent-teams-ui .setting-head h3 { margin: 0; }
+    #agent-teams-ui .setting-head .badge { margin-left: auto; }
+    #agent-teams-ui .setting select { height: 26px; min-width: 132px; border-radius: 6px; border: 1px solid var(--line-strong); background: var(--surface-2); color: var(--text); font-size: 9px; padding: 0 7px; }
+    #agent-teams-ui .mode-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    #agent-teams-ui .mode-card { text-align: left; padding: 10px; border-radius: 9px; border: 1px solid var(--line); background: var(--surface-2); display: grid; gap: 3px; }
+    #agent-teams-ui .mode-card.selected { border-color: var(--indigo); background: var(--indigo-soft); box-shadow: 0 0 0 3px color-mix(in srgb, var(--indigo) 10%, transparent); }
+    #agent-teams-ui .mode-card b { font-size: 11px; }
+    #agent-teams-ui .mode-card span { font-size: 9.5px; color: var(--text); }
+    #agent-teams-ui .mode-card em { font-size: 8.5px; font-style: normal; color: var(--muted); }
+    #agent-teams-ui .full-access .settings-grid .setting:not(.mode-panel) { opacity: .5; pointer-events: none; }
+    #agent-teams-ui .full-access .mode-panel { border-color: var(--rose); box-shadow: 0 0 0 3px color-mix(in srgb, var(--rose) 12%, transparent); }
+    #agent-teams-ui .setting details { display: grid; gap: 7px; }
+    #agent-teams-ui .setting summary { cursor: pointer; font-size: 9.5px; color: var(--muted); }
+    #agent-teams-ui .setting-warning { padding: 8px 9px; border-radius: 7px; background: var(--amber-soft); color: var(--amber); font-size: 8.5px; line-height: 1.45; }
+
+    /* Overlays */
+    #agent-teams-ui .modal-backdrop { position: absolute; inset: 0; background: rgba(2,6,14,.58); display: grid; place-items: center; padding: 20px; z-index: 20; backdrop-filter: blur(4px); }
+    #agent-teams-ui .modal-backdrop[hidden] { display: none; }
+    #agent-teams-ui .modal { width: min(460px, 100%); border-radius: 13px; background: var(--glass-strong); -webkit-backdrop-filter: blur(26px) saturate(140%); backdrop-filter: blur(26px) saturate(140%); border: 1px solid var(--line-strong); box-shadow: var(--shadow); padding: 16px; display: grid; gap: 11px; }
+    #agent-teams-ui .modal h2 { margin: 0; font-size: 15px; font-weight: 600; }
+    #agent-teams-ui .field { display: grid; gap: 4px; }
+    #agent-teams-ui .field label { font-size: 9px; color: var(--muted); }
+    #agent-teams-ui .field input, #agent-teams-ui .field select { height: 32px; border-radius: 8px; border: 1px solid var(--line-strong); background: var(--surface-2); padding: 0 9px; font-size: 10.5px; color: var(--text); outline: none; }
+    #agent-teams-ui input::placeholder { color: var(--muted); opacity: 1; }
+    #agent-teams-ui .field input:focus, #agent-teams-ui .field select:focus { border-color: var(--indigo); box-shadow: 0 0 0 3px var(--indigo-soft); }
+    #agent-teams-ui .modal-actions { display: flex; justify-content: flex-end; gap: 6px; }
+    #agent-teams-ui .toast { position: absolute; right: 20px; bottom: 20px; z-index: 30; background: var(--glass-strong); -webkit-backdrop-filter: blur(20px) saturate(140%); backdrop-filter: blur(20px) saturate(140%); color: var(--text); border: 1px solid var(--line-strong); border-radius: 9px; padding: 9px 12px; font-size: 10px; box-shadow: var(--shadow); opacity: 0; transform: translateY(8px); pointer-events: none; transition: opacity .18s ease, transform .18s ease; }
+    #agent-teams-ui .toast.show { opacity: 1; transform: translateY(0); }
+
+    @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+      #agent-teams-ui .panel,
+      #agent-teams-ui .stat,
+      #agent-teams-ui .task-detail,
+      #agent-teams-ui .modal,
+      #agent-teams-ui .toast { background: var(--surface-solid); }
+      #agent-teams-ui .sidebar { background: var(--sidebar-fallback); }
+      #agent-teams-ui .topbar { background: var(--bg); }
+    }
+
+    @media (max-width: 1240px) {
+      #agent-teams-ui .workforce-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      #agent-teams-ui .dual-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      #agent-teams-ui #page-dual .pool-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      #agent-teams-ui .workbench { grid-template-columns: 188px minmax(0, 1fr); }
+      #agent-teams-ui .top-right .hide-md { display: none; }
+      /* Four stat columns only fit above this point. Below it each card is under
+         ~230px inside, which is narrower than the intrinsic width of a long
+         English badge ("On duty / concurrency limit" needs ~178px on its own),
+         so the badge was clipped mid-glyph with no ellipsis. The theme
+         stylesheets already switch to two columns at 1080px, which left
+         1081-1230px unprotected -- including 1152px, the CSS width of a 1440px
+         screen at 125% Windows scaling. `#page-dual .stats` needs its own
+         selector because it sets four columns with higher specificity. */
+      #agent-teams-ui .stats,
+      #agent-teams-ui #page-dual .stats { grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 1080px) {
+      #agent-teams-ui .shell { grid-template-columns: 68px minmax(0, 1fr); }
+      #agent-teams-ui .brand span, #agent-teams-ui .brand b, #agent-teams-ui .workspace, #agent-teams-ui .nav-label, #agent-teams-ui .nav-item > span:not(.icon), #agent-teams-ui .rail-status .label, #agent-teams-ui .rail-status-tag { display: none; }
+      #agent-teams-ui .sidebar { align-items: center; padding-left: 8px; padding-right: 8px; }
+      #agent-teams-ui .nav-item { justify-content: center; padding: 9px; }
+      #agent-teams-ui .nav-item.active::before { left: -8px; }
+      #agent-teams-ui .rail-status { padding: 7px; justify-content: center; }
+      #agent-teams-ui .workbench, #agent-teams-ui .member-layout, #agent-teams-ui .merge-layout, #agent-teams-ui .two-col { grid-template-columns: 1fr; }
+      #agent-teams-ui .workbench .roster { order: 2; }
+      #agent-teams-ui .workbench .graph-panel { order: 1; }
+      #agent-teams-ui .settings-grid { grid-template-columns: 1fr; }
+      #agent-teams-ui #page-dual .dual-utility-grid { grid-template-columns: 1fr; }
+      #agent-teams-ui #page-dual .pool-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      #agent-teams-ui .steps { display: none; }
+    }
+    @media (max-width: 840px) {
+      #agent-teams-ui .task-workspace { grid-template-columns: 1fr; height: auto; min-height: 0; }
+      #agent-teams-ui .task-workspace .task-list-panel, #agent-teams-ui .task-workspace .graph-panel { grid-column: 1; grid-row: auto; }
+      #agent-teams-ui .task-workspace .task-list-panel { max-height: 360px; }
+      #agent-teams-ui .task-workspace .graph-panel { min-height: 600px; }
+    }
+    @media (max-width: 720px) {
+      #agent-teams-ui .topbar { padding: 0 14px; }
+      #agent-teams-ui .content { padding: 16px 14px 22px; }
+      #agent-teams-ui .stats { grid-template-columns: 1fr 1fr; }
+      #agent-teams-ui .kanban { grid-template-columns: 1fr; }
+      #agent-teams-ui .top-right .hide-sm { display: none; }
+      #agent-teams-ui #page-merge .checklist { grid-template-columns: 1fr; }
+      #agent-teams-ui #page-merge .merge-actions { flex-direction: column; align-items: stretch; }
+      #agent-teams-ui #page-merge .merge-action-buttons { width: 100%; }
+      #agent-teams-ui #page-merge .merge-action-buttons .btn { flex: 1; }
+    }
+    @media (max-width: 620px) {
+      #agent-teams-ui .topbar { padding: 0 12px; gap: 10px; }
+      #agent-teams-ui .topbar-status { display: none; }
+    }
+    /* Below ~560px even a two-column grid leaves each card under the intrinsic
+       width of the longest English badge, and the pill cannot wrap on its own
+       (`white-space: nowrap` plus `overflow: hidden` cut the glyph mid-letter).
+       Letting the badge text wrap inside the pill is the only option left that
+       keeps every word readable. */
+    @media (max-width: 560px) {
+      /* `min-height` is deliberately not restated here: the theme stylesheets
+         already set it to 24px with higher specificity, so a value here would be
+         dead. Only the properties that make the text wrap are listed. */
+      #agent-teams-ui .stat-label > .badge {
+        white-space: normal; height: auto; padding: 3px 6px;
+        line-height: 1.25; text-align: center;
+      }
+    }
+    @media (max-width: 480px) {
+      #agent-teams-ui .kv-grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 420px) {
+      #agent-teams-ui .crumb { display: none; }
+    }
+    #agent-teams-ui .task-list { flex: 1 1 auto; min-height: 0; display: grid; align-content: start; gap: 6px; padding: 10px 13px 13px; overflow: auto; }
+    #agent-teams-ui .task-list-row { display: grid; grid-template-columns: minmax(44px, auto) minmax(0, 1fr) auto; grid-template-areas: 'id title status' 'owner owner upstream'; gap: 3px 7px; align-items: center; width: 100%; text-align: left; border: 1px solid var(--line); border-radius: 9px; background: var(--surface-2); color: var(--text); padding: 8px 9px; font: inherit; cursor: pointer; }
+    #agent-teams-ui .task-list-row:hover, #agent-teams-ui .task-list-row:focus-visible { border-color: var(--line-strong); background: var(--surface-3); outline: none; }
+    #agent-teams-ui .task-list-row.selected { border-color: var(--indigo); background: var(--indigo-soft); }
+    #agent-teams-ui .task-list-row > .mono { grid-area: id; min-width: 0; }
+    #agent-teams-ui .task-list-row > .task-list-title { grid-area: title; min-width: 0; }
+    #agent-teams-ui .task-list-row > .task-list-owner { grid-area: owner; min-width: 0; }
+    #agent-teams-ui .task-list-row > .badge { grid-area: status; justify-self: end; }
+    #agent-teams-ui .task-list-row > .tiny { grid-area: upstream; justify-self: end; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #agent-teams-ui .task-list-row b { display: block; font-size: 11px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #agent-teams-ui .task-list-row small { display: block; font-size: 10px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #agent-teams-ui .task-list-row .mono { font-size: 10px; color: var(--muted); }
+    #agent-teams-ui .task-list-empty { padding: 18px; color: var(--muted); font-size: 11px; text-align: center; }
+
+/* Dark-only task controls; the light toolbar retains its original layout. */
+#agent-teams-ui .task-dark-control { display: none; }
+
+#agent-teams-ui .member-residency-counts,
+#agent-teams-ui .member-residency-dark-label { display: none; }
+
+#agent-teams-ui .member-team-filter { display: none; }

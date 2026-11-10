@@ -1,0 +1,46 @@
+{
+  "name": "ai-agent-teams",
+  "version": "0.2.2",
+  "description": "Team control plane for ZCode: captain, two teams, tasks, attempts, mailbox, quality gates.",
+  "description_i18n": {
+    "en": "Team control plane for ZCode: captain, two teams, tasks, attempts, mailbox, quality gates.",
+    "zh-CN": "一个队长、两支队伍、任务/尝试/邮箱/质量门禁的 ZCode 团队控制平面。",
+    "ja-JP": "ZCode 向けチーム制御プレーン：captain、2チーム、タスク、試行、メールボックス、品質ゲート。",
+    "ko-KR": "ZCode용 팀 제어 플레인: captain, 2개 팀, 태스크, 시도, 메일박스, 품질 게이트."
+  },
+  "displayName": "Ai-Agent-Teams-Zcode",
+  "displayName_i18n": {
+    "zh-CN": "AI 智能体团队"
+  },
+  "icon": "assets/icon.png",
+  "category": "developer-tools",
+  "skills": "./skills",
+  "commands": "./commands",
+  "agents": "./agents",
+  "hooks": "./hooks/hooks.json",
+  "mcpServers": {
+    "agent-teams": {
+      "command": "node",
+      "args": [
+        "${CLAUDE_PLUGIN_ROOT}/src/mcp-server.mjs"
+      ]
+    }
+  },
+  "ui": {
+    "surfaces": [
+      {
+        "id": "ai-agent-teams",
+        "title": {
+          "zh-CN": "智能体团队",
+          "en-US": "Agent Teams",
+          "ja-JP": "エージェントチーム",
+          "ko-KR": "에이전트 팀"
+        },
+        "icon": "users",
+        "server": "agent-teams",
+        "resourceUri": "ui://ai-agent-teams/panel.html",
+        "availability": "session"
+      }
+    ]
+  }
+}

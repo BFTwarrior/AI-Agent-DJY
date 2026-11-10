@@ -1,0 +1,965 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/ai-agent-teams/config.schema.json",
+  "title": "Ai-Agent-Teams-Zcode configuration",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "teams"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "version": {
+      "const": 1
+    },
+    "captain": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "model": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "maxTeams": {
+          "enum": [
+            1,
+            2
+          ],
+          "default": 2
+        }
+      }
+    },
+    "teams": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 2,
+      "items": {
+        "$ref": "#/$defs/team"
+      }
+    },
+    "scheduler": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [],
+      "properties": {
+        "activeWorkerSlots": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 64,
+          "default": 6,
+          "description": "Global worker slots shared by both teams. 6 by default; roster size is not concurrency."
+        },
+        "maxActivePerTeam": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 32,
+          "default": 3
+        },
+        "fairness": {
+          "enum": [
+            "equal",
+            "priority"
+          ],
+          "default": "equal"
+        },
+        "dynamicTeams": {
+          "type": "boolean",
+          "default": false
+        },
+        "maxTurnsPerTask": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 30
+        },
+        "taskTimeoutMinutes": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 120
+        },
+        "idleSessionMinutes": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 30
+        },
+        "preset": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            null,
+            "conservative",
+            "balanced"
+          ],
+          "default": null
+        },
+        "memoryGb": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 8,
+          "maximum": 1024,
+          "default": null
+        },
+        "minActivePerTeam": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 32,
+          "default": 1
+        },
+        "maxControlSessions": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 128,
+          "default": 5
+        },
+        "maxTotalSessions": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 128,
+          "default": 32
+        },
+        "allowAboveDesignCap": {
+          "type": "boolean",
+          "default": false
+        },
+        "worktreeBaseCheckMs": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 600000,
+          "default": 30000,
+          "description": "Cache TTL for the worktree base preflight; failures use exponential backoff up to 5 minutes."
+        },
+        "worktreeTtlHours": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 720,
+          "default": 24,
+          "description": "Reclaim a terminal task's checkout after this many hours. A checkout with uncommitted changes is never removed."
+        },
+        "maxConcurrentWorktrees": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 64,
+          "default": 6,
+          "description": "Soft ceiling on task checkouts kept on disk; the oldest clean ones are reclaimed first."
+        },
+        "worktreeReclaimMinutes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1440,
+          "default": 30,
+          "description": "How often the daemon re-runs the worktree reclaimer. 0 disables the periodic sweep; startup, cancel and merge still reclaim."
+        },
+        "memberHomeReclaimMinutes": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1440,
+          "default": null,
+          "description": "Opt-in owned orphan home sweep. null disables; 0 startup only; 1..1440 also schedules periodic sweeps."
+        }
+      }
+    },
+    "isolation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [],
+      "properties": {
+        "mode": {
+          "enum": [
+            "worktree",
+            "container",
+            "microvm",
+            "none"
+          ],
+          "default": "worktree"
+        },
+        "containerRuntime": {
+          "enum": [
+            "docker",
+            "podman"
+          ],
+          "default": "docker"
+        },
+        "image": {
+          "type": "string",
+          "default": "ai-agent-teams-worker:latest"
+        },
+        "imagePullPolicy": {
+          "enum": [
+            "never",
+            "if-missing",
+            "always"
+          ],
+          "default": "never",
+          "description": "Pull the configured worker image at daemon startup; never uses only the local image, if-missing pulls only when absent, and always pulls before the CLI self-test. Configure a trusted registry image before enabling pulls."
+        },
+        "cliPath": {
+          "type": "string",
+          "default": "zcode"
+        },
+        "containerUrl": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "hostAddress": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "bindHost": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "homeSeed": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "workerModel": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "providerId": {
+              "type": "string"
+            },
+            "modelId": {
+              "type": "string"
+            },
+            "reasoningLevel": {
+              "type": "string"
+            },
+            "options": {
+              "type": "object"
+            }
+          },
+          "default": null
+        },
+        "workerMode": {
+          "enum": [
+            "build",
+            "edit",
+            "plan",
+            "yolo",
+            "guarded"
+          ],
+          "default": "yolo"
+        },
+        "network": {
+          "enum": [
+            "gateway-only",
+            "none"
+          ],
+          "default": "gateway-only"
+        },
+        "readOnlyRoot": {
+          "type": "boolean",
+          "default": true
+        },
+        "nonRoot": {
+          "type": "boolean",
+          "default": true
+        },
+        "cpuLimit": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "default": 2
+        },
+        "memoryMb": {
+          "type": "integer",
+          "minimum": 128,
+          "default": 2048
+        },
+        "pidsLimit": {
+          "type": "integer",
+          "minimum": 32,
+          "default": 512
+        }
+      }
+    },
+    "interruption": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [],
+      "properties": {
+        "defaultDelivery": {
+          "enum": [
+            "queue",
+            "guide"
+          ],
+          "default": "queue"
+        },
+        "urgentDelivery": {
+          "enum": [
+            "guide",
+            "stop"
+          ],
+          "default": "guide"
+        },
+        "hardStop": {
+          "enum": [
+            "stop",
+            "kill"
+          ],
+          "default": "stop"
+        },
+        "cancelBackgroundTasks": {
+          "type": "boolean",
+          "default": true
+        }
+      }
+    },
+    "zcode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [],
+      "properties": {
+        "cliPath": {
+          "type": "string",
+          "minLength": 1,
+          "default": "auto"
+        },
+        "protocol": {
+          "enum": [
+            "app-server",
+            "cli"
+          ]
+        },
+        "mode": {
+          "enum": [
+            "build",
+            "edit",
+            "plan",
+            "yolo",
+            "guarded"
+          ]
+        },
+        "locale": {
+          "enum": [
+            "zh-CN",
+            "ja-JP",
+            "ko-KR",
+            "en-US",
+            "auto"
+          ],
+          "default": "auto",
+          "description": "UI locale. auto (default) resolves from AGENT_TEAMS_LOCALE, ZCODE_LOCALE, LC_ALL, LC_MESSAGES, LANG, then the platform locale, and finally en-US. The config loader returns the resolved concrete locale. Internal prompts, MCP tool descriptions and agent templates stay English regardless of this value."
+        },
+        "timezone": {
+          "type": "string",
+          "minLength": 1,
+          "default": "auto",
+          "description": "Display time zone. auto (default) resolves from AGENT_TEAMS_TIMEZONE, TZ, then the platform time zone, and finally UTC. Any valid IANA name is accepted; the config loader returns the resolved concrete zone."
+        },
+        "defaultModel": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "defaultReasoning": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Reasoning level passed to app-server session/setModel, for example max; not used by the CLI adapter. The daemon selects app-server when model defaults are set."
+        },
+        "modelPolicy": {
+          "enum": [
+            "follow-host",
+            "fixed"
+          ],
+          "default": "follow-host",
+          "description": "follow-host (default) resolves each member spawn from the captain session's model/reasoning (session.model.updated path in ~/.zcode/cli/log) and hot-switches active member sessions when the host model or reasoning changes. A real host value wins; otherwise a member's explicit model/reasoning is used, then defaultModel/defaultReasoning. fixed pins a model via zcode.defaultModel at startup or agent_teams_model set at runtime, then the member's explicit model, then config defaults. fixed without defaultModel warns. follow-host with isolation.mode=container warns because container sessions cannot hot-switch (the resolved value is only passed to session/create and the container CLI ignores it)."
+        },
+        "maxRequestsPerMinute": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000,
+          "default": 0,
+          "description": "Spaces provider-facing member and contractor dispatch starts. 0 disables pacing."
+        },
+        "maxConcurrentSessions": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 64,
+          "description": "Worker sessions only; the captain and the two team leads are control sessions outside this budget. Must be >= scheduler.activeWorkerSlots. If omitted, the runtime uses max(6, scheduler.activeWorkerSlots)."
+        },
+        "memberMcpServers": {
+          "type": "string",
+          "enum": [
+            "minimal"
+          ],
+          "default": "minimal",
+          "description": "A member-scoped agent-teams-member MCP server is mounted into member sessions; the plugin admin server is denied by exact tool name. Inheriting the full host/plugin MCP catalog is intentionally unsupported because it would bypass the member token boundary and add large context cost."
+        },
+        "turnWatchIntervalMs": {
+          "type": "integer",
+          "minimum": 500,
+          "maximum": 60000,
+          "default": 2000,
+          "description": "How often the protocol adapter polls session/events for turn-failed so a provider failure can be retried without waiting for the task lease."
+        },
+        "turnFailureRetry": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": true
+            },
+            "maxAttempts": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10,
+              "default": 3
+            },
+            "capacityMaxAttempts": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100,
+              "default": 3,
+              "description": "Retry budget for provider capacity/429 errors; the scheduler also reduces activeWorkerSlots before retrying."
+            },
+            "baseDelayMs": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 600000,
+              "default": 3000
+            },
+            "maxDelayMs": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 3600000,
+              "default": 60000
+            },
+            "capacityRecoveryMs": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 3600000,
+              "default": 60000,
+              "description": "Cooldown after a capacity reduction before successful turns may raise activeWorkerSlots again."
+            },
+            "capacityRecoverySuccesses": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 3,
+              "description": "Consecutive successful turns after the cooldown required to restore one worker slot."
+            }
+          }
+        },
+        "redAutoReview": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Automatic review of a task that turned red (failed). The review does one thing only: send 继续 to the failed task, at most maxContinues times, then report to the captain. Review tasks are hidden from the task tree.",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": true
+            },
+            "maxContinues": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10,
+              "default": 3,
+              "description": "Automatic 继续 messages sent by the red review for the same task/session before the captain is messaged and automatic continues stop."
+            },
+            "retryDelayMs": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 600000,
+              "default": 5000,
+              "description": "Delay before retrying a red review that could not send yet (for example the member still owns another open task)."
+            },
+            "maxAttempts": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 5,
+              "description": "How often one red review may retry a deferred send before it reports to the captain."
+            }
+          }
+        }
+      }
+    },
+    "storage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [],
+      "properties": {
+        "database": {
+          "type": "string",
+          "minLength": 1
+        },
+        "archiveDays": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 30
+        }
+      }
+    },
+    "quality": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [],
+      "properties": {
+        "kinds": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "requirements",
+              "implementation",
+              "verification",
+              "review",
+              "repair",
+              "integration"
+            ]
+          }
+        },
+        "requireIndependentReview": {
+          "type": "boolean",
+          "default": true
+        },
+        "maxReviewRounds": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 3
+        },
+        "verifyCommands": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "reviewPolicy": {
+          "$ref": "#/$defs/reviewPolicy"
+        },
+        "postMergeReview": {
+          "enum": [
+            "off",
+            "contractor"
+          ],
+          "default": "off"
+        },
+        "mergeBranch": {
+          "type": "string",
+          "minLength": 1,
+          "default": "integration"
+        }
+      }
+    },
+    "features": {
+      "type": "object",
+      "additionalProperties": false,
+      "default": {},
+      "properties": {
+        "lazyMembers": {
+          "type": "boolean",
+          "default": false
+        },
+        "licenses": {
+          "type": "boolean",
+          "default": false
+        },
+        "compression": {
+          "type": "boolean",
+          "default": false
+        },
+        "contractors": {
+          "type": "boolean",
+          "default": false
+        },
+        "patrol": {
+          "type": "boolean",
+          "default": false
+        },
+        "postMergeReview": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+    "automation": {
+      "type": "object",
+      "additionalProperties": false,
+      "default": {},
+      "properties": {
+        "mode": {
+          "enum": [
+            "standard",
+            "full-access"
+          ],
+          "default": "standard"
+        }
+      }
+    },
+    "shadow": {
+      "type": "object",
+      "additionalProperties": false,
+      "default": {},
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true
+        },
+        "idleStopMinutes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1440,
+          "default": 30
+        }
+      }
+    },
+    "contractors": {
+      "type": "object",
+      "additionalProperties": false,
+      "default": {},
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false
+        },
+        "maxConcurrent": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 16,
+          "default": 2
+        },
+        "maxLifetimeMinutes": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 15
+        },
+        "defaultPermission": {
+          "enum": [
+            "read-only",
+            "workspace-write"
+          ],
+          "default": "read-only"
+        },
+        "allowBorrow": {
+          "type": "boolean",
+          "default": false
+        },
+        "reviewPool": {
+          "type": "object",
+          "additionalProperties": false,
+          "default": {
+            "enabled": false,
+            "capacity": 0
+          },
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false
+            },
+            "capacity": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10,
+              "default": 0
+            }
+          }
+        },
+        "slots": {
+          "type": "object",
+          "additionalProperties": false,
+          "not": {
+            "required": [
+              "patrol",
+              "main"
+            ],
+            "properties": {
+              "patrol": {
+                "type": "object"
+              },
+              "main": {
+                "type": "object"
+              }
+            }
+          },
+          "properties": {
+            "merge": {
+              "type": [
+                "object",
+                "null"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "cap": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 1,
+                  "default": 1
+                },
+                "kinds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "default": [
+                    "post_merge_review",
+                    "merge_verify",
+                    "merge_review",
+                    "merge"
+                  ]
+                }
+              }
+            },
+            "patrol": {
+              "type": [
+                "object",
+                "null"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "cap": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 1,
+                  "default": 1
+                },
+                "kinds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "default": [
+                    "*"
+                  ]
+                }
+              }
+            },
+            "main": {
+              "type": [
+                "object",
+                "null"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "cap": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 1,
+                  "default": 1
+                },
+                "kinds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "default": [
+                    "*"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "patrol": {
+      "type": "object",
+      "additionalProperties": false,
+      "default": {},
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false
+        },
+        "captainSelfWake": {
+          "type": "boolean",
+          "default": true
+        },
+        "intervalMinutes": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 15,
+          "description": "Fixed patrol window in minutes. A team with unfinished tasks and a working member gets at most one report per window."
+        },
+        "whenCaptainBusy": {
+          "enum": [
+            "queue",
+            "one-shot-contractor",
+            "wait"
+          ],
+          "default": "queue",
+          "description": "queue (default) delivers the report with delivery=queue so a busy captain never loses it; one-shot-contractor is the legacy fallback; wait defers the report."
+        },
+        "maxContractorPerCycle": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2,
+          "default": 1
+        },
+        "timeoutMinutes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1440,
+          "default": 30,
+          "description": "Record patrol.stalled once when a patrol has been in flight longer than this; the in-flight guard stays set."
+        }
+      }
+    },
+    "memory": {
+      "type": "object",
+      "additionalProperties": false,
+      "default": {},
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false
+        },
+        "highWatermarkPercent": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100,
+          "default": 80
+        },
+        "lowWatermarkPercent": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100,
+          "default": 65
+        },
+        "budgetMb": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 128,
+          "default": null
+        },
+        "availableIdleMinutes": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 10
+        },
+        "waitingWarmMinutes": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 3
+        },
+        "waitingColdMinutes": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 10
+        }
+      }
+    }
+  },
+  "$defs": {
+    "team": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name",
+        "lead"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9._-]{0,31}$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "lead": {
+          "type": "string",
+          "minLength": 1
+        },
+        "defaultMembers": {
+          "type": "integer",
+          "minimum": 8,
+          "maximum": 32,
+          "default": 16
+        },
+        "maxMembers": {
+          "type": "integer",
+          "minimum": 8,
+          "maximum": 32,
+          "default": 32
+        },
+        "maxActiveWorkers": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 32,
+          "description": "Optional hard cap on concurrent tasks for this team. Falls back to scheduler.maxActivePerTeam."
+        },
+        "baseBranch": {
+          "type": "string",
+          "minLength": 1,
+          "default": "main"
+        }
+      }
+    },
+    "reviewPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [],
+      "properties": {
+        "requirementsMinRounds": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 1
+        },
+        "requirementsMaxRounds": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 2
+        },
+        "codeMaxRounds": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 3
+        },
+        "maxRepairAttempts": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 2
+        },
+        "requiredReviewers": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,57 @@
+:root {
+  color-scheme: light dark;
+  --bg: light-dark(#f4f7fb, #0c1119);
+  --card: light-dark(#ffffff, #121a25);
+  --card-2: light-dark(#f7f9fd, #162131);
+  --line: light-dark(#dfe7f1, rgba(255, 255, 255, .09));
+  --text: light-dark(#172033, #eef3fb);
+  --muted: light-dark(#687892, #8b9ab0);
+  --indigo: light-dark(#4f46e5, #93a3ff);
+  --mint: light-dark(#0b8a60, #5ce3b1);
+  --amber: light-dark(#a85a05, #f6bd63);
+  --rose: light-dark(#bd2942, #fc8397);
+  font-family: "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; background: transparent; }
+body { padding: 10px; }
+.shell { max-width: 460px; margin: 0 auto; border: 1px solid var(--line); border-radius: 16px; overflow: hidden; background: var(--bg); box-shadow: 0 18px 50px rgba(0,0,0,.24); }
+header { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--line); background: color-mix(in srgb, var(--card) 88%, transparent); }
+.brand { width: 30px; height: 30px; border-radius: 10px; display: grid; place-items: center; font-weight: 800; font-size: 14px; color: #07101f; background: linear-gradient(145deg, #6d7cff, #22d3ee 60%, #a78bfa); }
+.title { min-width: 0; }
+.title b { display: block; font-size: 13px; letter-spacing: .1px; }
+.title small { display: block; margin-top: 2px; font-size: 10px; color: var(--muted); }
+.actions { margin-left: auto; display: flex; gap: 6px; }
+button { font: inherit; color: var(--text); background: var(--card-2); border: 1px solid var(--line); border-radius: 8px; padding: 6px 9px; font-size: 11px; cursor: pointer; }
+button:hover { border-color: var(--indigo); }
+button:disabled { opacity: .55; cursor: wait; }
+main { padding: 12px 14px 14px; }
+#status { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; font-size: 10.5px; color: var(--muted); }
+.live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--mint); box-shadow: 0 0 0 3px color-mix(in srgb, var(--mint) 18%, transparent); }
+.summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; margin-bottom: 10px; }
+.summary > div { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 8px; text-align: center; }
+.summary strong { display: block; font-size: 17px; line-height: 1.1; }
+.summary span { display: block; margin-top: 3px; font-size: 9px; color: var(--muted); }
+.team { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 10px; margin-top: 8px; }
+.team-head { display: flex; align-items: center; gap: 8px; }
+.team-head > div { min-width: 0; display: flex; align-items: center; gap: 7px; }
+.team-head b { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.phase { font-size: 9px; color: var(--indigo); background: color-mix(in srgb, var(--indigo) 12%, transparent); padding: 2px 5px; border-radius: 5px; text-transform: uppercase; }
+.team-count { margin-left: auto; color: var(--muted); font-size: 9.5px; white-space: nowrap; }
+.progress { height: 4px; border-radius: 99px; background: var(--card-2); margin: 9px 0 6px; overflow: hidden; }
+.progress span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--indigo), var(--mint)); }
+.meta { display: flex; justify-content: space-between; color: var(--muted); font-size: 9.5px; }
+.tasks { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 4px; }
+.task { display: flex; align-items: center; gap: 7px; min-width: 0; font-size: 10.5px; }
+.dot { width: 6px; height: 6px; border-radius: 50%; flex: 0 0 auto; background: var(--muted); }
+.dot.ok { background: var(--mint); }
+.dot.run { background: var(--amber); }
+.dot.bad { background: var(--rose); }
+.task-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.task-state { margin-left: auto; color: var(--muted); font-size: 9px; white-space: nowrap; }
+.empty { color: var(--muted); font-size: 10px; padding: 4px 0; }
+footer { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-top: 1px solid var(--line); background: var(--card); }
+footer button { width: 100%; color: #fff; background: var(--indigo); border-color: transparent; }
+#updated { color: var(--muted); font-size: 9px; white-space: nowrap; }
