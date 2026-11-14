@@ -5,7 +5,7 @@
 > **V0.2.13 及更早版本（Build line 0.4.0）的整套设计已废弃**：hook 注入 + 内存 patch fetch + 本地反向代理 + 邮件上报，这一路线不再维护，也不要再安装它的 hook。
 >
 > **V0.2.13 及之前的版本均不再使用。请改用 `zcode-community-retry` 插件 V0.4.5 及之后的版本**
-> （Zcode-Persistence 本地项目，基于 [`tangyixiao/zcode-community-retry`](https://github.com/tangyixiao/zcode-community-retry) 的 fork）。
+> （本仓库 [`projects/zcode-community-retry`](../zcode-community-retry/README.md)，基于 [`tangyixiao/zcode-community-retry`](https://github.com/tangyixiao/zcode-community-retry) 的 fork）。
 >
 > 新行为：任何失败（含 1113 余额不足、无权限等终止类错误）统一**最多重试 3 次**，之后停止，不再无限重试；由插件自己完成，不需要改写 ZCode 安装目录、不需要 hook、不需要本地代理。
 >

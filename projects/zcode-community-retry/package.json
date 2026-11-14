@@ -1,0 +1,14 @@
+{
+  "name": "zcode-community-retry-repository",
+  "private": true,
+  "version": "0.4.5",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "node --test --test-concurrency=1 test/community-idle.test.mjs test/community-inspector.test.mjs test/community-native-runtime.test.mjs test/community-plugin.test.mjs test/community-retry.test.mjs test/community-settings.test.mjs test/keeper-attach.test.mjs test/keeper.test.mjs",
+    "test:native": "node --test --test-concurrency=1 test/community-native.test.mjs test/force-keeper-native.test.mjs",
+    "test:cli": "node --test --test-concurrency=1 test/community-cli.test.mjs"
+  }
+}
