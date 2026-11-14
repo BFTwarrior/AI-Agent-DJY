@@ -1,0 +1,17 @@
+{
+  "name": "zcode-persistence-local",
+  "owner": {
+    "name": "BFTwarrior"
+  },
+  "plugins": [
+    {
+      "name": "zcode-community-retry",
+      "source": "./",
+      "version": "0.4.5",
+      "description": "本地改造版：任何失败（含余额不足、无权限）统一最多重试 3 次，之后不再重试",
+      "displayName": "Zcode Persistence",
+      "publisherType": "community",
+      "homepage": "https://github.com/tangyixiao/zcode-community-retry"
+    }
+  ]
+}

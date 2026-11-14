@@ -1,0 +1,28 @@
+{
+  "name": "tangyixiao-zcode-community",
+  "owner": {
+    "name": "tangyixiao"
+  },
+  "plugins": [
+    {
+      "name": "zcode-community-retry",
+      "source": "./community",
+      "version": "0.4.5",
+      "description": "非官方主聊天重试：任何失败统一最多重试 3 次，插件内设置间隔，Windows ZCode 用户范围与运行时配置路径校验",
+      "icon": "https://tangyixiao.github.io/dsh-plugin-market/assets/zcode-community-retry.webp",
+      "displayName": "Zcode Persistence",
+      "publisherType": "community",
+      "homepage": "https://github.com/tangyixiao/zcode-community-retry"
+    },
+    {
+      "name": "zcode-retry-keeper",
+      "source": "./keeper",
+      "version": "0.1.1",
+      "description": "Automatically keep ZCode Community Retry enabled in user scope.",
+      "icon": "https://tangyixiao.github.io/dsh-plugin-market/assets/zcode-community-retry.webp",
+      "displayName": "ZCode Retry Keeper",
+      "publisherType": "community",
+      "homepage": "https://github.com/tangyixiao/zcode-community-retry"
+    }
+  ]
+}

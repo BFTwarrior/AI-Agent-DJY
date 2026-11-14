@@ -1,0 +1,8 @@
+node_modules/
+*.tgz
+
+work/
+
+*.log
+
+__pycache__/
