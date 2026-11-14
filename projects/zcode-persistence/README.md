@@ -1,14 +1,43 @@
 # Zcode-Persistence
 
-A ZCode failure-retry toolkit: **suggests a retry when a tool fails**, **automatically
-resends when a model request fails**, plus a default-off **email report of session errors**.
+> ## ⛔ 已废弃 / DEPRECATED
+>
+> **V0.2.13 及更早版本（Build line 0.4.0）的整套设计已废弃**：hook 注入 + 内存 patch fetch + 本地反向代理 + 邮件上报，这一路线不再维护，也不要再安装它的 hook。
+>
+> **V0.2.13 及之前的版本均不再使用。请改用 `zcode-community-retry` 插件 V0.4.5 及之后的版本**
+> （Zcode-Persistence 本地项目，基于 [`tangyixiao/zcode-community-retry`](https://github.com/tangyixiao/zcode-community-retry) 的 fork）。
+>
+> 新行为：任何失败（含 1113 余额不足、无权限等终止类错误）统一**最多重试 3 次**，之后停止，不再无限重试；由插件自己完成，不需要改写 ZCode 安装目录、不需要 hook、不需要本地代理。
+>
+> **V0.2.13 and earlier are deprecated.** The hook + in-memory patch + local proxy design is retired.
+> Use the `zcode-community-retry` plugin **V0.4.5 or later** instead (every failure is retried at most
+> three times, then it stops). Everything below is kept for history only.
 
-- Version: V0.2.12 (released 2026-11-11)
+- Version: V0.2.13 (2026-11-11) — 最后版本 / last release of this deprecated design
 - Build line: 0.4.0
 - Applies to: ZCode Desktop (Windows), Python 3.9+
 - Dependencies: Python standard library only; proxy mode prefers certifi (if installed)
+- Status: **DEPRECATED** — replaced by `zcode-community-retry` plugin V0.4.5+
 
 ## Version history
+
+### V0.2.13: no slowdown, no proxy-only failures
+
+Three field-measured defects are fixed; each made "direct works, proxy breaks" true.
+
+- **Deterministic 4xx returns immediately.** A 400 used to be resent 20 times over 585 s.
+  It is now passed through after one upstream hit. 408/425/429 and 5xx still retry.
+- **Same latency as a direct connection.** `TCP_NODELAY` on both the client-facing and the
+  upstream socket; loopback measurement: direct 41.9 ms vs proxy 52.4 ms to first content
+  (repeated: 52.3 ms). `tools/selftest_speed.py` gates the proxy's extra overhead
+  (proxied minus direct) at 40 ms for the first byte and 30 ms for the first content
+  chunk, after discarding a warm-up round and asserting HTTP 200.
+- **Repeated early incomplete tool calls retry inside the proxy** (default 3, 3 s apart)
+  instead of resetting the client every time; anchor + RST remains the fallback once that
+  budget is spent.
+- Tool-call completeness validation now lives in `src/sse_tools.py` (pure functions).
+  An `arguments` payload sent as a JSON object instead of a string is no longer a false
+  incomplete call.
 
 ### V0.2.12: repeated early incomplete-tool recovery
 
